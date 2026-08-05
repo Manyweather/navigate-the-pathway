@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Focus = "records" | "courses" | "story" | "support" | "unsure";
 type Standing = "junior" | "senior" | "gap" | "unsure";
@@ -17,6 +17,31 @@ type Branch = {
   reason: string;
   nextMove: string;
   outcome: string;
+};
+
+type TransitionState = {
+  target: number;
+  kicker: string;
+  title: string;
+  copy: string;
+};
+
+const transitionMoments: Record<number, Omit<TransitionState, "target">> = {
+  5: {
+    kicker: "Landscape complete",
+    title: "Your route is taking shape.",
+    copy: "What you already carry is becoming a useful next move.",
+  },
+  7: {
+    kicker: "Experience captured",
+    title: "Memory becomes evidence.",
+    copy: "A few specific details can become reflection, learning, and clearer writing later.",
+  },
+  10: {
+    kicker: "First map complete",
+    title: "One next move, made visible.",
+    copy: "Reflection, compassion, and community now have a place in your plan.",
+  },
 };
 
 const focusOptions: { value: Focus; title: string; note: string }[] = [
@@ -118,8 +143,39 @@ function SectionHeading({ kicker, title, copy }: { kicker: string; title: string
   return <div className="section-heading"><p className="kicker">{kicker}</p><h1>{title}</h1><p className="lede">{copy}</p></div>;
 }
 
-function MiniCompass() {
-  return <span className="mini-compass" aria-hidden="true"><span /></span>;
+function RouteMark({ large = false, inverse = false }: { large?: boolean; inverse?: boolean }) {
+  return (
+    <span className={`route-mark ${large ? "route-mark--large" : ""} ${inverse ? "route-mark--inverse" : ""}`} aria-hidden="true">
+      <span className="route-mark__stem" />
+      <span className="route-mark__branch route-mark__branch--left" />
+      <span className="route-mark__branch route-mark__branch--right" />
+      <span className="route-mark__node route-mark__node--left" />
+      <span className="route-mark__node route-mark__node--center" />
+      <span className="route-mark__node route-mark__node--right" />
+      <span className="route-mark__waypoint" />
+    </span>
+  );
+}
+
+function BrandLockup() {
+  return (
+    <span className="brand-lockup">
+      <RouteMark />
+      <span className="brand-lockup__copy">
+        <strong>Navigate</strong>
+        <small>Pre-Med Pathways</small>
+      </span>
+    </span>
+  );
+}
+
+function MilestoneSignal({ label }: { label: string }) {
+  return (
+    <div className="milestone-signal">
+      <RouteMark />
+      <span><small>Navigate pathway</small><strong>{label}</strong></span>
+    </div>
+  );
 }
 
 export function JourneyExperience() {
@@ -141,6 +197,18 @@ export function JourneyExperience() {
   const [cohortMode, setCohortMode] = useState<string | null>(null);
   const [commitment, setCommitment] = useState<string | null>(null);
   const [reminder, setReminder] = useState("In 3 days");
+  const [transition, setTransition] = useState<TransitionState | null>(null);
+
+  useEffect(() => {
+    if (!transition) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => {
+      setStep(transition.target);
+      setTransition(null);
+      window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+    }, reducedMotion ? 120 : 880);
+    return () => window.clearTimeout(timer);
+  }, [transition]);
 
   const recommendedBranch = useMemo(() => {
     if (focus === "records" || records === "scattered" || records === "memory") return branches.evidence;
@@ -179,26 +247,54 @@ export function JourneyExperience() {
   const reset = () => {
     setStep(0); setFocus(null); setStanding(null); setCycle(null); setRecords(null); setExperiences([]); setBandwidth(null);
     setParticipation(null); setSupport(null); setSelectedBranch(null); setExperienceTitle(""); setExperienceWhen("");
-    setExperienceRole(""); setExperiencePeople(""); setExperienceLesson(""); setCohortMode(null); setCommitment(null); setReminder("In 3 days");
+    setExperienceRole(""); setExperiencePeople(""); setExperienceLesson(""); setCohortMode(null); setCommitment(null); setReminder("In 3 days"); setTransition(null);
   };
 
-  const next = () => { setStep((current) => Math.min(10, current + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const next = () => {
+    const target = Math.min(10, step + 1);
+    const moment = transitionMoments[target];
+    if (moment) {
+      setTransition({ target, ...moment });
+      return;
+    }
+    setStep(target);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const back = () => { setStep((current) => Math.max(0, current - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   return (
     <main className="site-shell">
       <div className="ambient ambient--one" aria-hidden="true" /><div className="ambient ambient--two" aria-hidden="true" />
+      {transition ? <div className="transition-screen" role="status" aria-live="polite">
+        <span className="transition-hex transition-hex--one" aria-hidden="true" /><span className="transition-hex transition-hex--two" aria-hidden="true" />
+        <div className="transition-screen__inner">
+          <RouteMark large inverse />
+          <p className="transition-kicker">{transition.kicker}</p>
+          <h2>{transition.title}</h2>
+          <p>{transition.copy}</p>
+          <span className="transition-line" aria-hidden="true"><i /><i /><i /><i /></span>
+          <small>Roseman University College of Medicine · concept experience</small>
+        </div>
+      </div> : null}
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="Navigate Pathways home"><MiniCompass /><span><strong>Navigate</strong><small>Pathways</small></span></a>
+        <a className="brand" href="#top" aria-label="Navigate Pre-Med Pathways home"><BrandLockup /></a>
         <span className="concept-label">Concept prototype</span>
       </header>
       {step < 10 ? <div className="progress-wrap" aria-label={`Journey progress: ${progress}%`}><div className="progress-meta"><span>Your first map</span><span>{progress}%</span></div><div className="progress-track"><span style={{ width: `${Math.max(4, progress)}%` }} /></div></div> : null}
 
       <div className="experience" id="top">
         {step === 0 ? <section className="screen welcome-screen" aria-labelledby="welcome-title">
-          <div className="hero-mark" aria-hidden="true"><span className="hero-mark__path" /><span className="hero-mark__point hero-mark__point--one" /><span className="hero-mark__point hero-mark__point--two" /><span className="hero-mark__point hero-mark__point--three" /></div>
-          <p className="kicker">Your path is already in motion</p><h1 id="welcome-title">You have already started your path to medicine.</h1>
-          <p className="lede">Let’s make what you’ve learned, contributed, and overcome visible—then choose one useful next move.</p>
+          <div className="institutional-line"><span>Roseman University</span><span>College of Medicine · concept experience</span></div>
+          <div className="welcome-intro">
+            <div className="welcome-intro__copy"><p className="kicker">Your path is already in motion</p><h1 id="welcome-title">You have already started your path to medicine.</h1><p className="lede">Let’s make what you’ve learned, contributed, and overcome visible—then choose one useful next move.</p></div>
+            <div className="opening-emblem" aria-label="Experience, evidence, support, and direction form one connected pathway">
+              <span className="brand-hex brand-hex--one" aria-hidden="true" /><span className="brand-hex brand-hex--two" aria-hidden="true" />
+              <RouteMark large />
+              <strong>What you carry matters.</strong>
+              <small>Experience · evidence · support · direction</small>
+            </div>
+          </div>
+          <p className="roseman-throughline">Inclusive learning. Shared support. Compassionate purpose.</p>
           <div className="prompt-block"><h2>Which sounds most like you today?</h2><div className="choice-stack">{focusOptions.map((option) => <ChoiceButton key={option.value} selected={focus === option.value} title={option.title} note={option.note} onClick={() => setFocus(option.value)} />)}</div></div>
           <button className="primary-button" type="button" disabled={!focus} onClick={next}>Begin my map <span aria-hidden="true">→</span></button><p className="microcopy">No score. No ranking. About 6 minutes.</p>
         </section> : null}
@@ -235,6 +331,7 @@ export function JourneyExperience() {
         </section> : null}
 
         {step === 5 ? <section className="screen map-screen" aria-labelledby="map-title">
+          <MilestoneSignal label="Route reveal" />
           <SectionHeading kicker="Your first map" title="You are not starting from zero." copy="Your route begins with what you already carry—and one next move that makes it more useful." />
           <div className="strength-map">
             <article><span className="map-number">01</span><p>What you already carry</p><h2 id="map-title">{experiences.includes("None yet") ? "Curiosity, course experience, and a place to begin" : `${experiences.slice(0, 3).join(", ")}${experiences.length > 3 ? ` +${experiences.length - 3}` : ""}`}</h2></article><span className="map-connector" aria-hidden="true">↓</span>
@@ -266,7 +363,7 @@ export function JourneyExperience() {
         </section> : null}
 
         {step === 7 ? <section className="screen reveal-screen" aria-labelledby="reveal-title">
-          <div className="reveal-badge" aria-hidden="true">✓</div><SectionHeading kicker="Artifact created" title="That was more than an hour count." copy="You just preserved three things your future application—and your future self—can use." />
+          <MilestoneSignal label="Evidence reveal" /><div className="reveal-badge" aria-hidden="true">✓</div><SectionHeading kicker="Artifact created" title="That was more than an hour count." copy="You just preserved three things your future application—and your future self—can use." />
           <div className="artifact-value-grid">
             <article><span>01</span><h2 id="reveal-title">An accurate activity record</h2><p>{experienceTitle} · {experienceWhen}</p></article>
             <article><span>02</span><h2>Evidence of learning</h2><p>{experienceLesson}</p></article>
@@ -297,6 +394,7 @@ export function JourneyExperience() {
         </section> : null}
 
         {step === 10 ? <section className="dashboard" aria-labelledby="dashboard-title">
+          <MilestoneSignal label="First map complete" />
           <div className="dashboard-hero"><div><p className="kicker">Your path · Today</p><h1 id="dashboard-title">You made your experience usable.</h1><p>Not because a meter filled up—because you turned experience into evidence and chose what comes next.</p></div><div className="completion-ring" aria-label="First map complete"><span>1</span><small>map built</small></div></div>
           <div className="dashboard-grid">
             <article className="dash-card dash-card--artifact"><p className="card-label">Saved artifact</p><h2>{experienceTitle}</h2><p>{experienceLesson}</p><span className="status-line"><b aria-hidden="true">✓</b> Reflection attached</span></article>

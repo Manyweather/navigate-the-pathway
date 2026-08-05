@@ -29,7 +29,10 @@ test("server-renders the self-guided opening experience", async () => {
 });
 
 test("keeps the critical safety, branching, and learning signals in the experience", async () => {
-  const source = await readFile(new URL("../app/journey-experience.tsx", import.meta.url), "utf8");
+  const [source, styles] = await Promise.all([
+    readFile(new URL("../app/journey-experience.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
   assert.match(source, /Private by default/);
   assert.match(source, /Never enter patient names or identifying details/);
   assert.match(source, /Why we suggested this/);
@@ -39,4 +42,12 @@ test("keeps the critical safety, branching, and learning signals in the experien
   assert.match(source, /Chart the Route/);
   assert.match(source, /Find the Story/);
   assert.match(source, /Build the Constellation/);
+  assert.match(source, /RouteMark/);
+  assert.match(source, /Roseman University College of Medicine · concept experience/);
+  assert.match(source, /Your route is taking shape/);
+  assert.match(source, /Memory becomes evidence/);
+  assert.match(styles, /--maroon: #791034/);
+  assert.match(styles, /--navy: #1b2a4a/);
+  assert.match(styles, /--teal: #1a6b6b/);
+  assert.match(styles, /\.transition-screen/);
 });
