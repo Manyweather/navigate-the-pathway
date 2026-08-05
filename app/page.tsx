@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { JourneyExperience } from "./journey-experience";
 
 export const metadata: Metadata = {
-  title: "Your path is already in motion",
+  title: "Your personalized premed pathway",
   description:
-    "Map what you already carry, turn experience into evidence, and choose a next move that fits your life.",
+    "Set up your premed pathway, explore practical learning stations, and choose one useful next action.",
 };
 
 export default function Home() {
