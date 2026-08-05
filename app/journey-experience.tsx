@@ -1,495 +1,518 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Focus = "records" | "courses" | "story" | "support" | "unsure";
-type Standing = "junior" | "senior" | "gap" | "unsure";
-type Records = "current" | "scattered" | "memory";
-type Cycle = "this-year" | "next-year" | "later" | "unsure";
-type Bandwidth = "steady" | "tight" | "overloaded";
-type Participation = "observe" | "react" | "respond" | "connect";
-type Support = "mapped" | "some" | "not-sure";
+type View = "welcome" | "trust" | "setup" | "map" | "mission" | "stamp" | "home" | "cohort" | "vault";
+type StationId = "courses" | "evidence" | "service" | "cohort" | "reflection" | "application";
 
-type Branch = {
+type MediaSource = { src: string; type: "video/mp4" | "video/webm" };
+
+export type MediaDefinition = {
   id: string;
   title: string;
-  eyebrow: string;
-  reason: string;
-  nextMove: string;
-  outcome: string;
+  sources: MediaSource[];
+  poster: string;
+  captions: string;
+  transcript: string;
+  duration: number;
+  autoplayOnce: boolean;
+  storyboard: string[];
+};
+
+type DiagramStep = { label: string; icon: string; hint: string };
+
+export type DiagramDefinition = {
+  id: string;
+  steps: DiagramStep[];
+  studentPrompt: string;
+  learningPrinciple: string;
+  completionState: string;
+};
+
+export type MissionDefinition = {
+  id: string;
+  title: string;
+  stationId: StationId;
+  requiredArtifact: string;
+  diagram: DiagramDefinition;
+  mediaId?: string;
+  stamp: string;
+};
+
+type Artifact = {
+  id: string;
+  missionId: string;
+  stationId: StationId;
+  label: string;
+  response: string;
+  savedAt: string;
+};
+
+export type ProgressState = {
+  artifacts: Artifact[];
+  stamps: StationId[];
+  suggestedStation: StationId;
+  diagramProgress: Record<string, number>;
+  viewedVideos: string[];
+  commitment: string | null;
+  reminderDate: string;
+  focus: Focus | null;
+  lastUpdate: string;
+  lastView: View;
 };
 
 type Station = {
-  id: string;
-  branchId: string;
+  id: StationId;
   name: string;
-  label: string;
+  short: string;
   icon: string;
-  action: string;
-  science: string;
+  missionId: string;
 };
 
-type TransitionState = {
-  target: number;
-  kicker: string;
-  title: string;
-  copy: string;
-};
+const STORAGE_KEY = "navigate.pipeline.progress.v1";
+const stationOrder: StationId[] = ["evidence", "reflection", "cohort", "courses", "service", "application"];
 
-const transitionMoments: Record<number, Omit<TransitionState, "target">> = {
-  5: {
-    kicker: "District unlocked",
-    title: "Your pathway map is ready.",
-    copy: "Tap a station to see one useful action and one practical tip.",
+const diagrams: Record<StationId, DiagramDefinition> = {
+  courses: {
+    id: "course-camp-diagram",
+    steps: [
+      { label: "Course status", icon: "01", hint: "Name what is complete or in progress." },
+      { label: "Uncertainty", icon: "?", hint: "Turn the fuzzy part into one question." },
+      { label: "Person to ask", icon: "@", hint: "Choose the person with the right context." },
+      { label: "Follow-up date", icon: "+", hint: "Give the question a next date." },
+    ],
+    studentPrompt: "Write the course question, who you will ask, and when.",
+    learningPrinciple: "Chunking reduces planning load.",
+    completionState: "Course question saved",
   },
-  7: {
-    kicker: "Experience captured",
-    title: "Memory becomes evidence.",
-    copy: "A few specific details can become reflection, learning, and clearer writing later.",
-  },
-  10: {
-    kicker: "Setup complete",
-    title: "Your pathway is ready.",
-    copy: "You saved one experience and chose one clear next action.",
-  },
-};
-
-const focusOptions: { value: Focus; title: string; note: string; icon: string }[] = [
-  { value: "records", title: "My records are scattered", note: "Organize what you have", icon: "▤" },
-  { value: "courses", title: "I need course direction", note: "Clarify what comes next", icon: "⌁" },
-  { value: "story", title: "Writing feels difficult", note: "Find meaning first", icon: "✎" },
-  { value: "support", title: "I need more support", note: "Connect at your pace", icon: "◎" },
-  { value: "unsure", title: "I am still exploring", note: "Start with curiosity", icon: "✦" },
-];
-
-const branches: Record<string, Branch> = {
   evidence: {
-    id: "evidence",
-    title: "Recover the Evidence",
-    eyebrow: "Recommended first route",
-    reason: "You already have experiences. Capturing one well gives you more value than chasing another hour today.",
-    nextMove: "Turn one experience into an application-ready record.",
-    outcome: "A reusable experience artifact",
+    id: "experience-vault-diagram",
+    steps: [
+      { label: "Activity", icon: "01", hint: "Name the role or setting." },
+      { label: "Specific moment", icon: "02", hint: "Zoom in on one scene." },
+      { label: "Learning", icon: "03", hint: "Name what shifted for you." },
+      { label: "Future use", icon: "04", hint: "Connect it to a future action." },
+    ],
+    studentPrompt: "Capture one moment, what it taught you, and how you may use it.",
+    learningPrinciple: "Retrieval preserves useful detail.",
+    completionState: "Experience evidence saved",
   },
-  course: {
-    id: "course",
-    title: "Chart the Route",
-    eyebrow: "Recommended first route",
-    reason: "Course clarity will make the rest of your planning more grounded and easier to sequence.",
-    nextMove: "Map one prerequisite and the question you still need answered.",
-    outcome: "A course-planning question",
+  service: {
+    id: "compassion-commons-diagram",
+    steps: [
+      { label: "Person and context", icon: "01", hint: "Center the person, not your role." },
+      { label: "Need or barrier", icon: "02", hint: "Notice what made access harder." },
+      { label: "Compassionate response", icon: "03", hint: "Describe listening plus action." },
+      { label: "Reflection", icon: "04", hint: "Name what you would carry forward." },
+    ],
+    studentPrompt: "Describe a barrier you noticed and the response it called for.",
+    learningPrinciple: "Self-explanation turns service into learning.",
+    completionState: "Compassion reflection saved",
   },
-  story: {
-    id: "story",
-    title: "Find the Story",
-    eyebrow: "Recommended first route",
-    reason: "You have material already. Reflection can reveal what an admissions reader cannot learn from hours alone.",
-    nextMove: "Name the moment that changed how you think or act.",
-    outcome: "A reflection seed",
+  cohort: {
+    id: "cohort-commons-diagram",
+    steps: [
+      { label: "Observe", icon: "01", hint: "Read and notice what helps." },
+      { label: "React", icon: "02", hint: "A signal of support is participation." },
+      { label: "Respond", icon: "03", hint: "Add one useful idea or question." },
+      { label: "Connect", icon: "04", hint: "Reach out only when it feels useful." },
+    ],
+    studentPrompt: "Choose your participation mode and one small action.",
+    learningPrinciple: "Belonging grows through low-risk steps.",
+    completionState: "Cohort action saved",
   },
-  explore: {
-    id: "explore",
-    title: "Explore the Next Door",
-    eyebrow: "Recommended first route",
-    reason: "You do not need a perfect plan yet. A small, informed exploration can tell you what deserves deeper commitment.",
-    nextMove: "Choose one setting or role to investigate.",
-    outcome: "A bounded exploration",
+  reflection: {
+    id: "reflection-studio-diagram",
+    steps: [
+      { label: "What happened", icon: "01", hint: "Describe one observable moment." },
+      { label: "Why it mattered", icon: "02", hint: "Name the meaning, tension, or change." },
+      { label: "What changes next", icon: "03", hint: "Choose how you will act differently." },
+    ],
+    studentPrompt: "Write the moment, its meaning, and what changes next.",
+    learningPrinciple: "Elaboration connects experience to action.",
+    completionState: "Reflection seed saved",
   },
-  quiet: {
-    id: "quiet",
-    title: "Quiet Start",
-    eyebrow: "Recommended first route",
-    reason: "Contribution does not have to begin with speaking. Observation and low-stakes responses can build belonging first.",
-    nextMove: "Observe one cohort exchange and save a useful idea.",
-    outcome: "A low-pressure connection",
-  },
-  constellation: {
-    id: "constellation",
-    title: "Build the Constellation",
-    eyebrow: "Recommended first route",
-    reason: "Premed progress is more sustainable when you can name who offers perspective, care, accountability, and expertise.",
-    nextMove: "Identify one person you can ask for a specific kind of support.",
-    outcome: "A support network",
-  },
-  sustainable: {
-    id: "sustainable",
-    title: "Make It Sustainable",
-    eyebrow: "Recommended first route",
-    reason: "Your current bandwidth matters. A smaller plan you can keep is stronger than an ambitious plan that drains you.",
-    nextMove: "Choose one habit small enough for a crowded week.",
-    outcome: "A realistic study-life experiment",
-  },
-  assemble: {
-    id: "assemble",
-    title: "Assemble the Evidence",
-    eyebrow: "Recommended first route",
-    reason: "Your application window is close enough that organizing evidence now will reduce pressure later.",
-    nextMove: "Connect one experience to a value, learning moment, and future action.",
-    outcome: "An application evidence block",
+  application: {
+    id: "application-outlook-diagram",
+    steps: [
+      { label: "Context", icon: "01", hint: "Give the reader only what they need." },
+      { label: "Contribution", icon: "02", hint: "Name what you actually did." },
+      { label: "Learning", icon: "03", hint: "Show how your thinking changed." },
+      { label: "Future direction", icon: "04", hint: "Connect learning to the physician you seek to become." },
+    ],
+    studentPrompt: "Build one evidence block using context, contribution, learning, and direction.",
+    learningPrinciple: "Structured recall lowers drafting effort.",
+    completionState: "Application evidence saved",
   },
 };
+
+const media: Record<string, MediaDefinition> = {
+  welcome: {
+    id: "welcome",
+    title: "Welcome from your Navigate Learning Coach",
+    sources: [],
+    poster: "/assets/navigate-learning-coach-v1.png",
+    captions: "/media/welcome.vtt",
+    transcript: "Welcome to Navigate. Your experiences already matter. This device keeps your private drafts. After setup, you will see a district built around your next useful action. You can skip any media and keep moving.",
+    duration: 36,
+    autoplayOnce: true,
+    storyboard: ["Your experiences matter.", "Drafts stay on this device.", "Choose one useful next move."],
+  },
+  reflection: {
+    id: "reflection",
+    title: "How an hour becomes evidence",
+    sources: [],
+    poster: "/assets/premed-pathway-illustration.png",
+    captions: "/media/reflection-studio.vtt",
+    transcript: "An hour is a record. A specific moment reveals what happened. Meaning shows why it mattered. A next action turns reflection into evidence you can use later.",
+    duration: 25,
+    autoplayOnce: true,
+    storyboard: ["Hour", "Specific moment", "Meaning", "Usable evidence"],
+  },
+  cohort: {
+    id: "cohort",
+    title: "Many ways to participate",
+    sources: [],
+    poster: "/assets/premed-district-map.png",
+    captions: "/media/cohort-commons.vtt",
+    transcript: "Cohort participation has more than one valid mode. Observe, react, respond, or connect. Start where your energy allows. You do not have to reach the final step to belong.",
+    duration: 24,
+    autoplayOnce: true,
+    storyboard: ["Observe", "React", "Respond", "Connect when useful"],
+  },
+};
+
+const missions: MissionDefinition[] = [
+  { id: "log-experience", title: "Recover one experience", stationId: "evidence", requiredArtifact: "Experience evidence", diagram: diagrams.evidence, mediaId: "reflection", stamp: "Evidence Keeper" },
+  { id: "course-question", title: "Resolve one course question", stationId: "courses", requiredArtifact: "Course question", diagram: diagrams.courses, stamp: "Route Clarifier" },
+  { id: "support-outreach", title: "Plan one support ask", stationId: "cohort", requiredArtifact: "Support outreach", diagram: diagrams.cohort, mediaId: "cohort", stamp: "Connection Builder" },
+  { id: "study-strategy", title: "Design one study experiment", stationId: "courses", requiredArtifact: "Study experiment", diagram: diagrams.courses, stamp: "Strategy Tester" },
+  { id: "cohort-participation", title: "Choose a cohort mode", stationId: "cohort", requiredArtifact: "Cohort action", diagram: diagrams.cohort, mediaId: "cohort", stamp: "Cohort Contributor" },
+  { id: "reflection-review", title: "Deepen one reflection", stationId: "reflection", requiredArtifact: "Reflection seed", diagram: diagrams.reflection, mediaId: "reflection", stamp: "Meaning Maker" },
+  { id: "service-reflection", title: "Notice compassion in action", stationId: "service", requiredArtifact: "Compassion reflection", diagram: diagrams.service, stamp: "Compassion Observer" },
+  { id: "application-evidence", title: "Build one evidence block", stationId: "application", requiredArtifact: "Application evidence", diagram: diagrams.application, stamp: "Evidence Architect" },
+];
 
 const stations: Station[] = [
-  {
-    id: "courses",
-    branchId: "course",
-    name: "Course Camp",
-    label: "Courses",
-    icon: "▤",
-    action: "Choose one prerequisite question to verify with an advisor.",
-    science: "Reduce cognitive load by solving one planning question at a time.",
-  },
-  {
-    id: "evidence",
-    branchId: "evidence",
-    name: "Experience Vault",
-    label: "Experiences",
-    icon: "⌕",
-    action: "Save one recent role while the details are still specific.",
-    science: "Frequent retrieval strengthens memory and gives future writing more detail.",
-  },
-  {
-    id: "service",
-    branchId: "explore",
-    name: "Compassion Commons",
-    label: "Service",
-    icon: "♡",
-    action: "Name who benefited, what you noticed, and what you would do differently.",
-    science: "Self-explanation turns an activity into transferable learning.",
-  },
-  {
-    id: "cohort",
-    branchId: "constellation",
-    name: "Cohort Commons",
-    label: "Support",
-    icon: "◎",
-    action: "Choose one low-pressure way to learn with classmates this week.",
-    science: "Belonging and social accountability make difficult goals easier to sustain.",
-  },
-  {
-    id: "reflection",
-    branchId: "story",
-    name: "Reflection Studio",
-    label: "Reflection",
-    icon: "✦",
-    action: "Capture one moment that changed how you think or act.",
-    science: "Elaboration connects a specific experience to a durable idea.",
-  },
-  {
-    id: "application",
-    branchId: "assemble",
-    name: "Application Outlook",
-    label: "Application",
-    icon: "⌁",
-    action: "Connect one experience to a value, a learning moment, and a future action.",
-    science: "Organizing evidence into small chunks lowers the effort of drafting later.",
-  },
+  { id: "courses", name: "Course Camp", short: "Clarify", icon: "C", missionId: "course-question" },
+  { id: "evidence", name: "Experience Vault", short: "Capture", icon: "E", missionId: "log-experience" },
+  { id: "service", name: "Compassion Commons", short: "Notice", icon: "♥", missionId: "service-reflection" },
+  { id: "cohort", name: "Cohort Commons", short: "Connect", icon: "O", missionId: "cohort-participation" },
+  { id: "reflection", name: "Reflection Studio", short: "Reflect", icon: "R", missionId: "reflection-review" },
+  { id: "application", name: "Application Outlook", short: "Assemble", icon: "A", missionId: "application-evidence" },
 ];
 
-const branchStation: Record<string, string> = {
-  evidence: "evidence",
-  course: "courses",
-  story: "reflection",
-  explore: "service",
-  quiet: "cohort",
-  constellation: "cohort",
-  sustainable: "reflection",
-  assemble: "application",
+const focusOptions: { id: Focus; label: string; missionId: string; icon: string }[] = [
+  { id: "records", label: "Organize experiences", missionId: "log-experience", icon: "E" },
+  { id: "courses", label: "Clarify courses", missionId: "course-question", icon: "C" },
+  { id: "story", label: "Find my story", missionId: "reflection-review", icon: "R" },
+  { id: "support", label: "Build support", missionId: "support-outreach", icon: "O" },
+  { id: "unsure", label: "Explore a starting point", missionId: "service-reflection", icon: "?" },
+];
+
+const commitmentOptions = [
+  { id: "log-experience", label: "Log an experience", icon: "E" },
+  { id: "course-question", label: "Map a course question", icon: "C" },
+  { id: "support-outreach", label: "Plan support outreach", icon: "O" },
+  { id: "study-strategy", label: "Try a study strategy", icon: "S" },
+  { id: "cohort-participation", label: "Join a cohort prompt", icon: "+" },
+  { id: "reflection-review", label: "Review a reflection", icon: "R" },
+];
+
+const emptyProgress: ProgressState = {
+  artifacts: [],
+  stamps: [],
+  suggestedStation: "evidence",
+  diagramProgress: {},
+  viewedVideos: [],
+  commitment: null,
+  reminderDate: "In 3 days",
+  focus: null,
+  lastUpdate: "",
+  lastView: "welcome",
 };
 
-const experienceOptions = ["Clinical exposure", "Community service", "Research", "Leadership", "Employment", "Shadowing", "Caregiving", "None yet"];
+function MediaMoment({ definition, viewed, onViewed }: { definition: MediaDefinition; viewed: boolean; onViewed: (id: string) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [mediaFailed, setMediaFailed] = useState(definition.sources.length === 0);
+  const [frame, setFrame] = useState(0);
 
-const experienceIcons: Record<string, string> = {
-  "Clinical exposure": "+",
-  "Community service": "♥",
-  Research: "⌬",
-  Leadership: "↑",
-  Employment: "▣",
-  Shadowing: "◉",
-  Caregiving: "♡",
-  "None yet": "○",
-};
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => {
+      if (definition.autoplayOnce && !viewed && !reduced) setPlaying(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [definition.autoplayOnce, viewed]);
 
-const commitments = [
-  ["Log another experience", "Keep your evidence trail alive."],
-  ["Map one course question", "Turn uncertainty into a question you can act on."],
-  ["Contact one support person", "Ask for one specific kind of help."],
-  ["Try one study strategy", "Run a small experiment, then reflect."],
-  ["Join a cohort prompt", "Participate at the level that fits today."],
-  ["Review this reflection", "Return with fresh eyes before you reuse it."],
-] as const;
+  useEffect(() => {
+    if (!playing || !mediaFailed) return;
+    const timer = window.setInterval(() => {
+      setFrame((current) => {
+        if (current >= definition.storyboard.length - 1) {
+          window.clearInterval(timer);
+          setPlaying(false);
+          onViewed(definition.id);
+          return current;
+        }
+        return current + 1;
+      });
+    }, 1600);
+    return () => window.clearInterval(timer);
+  }, [definition.id, definition.storyboard.length, mediaFailed, onViewed, playing]);
 
-function ChoiceButton({ selected, title, note, icon, onClick }: { selected: boolean; title: string; note?: string; icon?: string; onClick: () => void }) {
+  const replay = () => {
+    setFrame(0);
+    setPlaying(true);
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      void videoRef.current.play();
+    }
+  };
+
+  const togglePlayback = () => {
+    if (videoRef.current && !mediaFailed) {
+      if (videoRef.current.paused) void videoRef.current.play();
+      else videoRef.current.pause();
+    }
+    setPlaying((current) => !current);
+  };
+
   return (
-    <button className={`choice ${selected ? "choice--selected" : ""}`} type="button" aria-pressed={selected} onClick={onClick}>
-      <span className={`choice__marker ${icon ? "choice__marker--icon" : ""}`} aria-hidden="true">{selected ? "✓" : icon ?? ""}</span>
-      <span><strong>{title}</strong>{note ? <small>{note}</small> : null}</span>
-    </button>
+    <section className="media-moment" aria-label={definition.title}>
+      <div className={`media-stage ${playing ? "media-stage--playing" : ""}`}>
+        {!mediaFailed ? (
+          <video ref={videoRef} autoPlay={definition.autoplayOnce && !viewed} muted={muted} playsInline poster={definition.poster} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); onViewed(definition.id); }} onError={() => setMediaFailed(true)}>
+            {definition.sources.map((source) => <source key={source.src} src={source.src} type={source.type} />)}
+            <track default kind="captions" src={definition.captions} srcLang="en" label="English" />
+          </video>
+        ) : <img src={definition.poster} alt="" />}
+        <div className="media-caption" aria-live="polite"><span>{definition.storyboard[frame]}</span></div>
+        <span className="media-duration">{definition.duration}s</span>
+      </div>
+      <div className="media-controls" aria-label="Media controls">
+        <button type="button" onClick={togglePlayback}>{playing ? "Pause" : "Play"}</button>
+        <button type="button" onClick={replay}>Replay</button>
+        <button type="button" disabled={mediaFailed} onClick={() => { setMuted((current) => !current); if (videoRef.current) videoRef.current.muted = !muted; }}>{muted ? "Sound" : "Mute"}</button>
+        <button type="button" onClick={() => { setPlaying(false); videoRef.current?.pause(); onViewed(definition.id); }}>Skip</button>
+        <button type="button" aria-expanded={transcriptOpen} onClick={() => setTranscriptOpen((current) => !current)}>Transcript</button>
+      </div>
+      {transcriptOpen ? <p className="media-transcript">{definition.transcript}</p> : null}
+      {mediaFailed ? <p className="media-ready-note">Visual preview shown. Narration will be added after audio approval.</p> : null}
+    </section>
   );
 }
 
-function SectionHeading({ kicker, title, copy }: { kicker: string; title: string; copy?: string }) {
-  return <div className="section-heading"><p className="kicker">{kicker}</p><h1>{title}</h1>{copy ? <p className="lede">{copy}</p> : null}</div>;
-}
-
-function BrandLockup() {
+function StationDiagram({ definition, revealed, onReveal }: { definition: DiagramDefinition; revealed: number; onReveal: (step: number) => void }) {
   return (
-    <span className="brand-lockup">
-      <img src="/assets/navigate-pipeline-roseman.png" alt="" />
-    </span>
-  );
-}
-
-function MilestoneSignal({ label }: { label: string }) {
-  return (
-    <div className="milestone-signal">
-      <span className="milestone-signal__icon" aria-hidden="true">✓</span>
-      <span><small>Navigate</small><strong>{label}</strong></span>
+    <div className="diagram" aria-label="Tap through learning diagram">
+      <div className="diagram-track">
+        {definition.steps.map((item, index) => {
+          const available = index <= revealed + 1;
+          const isRevealed = index <= revealed;
+          return (
+            <button key={item.label} type="button" className={`diagram-step ${isRevealed ? "diagram-step--revealed" : ""}`} disabled={!available} aria-pressed={isRevealed} onClick={() => onReveal(index)}>
+              <span>{item.icon}</span><strong>{item.label}</strong>{isRevealed ? <small>{item.hint}</small> : <small>Tap to reveal</small>}
+            </button>
+          );
+        })}
+      </div>
+      <div className="science-chip"><span aria-hidden="true">◎</span><p><b>Learning move</b>{definition.learningPrinciple}</p></div>
     </div>
   );
 }
 
-function AppDock({ step }: { step: number }) {
-  const active = step >= 8 ? "cohort" : step >= 5 ? "path" : "setup";
-  return (
-    <nav className="app-dock" aria-label="Navigate sections">
-      <span className={active === "setup" ? "app-dock__active" : ""}><b aria-hidden="true">◌</b>Setup</span>
-      <span className={active === "path" ? "app-dock__active" : ""}><b aria-hidden="true">⌁</b>Path</span>
-      <span className={active === "cohort" ? "app-dock__active" : ""}><b aria-hidden="true">◎</b>Cohort</span>
-      <span><b aria-hidden="true">▤</b>Vault</span>
-    </nav>
-  );
+function BrandLockup() {
+  return <span className="brand-lockup"><img src="/assets/navigate-pipeline-roseman.png" alt="Navigate the Pipeline" /></span>;
+}
+
+function AppDock({ view, enabled, navigate }: { view: View; enabled: boolean; navigate: (view: View) => void }) {
+  const items: { id: View; label: string; icon: string }[] = [
+    { id: "home", label: "Home", icon: "H" },
+    { id: "map", label: "Map", icon: "M" },
+    { id: "cohort", label: "Cohort", icon: "C" },
+    { id: "vault", label: "Vault", icon: "V" },
+  ];
+  return <nav className="app-dock" aria-label="App destinations">{items.map((item) => <button key={item.id} type="button" disabled={!enabled} className={view === item.id ? "app-dock__active" : ""} onClick={() => navigate(item.id)}><b aria-hidden="true">{item.icon}</b><span>{item.label}</span></button>)}</nav>;
 }
 
 export function JourneyExperience() {
-  const [step, setStep] = useState(0);
+  const [view, setView] = useState<View>("welcome");
   const [focus, setFocus] = useState<Focus | null>(null);
-  const [standing, setStanding] = useState<Standing | null>(null);
-  const [cycle, setCycle] = useState<Cycle | null>(null);
-  const [records, setRecords] = useState<Records | null>(null);
-  const [experiences, setExperiences] = useState<string[]>([]);
-  const [bandwidth, setBandwidth] = useState<Bandwidth | null>(null);
-  const [participation, setParticipation] = useState<Participation | null>(null);
-  const [support, setSupport] = useState<Support | null>(null);
-  const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
-  const [experienceTitle, setExperienceTitle] = useState("");
-  const [experienceWhen, setExperienceWhen] = useState("");
-  const [experienceRole, setExperienceRole] = useState("");
-  const [experiencePeople, setExperiencePeople] = useState("");
-  const [experienceLesson, setExperienceLesson] = useState("");
-  const [cohortMode, setCohortMode] = useState<string | null>(null);
-  const [commitment, setCommitment] = useState<string | null>(null);
-  const [reminder, setReminder] = useState("In 3 days");
-  const [transition, setTransition] = useState<TransitionState | null>(null);
+  const [activeStationId, setActiveStationId] = useState<StationId>("evidence");
+  const [activeMissionId, setActiveMissionId] = useState("log-experience");
+  const [response, setResponse] = useState("");
+  const [progress, setProgress] = useState<ProgressState>(emptyProgress);
+  const [resumeProgress, setResumeProgress] = useState<ProgressState | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [lastStamp, setLastStamp] = useState("");
+
+  const activeStation = stations.find((station) => station.id === activeStationId) ?? stations[1];
+  const activeMission = missions.find((mission) => mission.id === activeMissionId) ?? missions[0];
+  const diagramRevealed = progress.diagramProgress[activeMission.diagram.id] ?? -1;
+  const diagramComplete = diagramRevealed >= activeMission.diagram.steps.length - 1;
 
   useEffect(() => {
-    if (!transition) return;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timer = window.setTimeout(() => {
-      setStep(transition.target);
-      setTransition(null);
-      window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
-    }, reducedMotion ? 120 : 880);
-    return () => window.clearTimeout(timer);
-  }, [transition]);
-
-  const recommendedBranch = useMemo(() => {
-    if (focus === "records" || records === "scattered" || records === "memory") return branches.evidence;
-    if (focus === "courses") return branches.course;
-    if (focus === "story") return branches.story;
-    if (focus === "support" || support === "not-sure") return branches.constellation;
-    if (focus === "unsure" || experiences.length <= 1) return branches.explore;
-    if (bandwidth === "overloaded") return branches.sustainable;
-    if (participation === "observe") return branches.quiet;
-    if (cycle === "this-year") return branches.assemble;
-    return branches.story;
-  }, [bandwidth, cycle, experiences.length, focus, participation, records, support]);
-
-  const activeBranch = branches[selectedBranch ?? recommendedBranch.id];
-  const recommendedStationId = branchStation[recommendedBranch.id];
-  const activeStation = stations.find((station) => station.id === branchStation[activeBranch.id]) ?? stations[0];
-  const progress = Math.min(100, Math.round((step / 10) * 100));
-
-  const toggleExperience = (value: string) => {
-    setExperiences((current) => {
-      if (value === "None yet") return current.includes(value) ? [] : [value];
-      const withoutNone = current.filter((item) => item !== "None yet");
-      return withoutNone.includes(value) ? withoutNone.filter((item) => item !== value) : [...withoutNone, value];
-    });
-  };
-
-  const loadExample = () => {
-    setExperienceTitle("Community food access volunteer");
-    setExperienceWhen("Spring semester · about 42 hours");
-    setExperienceRole("Welcomed families, restocked staples, and helped with check-in.");
-    setExperiencePeople("Families arriving after work and the volunteers coordinating intake.");
-    setExperienceLesson("I noticed that the check-in process was difficult for people arriving late. I learned to ask what would make access easier before assuming I knew the answer.");
-  };
-
-  const artifactComplete = experienceTitle.trim() && experienceWhen.trim() && experienceRole.trim() && experiencePeople.trim() && experienceLesson.trim();
-
-  const reset = () => {
-    setStep(0); setFocus(null); setStanding(null); setCycle(null); setRecords(null); setExperiences([]); setBandwidth(null);
-    setParticipation(null); setSupport(null); setSelectedBranch(null); setExperienceTitle(""); setExperienceWhen("");
-    setExperienceRole(""); setExperiencePeople(""); setExperienceLesson(""); setCohortMode(null); setCommitment(null); setReminder("In 3 days"); setTransition(null);
-  };
-
-  const next = () => {
-    const target = Math.min(10, step + 1);
-    const moment = transitionMoments[target];
-    if (moment) {
-      setTransition({ target, ...moment });
-      return;
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (saved) setResumeProgress({ ...emptyProgress, ...JSON.parse(saved) } as ProgressState);
+    } catch {
+      window.localStorage.removeItem(STORAGE_KEY);
     }
-    setStep(target);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || view === "welcome") return;
+    const snapshot = { ...progress, focus, lastUpdate: new Date().toISOString(), lastView: view };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+  }, [focus, hydrated, progress, view]);
+
+  const suggestedStation = stations.find((station) => station.id === progress.suggestedStation) ?? stations[1];
+  const completion = Math.round((progress.stamps.length / stations.length) * 100);
+
+  const markVideoViewed = (id: string) => setProgress((current) => current.viewedVideos.includes(id) ? current : { ...current, viewedVideos: [...current.viewedVideos, id] });
+
+  const scrollTop = () => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  const navigate = (nextView: View) => { setView(nextView); scrollTop(); };
+
+  const beginMission = (missionId: string) => {
+    const mission = missions.find((item) => item.id === missionId) ?? missions[0];
+    setActiveMissionId(mission.id);
+    setActiveStationId(mission.stationId);
+    setResponse("");
+    navigate("mission");
   };
-  const back = () => { setStep((current) => Math.max(0, current - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); };
+
+  const openStation = (station: Station) => {
+    setActiveStationId(station.id);
+  };
+
+  const revealDiagram = (index: number) => {
+    setProgress((current) => ({ ...current, diagramProgress: { ...current.diagramProgress, [activeMission.diagram.id]: Math.max(current.diagramProgress[activeMission.diagram.id] ?? -1, index) } }));
+  };
+
+  const completeMission = () => {
+    if (!diagramComplete || !response.trim()) return;
+    const savedAt = new Date().toISOString();
+    const artifact: Artifact = { id: `${activeMission.id}-${savedAt}`, missionId: activeMission.id, stationId: activeMission.stationId, label: activeMission.requiredArtifact, response: response.trim(), savedAt };
+    setProgress((current) => {
+      const stamps = current.stamps.includes(activeMission.stationId) ? current.stamps : [...current.stamps, activeMission.stationId];
+      const suggestedStation = stationOrder.find((id) => !stamps.includes(id)) ?? "evidence";
+      return { ...current, artifacts: [artifact, ...current.artifacts], stamps, suggestedStation, lastUpdate: savedAt };
+    });
+    setLastStamp(activeMission.stamp);
+    navigate("stamp");
+  };
+
+  const continuePathway = () => {
+    if (!resumeProgress) return;
+    setProgress(resumeProgress);
+    setFocus(resumeProgress.focus);
+    setActiveStationId(resumeProgress.suggestedStation);
+    const safeView = ["home", "map", "cohort", "vault"].includes(resumeProgress.lastView) ? resumeProgress.lastView : "home";
+    navigate(safeView);
+  };
+
+  const restartSetup = () => {
+    setFocus(null);
+    setResumeProgress(null);
+    setView("trust");
+    scrollTop();
+  };
+
+  const clearDeviceData = () => {
+    window.localStorage.removeItem(STORAGE_KEY);
+    setProgress(emptyProgress);
+    setResumeProgress(null);
+    setFocus(null);
+    setActiveStationId("evidence");
+    setActiveMissionId("log-experience");
+    setResponse("");
+    setView("welcome");
+    scrollTop();
+  };
+
+  const finishSetup = () => {
+    const option = focusOptions.find((item) => item.id === focus) ?? focusOptions[0];
+    const mission = missions.find((item) => item.id === option.missionId) ?? missions[0];
+    setActiveStationId(mission.stationId);
+    setProgress((current) => ({ ...current, focus, commitment: mission.id, suggestedStation: mission.stationId }));
+    navigate("map");
+  };
+
+  const selectedCommitment = progress.commitment ?? "log-experience";
+  const selectedMission = useMemo(() => missions.find((mission) => mission.id === selectedCommitment) ?? missions[0], [selectedCommitment]);
 
   return (
     <main className="site-shell">
       <div className="ambient ambient--one" aria-hidden="true" /><div className="ambient ambient--two" aria-hidden="true" />
-      {transition ? <div className="transition-screen" role="status" aria-live="polite">
-        <span className="transition-hex transition-hex--one" aria-hidden="true" /><span className="transition-hex transition-hex--two" aria-hidden="true" />
-        <div className="transition-screen__inner">
-          <img className="transition-logo" src="/assets/navigate-pipeline-roseman.png" alt="" />
-          <p className="transition-kicker">{transition.kicker}</p>
-          <h2>{transition.title}</h2>
-          <p>{transition.copy}</p>
-          <span className="transition-line" aria-hidden="true"><i /><i /><i /><i /></span>
-          <small>Roseman University College of Medicine · concept experience</small>
-        </div>
-      </div> : null}
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Navigate Pre-Med Pathways home"><BrandLockup /></a>
-        <span className="concept-label">Concept prototype</span>
-      </header>
-      {step < 10 ? <div className="progress-wrap" aria-label={`Pathway setup: ${progress}%`}><div className="progress-meta"><span>Pathway setup</span><span>{progress}%</span></div><div className="progress-track"><span style={{ width: `${Math.max(4, progress)}%` }} /></div></div> : null}
+      <header className="topbar"><button className="brand-button" type="button" onClick={() => view === "welcome" ? scrollTop() : navigate("home")}><BrandLockup /></button><span className="concept-label">Interactive concept</span></header>
 
       <div className="experience" id="top">
-        {step === 0 ? <section className="screen welcome-screen" aria-labelledby="welcome-title">
-          <div className="institutional-line"><span>Roseman University</span><span>College of Medicine · concept experience</span></div>
-          <img className="welcome-logo" src="/assets/navigate-pipeline-roseman.png" alt="Navigate the Pipeline" />
-          <div className="welcome-visual">
-            <div className="welcome-visual__copy"><p className="kicker">Personalized premed support</p><h1 id="welcome-title">Start with what you already have.</h1><p className="lede">Answer a few quick questions. Get one useful place to begin.</p></div>
-            <img src="/assets/premed-pathway-illustration.png" alt="Premed students studying, serving, researching, reflecting, and supporting each other" />
+        {view === "welcome" ? <section className="screen welcome-screen" aria-labelledby="welcome-title">
+          <div className="institutional-line"><span>Roseman University</span><span>College of Medicine concept</span></div>
+          <div className="welcome-grid">
+            <div className="welcome-copy"><p className="kicker">Navigate Learning Coach</p><h1 id="welcome-title">Your experiences already matter.</h1><p className="lede">Build one useful piece at a time.</p><button className="primary-button" type="button" onClick={() => navigate("trust")}>Begin setup <span aria-hidden="true">→</span></button></div>
+            <MediaMoment definition={media.welcome} viewed={progress.viewedVideos.includes("welcome")} onViewed={markVideoViewed} />
           </div>
-          <div className="prompt-block prompt-card"><div className="prompt-card__title"><span>1</span><h2>What feels hardest today?</h2></div><div className="choice-stack focus-grid">{focusOptions.map((option) => <ChoiceButton key={option.value} selected={focus === option.value} title={option.title} note={option.note} icon={option.icon} onClick={() => setFocus(option.value)} />)}</div></div>
-          <button className="primary-button primary-button--wide" type="button" disabled={!focus} onClick={next}>Set up my pathway <span aria-hidden="true">→</span></button><p className="microcopy">About 6 minutes · Private by default</p>
+          {resumeProgress ? <div className="resume-card"><div><span>Saved on this device</span><strong>{resumeProgress.artifacts.length} artifacts · {resumeProgress.stamps.length} stamps</strong></div><div><button className="primary-button" type="button" onClick={continuePathway}>Continue my pathway</button><button className="text-button" type="button" onClick={restartSetup}>Start over</button></div></div> : null}
         </section> : null}
 
-        {step === 1 ? <section className="screen" aria-labelledby="trust-title">
-          <SectionHeading kicker="Before you begin" title="Three things to know." copy="This is a preparation space, not an admissions prediction." />
+        {view === "trust" ? <section className="screen compact-screen" aria-labelledby="trust-title">
+          <div className="screen-heading"><p className="kicker">Before setup</p><h1 id="trust-title">Private by default.</h1><p>Drafts stay on this device.</p></div>
           <div className="trust-grid">
-            <article className="trust-card"><span className="trust-icon" aria-hidden="true">⌾</span><h2 id="trust-title">You control sharing</h2><p>Reflections stay private until you choose otherwise.</p></article>
-            <article className="trust-card"><span className="trust-icon" aria-hidden="true">⌁</span><h2>Coaching only</h2><p>Navigate does not predict admission outcomes.</p></article>
-            <article className="trust-card trust-card--warm"><span className="trust-icon" aria-hidden="true">♡</span><h2>Protect people</h2><p>Never enter patient names or identifying details.</p></article>
-          </div><div className="action-row"><button className="text-button" type="button" onClick={back}>Back</button><button className="primary-button" type="button" onClick={next}>I understand <span aria-hidden="true">→</span></button></div>
-        </section> : null}
-
-        {step === 2 ? <section className="screen" aria-labelledby="stage-title">
-          <SectionHeading kicker="Quick setup · 1 of 3" title="Where are you right now?" copy="There is no behind here." />
-          <div className="prompt-block"><h2 id="stage-title">Current stage</h2><div className="compact-grid">{(["junior", "senior", "gap", "unsure"] as Standing[]).map((value) => <ChoiceButton key={value} selected={standing === value} title={({ junior: "Junior", senior: "Senior", gap: "Gap or bridge year", unsure: "I’m not sure" } as Record<Standing, string>)[value]} onClick={() => setStanding(value)} />)}</div></div>
-          <div className="prompt-block"><h2>When might you apply?</h2><div className="compact-grid">{(["this-year", "next-year", "later", "unsure"] as Cycle[]).map((value) => <ChoiceButton key={value} selected={cycle === value} title={({ "this-year": "This cycle", "next-year": "Next cycle", later: "Later", unsure: "I’m not sure" } as Record<Cycle, string>)[value]} onClick={() => setCycle(value)} />)}</div></div>
-          <div className="action-row"><button className="text-button" type="button" onClick={back}>Back</button><button className="primary-button" type="button" disabled={!standing || !cycle} onClick={next}>Continue <span aria-hidden="true">→</span></button></div>
-        </section> : null}
-
-        {step === 3 ? <section className="screen" aria-labelledby="evidence-title">
-          <SectionHeading kicker="Quick setup · 2 of 3" title="What is already part of your journey?" copy="Paid, unpaid, and informal roles count." />
-          <div className="prompt-block"><h2 id="evidence-title">My records are</h2><div className="compact-grid compact-grid--three">{(["current", "scattered", "memory"] as Records[]).map((value) => <ChoiceButton key={value} selected={records === value} title={({ current: "Mostly current", scattered: "Scattered", memory: "Mostly in memory" } as Record<Records, string>)[value]} onClick={() => setRecords(value)} />)}</div></div>
-          <div className="prompt-block"><h2>Select your experiences</h2><div className="tag-grid experience-tile-grid">{experienceOptions.map((value) => <button className={`tag-choice experience-tile ${experiences.includes(value) ? "tag-choice--selected" : ""}`} type="button" aria-pressed={experiences.includes(value)} key={value} onClick={() => toggleExperience(value)}><span aria-hidden="true">{experienceIcons[value]}</span>{value}</button>)}</div></div>
-          <div className="action-row"><button className="text-button" type="button" onClick={back}>Back</button><button className="primary-button" type="button" disabled={!records || experiences.length === 0} onClick={next}>Continue <span aria-hidden="true">→</span></button></div>
-        </section> : null}
-
-        {step === 4 ? <section className="screen" aria-labelledby="rhythm-title">
-          <SectionHeading kicker="Quick setup · 3 of 3" title="How should Navigate support you?" copy="Choose what fits today. You can change it later." />
-          <div className="prompt-block"><h2 id="rhythm-title">My bandwidth</h2><div className="compact-grid compact-grid--three">{(["steady", "tight", "overloaded"] as Bandwidth[]).map((value) => <ChoiceButton key={value} selected={bandwidth === value} title={({ steady: "Steady", tight: "Tight", overloaded: "Overloaded" } as Record<Bandwidth, string>)[value]} onClick={() => setBandwidth(value)} />)}</div></div>
-          <div className="prompt-block"><h2>In a new group</h2><div className="compact-grid">{(["observe", "react", "respond", "connect"] as Participation[]).map((value) => <ChoiceButton key={value} selected={participation === value} title={({ observe: "I observe first", react: "I react", respond: "I use a prompt", connect: "I connect 1:1" } as Record<Participation, string>)[value]} onClick={() => setParticipation(value)} />)}</div></div>
-          <div className="prompt-block"><h2>My support system</h2><div className="compact-grid compact-grid--three">{(["mapped", "some", "not-sure"] as Support[]).map((value) => <ChoiceButton key={value} selected={support === value} title={({ mapped: "Clear", some: "Partly there", "not-sure": "Hard to name" } as Record<Support, string>)[value]} onClick={() => setSupport(value)} />)}</div></div>
-          <div className="action-row"><button className="text-button" type="button" onClick={back}>Back</button><button className="primary-button" type="button" disabled={!bandwidth || !participation || !support} onClick={next}>Show my starting point <span aria-hidden="true">→</span></button></div>
-        </section> : null}
-
-        {step === 5 ? <section className="screen map-screen" aria-labelledby="map-title">
-          <MilestoneSignal label="Premed district unlocked" />
-          <SectionHeading kicker="Your pathway map" title="Choose a station." copy="Swipe to explore. Tap any station for an action and a practical learning tip." />
-          <div className="map-recommendation"><span aria-hidden="true">✦</span><p><strong>Suggested first stop:</strong> {stations.find((station) => station.id === recommendedStationId)?.name}</p></div>
-          <div className="district-map" aria-label="Interactive map of premed development stations">
-            <div className="district-map__canvas">
-              <img src="/assets/premed-district-map.png" alt="Illustrated premed pathway with connected learning stations" />
-              {stations.map((station) => <button
-                key={station.id}
-                type="button"
-                className={`station station--${station.id} ${activeStation.id === station.id ? "station--active" : ""} ${recommendedStationId === station.id ? "station--recommended" : ""}`}
-                aria-pressed={activeStation.id === station.id}
-                onClick={() => setSelectedBranch(station.branchId)}
-              ><span aria-hidden="true">{station.icon}</span><strong>{station.label}</strong></button>)}
-            </div>
+            <article><span>01</span><strong>You choose what to share.</strong></article>
+            <article><span>02</span><strong>No admissions predictions.</strong></article>
+            <article><span>03</span><strong>No identifying patient details.</strong></article>
           </div>
-          <article className="station-sheet" id="map-title" aria-live="polite">
-            <div className="station-sheet__title"><span aria-hidden="true">{activeStation.icon}</span><div><p>{activeStation.id === recommendedStationId ? "Recommended first stop" : "Explore this station"}</p><h2>{activeStation.name}</h2></div></div>
-            <div className="station-sheet__grid"><div><small>Try this</small><p>{activeStation.action}</p></div><div><small>Why it works</small><p>{activeStation.science}</p></div></div>
-          </article>
-          <div className="action-row"><button className="text-button" type="button" onClick={back}>Back</button><button className="primary-button" type="button" onClick={next}>Enter {activeStation.name} <span aria-hidden="true">→</span></button></div>
+          <div className="action-row"><button className="text-button" type="button" onClick={() => navigate("welcome")}>Back</button><button className="primary-button" type="button" onClick={() => navigate("setup")}>I understand</button></div>
         </section> : null}
 
-        {step === 6 ? <section className="screen" aria-labelledby="quest-title">
-          <SectionHeading kicker={`Five-minute activity · ${activeStation.name}`} title="Save one experience." copy="Use a fictionalized example. Never include identifying details." />
-          <div className="quest-banner"><span aria-hidden="true">5:00</span><p><strong>Keep it simple.</strong> Capture useful details, not perfect writing.</p><button type="button" onClick={loadExample}>Try an example</button></div>
-          <form className="artifact-form" onSubmit={(event) => event.preventDefault()}>
-            <label><span><b>1</b> Experience</span><input id="quest-title" value={experienceTitle} onChange={(event) => setExperienceTitle(event.target.value)} placeholder="Role or experience name" /></label>
-            <label><span><b>2</b> When and how much</span><input value={experienceWhen} onChange={(event) => setExperienceWhen(event.target.value)} placeholder="Semester, dates, or estimated hours" /></label>
-            <label><span><b>3</b> What you did</span><textarea value={experienceRole} onChange={(event) => setExperienceRole(event.target.value)} placeholder="Use specific verbs" /></label>
-            <label><span><b>4</b> Who benefited</span><textarea value={experiencePeople} onChange={(event) => setExperiencePeople(event.target.value)} placeholder="Describe roles or groups, never names" /></label>
-            <label><span><b>5</b> What changed</span><textarea value={experienceLesson} onChange={(event) => setExperienceLesson(event.target.value)} placeholder="A lesson, question, or change in perspective" /></label>
-          </form>
-          <div className="action-row"><button className="text-button" type="button" onClick={back}>Back</button><button className="primary-button" type="button" disabled={!artifactComplete} onClick={next}>Save experience <span aria-hidden="true">→</span></button></div>
+        {view === "setup" ? <section className="screen compact-screen" aria-labelledby="setup-title">
+          <div className="screen-heading"><p className="kicker">Quick setup</p><h1 id="setup-title">What needs attention today?</h1><p>Choose one. Your map stays open.</p></div>
+          <div className="focus-grid">{focusOptions.map((option) => <button key={option.id} type="button" className={`focus-card ${focus === option.id ? "focus-card--selected" : ""}`} aria-pressed={focus === option.id} onClick={() => setFocus(option.id)}><span>{option.icon}</span><strong>{option.label}</strong></button>)}</div>
+          <div className="action-row"><button className="text-button" type="button" onClick={() => navigate("trust")}>Back</button><button className="primary-button" type="button" disabled={!focus} onClick={finishSetup}>Build my district</button></div>
         </section> : null}
 
-        {step === 7 ? <section className="screen reveal-screen" aria-labelledby="reveal-title">
-          <MilestoneSignal label="Experience saved" /><div className="reveal-badge" aria-hidden="true">✓</div><SectionHeading kicker="Saved to your vault" title="One experience. Three future uses." />
-          <div className="artifact-value-grid">
-            <article><span aria-hidden="true">▤</span><h2 id="reveal-title">Activity record</h2><p>{experienceTitle} · {experienceWhen}</p></article>
-            <article><span aria-hidden="true">✦</span><h2>Reflection</h2><p>{experienceLesson}</p></article>
-            <article><span aria-hidden="true">✎</span><h2>Story seed</h2><p>{experienceRole}</p></article>
-          </div>
-          <p className="insight-callout"><strong>Why it matters:</strong> Your hours now have context, learning, and a story you can return to.</p>
-          <div className="action-row"><button className="text-button" type="button" onClick={back}>Edit artifact</button><button className="primary-button" type="button" onClick={next}>Meet the cohort <span aria-hidden="true">→</span></button></div>
+        {view === "map" ? <section className="screen map-screen" aria-labelledby="map-title">
+          <div className="screen-heading map-heading"><div><p className="kicker">Premed district</p><h1 id="map-title">Choose a station.</h1><p>All stations are open.</p></div><div className="stamp-count"><span>{progress.stamps.length}</span><small>stamps</small></div></div>
+          <div className="map-recommendation"><span>★</span><p>Suggested now: <strong>{suggestedStation.name}</strong></p></div>
+          <div className="district-map" aria-label="Scrollable station map"><div className="district-map__canvas"><img src="/assets/premed-district-map.png" alt="Illustrated pathway through six premed learning stations" />{stations.map((station) => <button key={station.id} type="button" className={`station station--${station.id} ${activeStationId === station.id ? "station--active" : ""} ${progress.suggestedStation === station.id ? "station--recommended" : ""} ${progress.stamps.includes(station.id) ? "station--stamped" : ""}`} onClick={() => openStation(station)}><span>{progress.stamps.includes(station.id) ? "✓" : station.icon}</span><strong>{station.name}</strong></button>)}</div></div>
+          <article className="station-sheet"><div className="station-sheet__title"><span>{activeStation.icon}</span><div><small>{activeStation.short}</small><h2>{activeStation.name}</h2></div>{progress.stamps.includes(activeStation.id) ? <b className="earned-label">Stamped</b> : null}</div><StationDiagram definition={diagrams[activeStation.id]} revealed={Math.max(-1, progress.diagramProgress[diagrams[activeStation.id].id] ?? -1)} onReveal={(index) => setProgress((current) => ({ ...current, diagramProgress: { ...current.diagramProgress, [diagrams[activeStation.id].id]: Math.max(current.diagramProgress[diagrams[activeStation.id].id] ?? -1, index) } }))} /><button className="primary-button primary-button--wide" type="button" onClick={() => beginMission(activeStation.missionId)}>Start this mission</button></article>
         </section> : null}
 
-        {step === 8 ? <section className="screen" aria-labelledby="cohort-title">
-          <SectionHeading kicker="Cohort" title="Choose how you want to participate." copy="Quiet participation counts." />
-          <div className="cohort-visual"><img src="/assets/premed-pathway-illustration.png" alt="Premed classmates learning and supporting one another" /><span>18 classmates here</span></div>
-          <article className="cohort-prompt"><div className="cohort-prompt__meta"><span>Today’s cohort prompt</span><span>18 classmates here</span></div><h2 id="cohort-title">What is one small way a classmate could support your next step?</h2><div className="sample-reply"><span className="avatar" aria-hidden="true">M</span><p><strong>Maya · Senior</strong>I’d appreciate an accountability check after I contact my research mentor.</p></div></article>
-          <div className="choice-stack cohort-choices">
-            <ChoiceButton selected={cohortMode === "observe"} title="Observe" note="Read and save one idea" icon="◉" onClick={() => setCohortMode("observe")} />
-            <ChoiceButton selected={cohortMode === "react"} title="React" note="Acknowledge a classmate" icon="♡" onClick={() => setCohortMode("react")} />
-            <ChoiceButton selected={cohortMode === "prompt"} title="Use a prompt" note="Start with a sentence" icon="✎" onClick={() => setCohortMode("prompt")} />
-            <ChoiceButton selected={cohortMode === "connect"} title="Connect 1:1" note="Invite one focused conversation" icon="◎" onClick={() => setCohortMode("connect")} />
-          </div><p className="quiet-assurance">Quiet participation is real participation. You can change modes any time.</p>
-          <div className="action-row"><button className="text-button" type="button" onClick={back}>Back</button><button className="primary-button" type="button" disabled={!cohortMode} onClick={next}>Choose my next move <span aria-hidden="true">→</span></button></div>
+        {view === "mission" ? <section className="screen mission-screen" aria-labelledby="mission-title">
+          <div className="screen-heading"><p className="kicker">{activeStation.name}</p><h1 id="mission-title">{activeMission.title}</h1><p>Tap each step. Save one response.</p></div>
+          {activeMission.mediaId ? <MediaMoment definition={media[activeMission.mediaId]} viewed={progress.viewedVideos.includes(activeMission.mediaId)} onViewed={markVideoViewed} /> : null}
+          <StationDiagram definition={activeMission.diagram} revealed={diagramRevealed} onReveal={revealDiagram} />
+          {diagramComplete ? <div className="artifact-entry"><label htmlFor="mission-response"><span>{activeMission.diagram.studentPrompt}</span><textarea id="mission-response" value={response} onChange={(event) => setResponse(event.target.value)} placeholder="Keep names and identifying details out." /></label><div className="artifact-status"><span>{response.trim() ? "Ready to save" : "One response required"}</span><small>Device only</small></div></div> : null}
+          <div className="action-row"><button className="text-button" type="button" onClick={() => navigate("map")}>Back to map</button><button className="primary-button" type="button" disabled={!diagramComplete || !response.trim()} onClick={completeMission}>Save and stamp</button></div>
         </section> : null}
 
-        {step === 9 ? <section className="screen" aria-labelledby="next-title">
-          <SectionHeading kicker="One next action" title="Choose something small enough to keep." />
-          <div className="commitment-grid" id="next-title">{commitments.map(([title, note]) => <ChoiceButton key={title} selected={commitment === title} title={title} note={note} onClick={() => setCommitment(title)} />)}</div>
-          <div className="reminder-card"><div><p className="kicker">Gentle follow-through</p><h2>When should Navigate bring this back?</h2></div><select value={reminder} onChange={(event) => setReminder(event.target.value)} aria-label="Reminder timing"><option>Tomorrow</option><option>In 3 days</option><option>In one week</option><option>No reminder</option></select></div>
-          <div className="action-row"><button className="text-button" type="button" onClick={back}>Back</button><button className="primary-button" type="button" disabled={!commitment} onClick={next}>Finish setup <span aria-hidden="true">→</span></button></div>
+        {view === "stamp" ? <section className="screen stamp-screen" aria-labelledby="stamp-title"><div className="stamp-seal" aria-hidden="true"><span>✓</span><small>Navigate</small></div><p className="kicker">Station complete</p><h1 id="stamp-title">{lastStamp}</h1><p>{activeMission.diagram.completionState}.</p><button className="primary-button" type="button" onClick={() => navigate("map")}>Return to the district</button></section> : null}
+
+        {view === "home" ? <section className="screen dashboard" aria-labelledby="home-title">
+          <div className="dashboard-hero"><div><p className="kicker">Your pathway</p><h1 id="home-title">One clear next move.</h1><p>{progress.artifacts.length} saved artifacts · {progress.stamps.length} station stamps</p></div><div className="completion-ring" aria-label={`${completion}% of stations stamped`}><span>{completion}%</span><small>explored</small></div></div>
+          <div className="next-move-card"><div><span>Recommended</span><h2>{selectedMission.title}</h2></div><button className="primary-button" type="button" onClick={() => beginMission(selectedMission.id)}>Open next move</button></div>
+          <section className="commitment-panel" aria-labelledby="commitment-title"><h2 id="commitment-title">Change my next move</h2><div className="commitment-grid">{commitmentOptions.map((item) => <button key={item.id} type="button" aria-pressed={selectedCommitment === item.id} className={selectedCommitment === item.id ? "commitment--selected" : ""} onClick={() => setProgress((current) => ({ ...current, commitment: item.id }))}><span>{item.icon}</span>{item.label}</button>)}</div></section>
+          <div className="device-actions"><label>Reminder<select value={progress.reminderDate} onChange={(event) => setProgress((current) => ({ ...current, reminderDate: event.target.value }))}><option>Tomorrow</option><option>In 3 days</option><option>Next week</option><option>No reminder</option></select></label><button className="text-button" type="button" onClick={clearDeviceData}>Clear this device&apos;s data</button></div>
         </section> : null}
 
-        {step === 10 ? <section className="dashboard" aria-labelledby="dashboard-title">
-          <MilestoneSignal label="Pathway setup complete" />
-          <div className="dashboard-hero"><div><p className="kicker">Your pathway · Today</p><h1 id="dashboard-title">You are ready for one next action.</h1><p>Your experience is saved. Your starting point is clear.</p></div><div className="completion-ring" aria-label="Pathway setup complete"><span>✓</span><small>ready</small></div></div>
-          <div className="dashboard-grid">
-            <article className="dash-card dash-card--artifact"><p className="card-label">Saved artifact</p><h2>{experienceTitle}</h2><p>{experienceLesson}</p><span className="status-line"><b aria-hidden="true">✓</b> Reflection attached</span></article>
-            <article className="dash-card"><p className="card-label">Active station</p><h2>{activeStation.name}</h2><p>{activeStation.action}</p></article>
-            <article className="dash-card"><p className="card-label">Cohort mode</p><h2>{({ observe: "Observing", react: "Reacting", prompt: "Prompted response", connect: "1:1 connection" } as Record<string, string>)[cohortMode ?? "observe"]}</h2><p>Your participation setting can change whenever your comfort or context changes.</p></article>
-            <article className="dash-card dash-card--next"><p className="card-label">Your next move</p><h2>{commitment}</h2><p>{reminder === "No reminder" ? "No reminder set." : `We’ll bring this back ${reminder.toLowerCase()}.`}</p><button type="button">Open next move <span aria-hidden="true">→</span></button></article>
-          </div>
-          <div className="values-line"><span>Reflect with honesty</span><span>Act with compassion</span><span>Grow with others</span></div><button className="reset-button" type="button" onClick={reset}>Restart the prototype</button><p className="prototype-note">Navigate Pathways is a concept prototype. It is not an admissions portal or admissions decision tool.</p>
-        </section> : null}
+        {view === "cohort" ? <section className="screen compact-screen" aria-labelledby="cohort-title"><div className="screen-heading"><p className="kicker">Cohort Commons</p><h1 id="cohort-title">Participation has modes.</h1><p>Start where your energy allows.</p></div><MediaMoment definition={media.cohort} viewed={progress.viewedVideos.includes("cohort")} onViewed={markVideoViewed} /><div className="participation-modes">{diagrams.cohort.steps.map((item, index) => <button type="button" key={item.label} onClick={() => beginMission("cohort-participation")}><span>{index + 1}</span><strong>{item.label}</strong><small>{index === 3 ? "Optional" : "Valid participation"}</small></button>)}</div><p className="privacy-note">Drafts stay here. Nothing is sent.</p></section> : null}
+
+        {view === "vault" ? <section className="screen compact-screen" aria-labelledby="vault-title"><div className="screen-heading"><p className="kicker">Experience Vault</p><h1 id="vault-title">Your saved evidence.</h1><p>Device only. Reuse when ready.</p></div>{progress.artifacts.length ? <div className="artifact-list">{progress.artifacts.map((artifact) => <article key={artifact.id}><div><span>{stations.find((station) => station.id === artifact.stationId)?.icon}</span><strong>{artifact.label}</strong></div><p>{artifact.response}</p><small>{new Date(artifact.savedAt).toLocaleDateString()}</small></article>)}</div> : <div className="empty-vault"><span>V</span><h2>No artifacts yet.</h2><button className="primary-button" type="button" onClick={() => beginMission("log-experience")}>Capture one experience</button></div>}<button className="text-button clear-button" type="button" onClick={clearDeviceData}>Clear this device&apos;s data</button></section> : null}
       </div>
-      {step > 0 ? <AppDock step={step} /> : null}
-      <footer className="site-footer"><p>Designed for the journey before application.</p><p>Concept prototype · Not an admissions decision tool</p></footer>
+
+      <AppDock view={view} enabled={["map", "mission", "stamp", "home", "cohort", "vault"].includes(view)} navigate={navigate} />
+      <footer className="site-footer"><p>Navigate the Pipeline concept</p><p>Not an admissions decision tool</p></footer>
     </main>
   );
 }
