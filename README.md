@@ -1,30 +1,78 @@
-# Navigate the Pathway
+<p align="center">
+  <img src="public/og.png" alt="Navigate the Pathway through a Southwestern landscape" width="100%" />
+</p>
 
-Navigate the Pathway is a phone-first, media-first concept prototype for premedical juniors and seniors. It helps students capture experience evidence, reflect on learning, test study strategies, map support, participate in a cohort, and prepare selected work for advising and application drafting.
+<h1 align="center">Navigate the Pathway</h1>
 
-This repository is public. The hosted demonstration uses a shared playtest gate, but every included record is fictional and every student-created entry stays in the current browser.
+<p align="center">
+  A phone-first, media-first learning experience for premedical juniors and seniors.
+</p>
 
-## Implemented demonstration behavior
+<p align="center">
+  <a href="https://navigate-pathways.roseman-coll-6465.chatgpt.site"><strong>Open the live prototype</strong></a>
+  &nbsp;|&nbsp;
+  <a href="docs/spec/PRODUCT_AND_SOFTWARE_SPECIFICATION.md">Read the product specification</a>
+</p>
 
-- Six open map stations with visual missions, tap-through diagrams, station stamps, and a four-destination dock
-- Rosie the Roadrunner as the reusable guide for welcome, privacy, recommendations, saved work, and return moments
-- Muted autoplay-once media behavior with captions, transcript, replay, skip, reduced-motion support, and poster fallbacks
-- Eight route recommendations based on student-selected readiness context, never GPA, MCAT, demographics, personality labels, or message volume
-- Courses, study experiments, detailed and quick experience capture, service reflection, support mapping, community participation, Story Studio, Portfolio history, advising packets, and application-note export
-- Privacy signal detection, autosaved drafts, experience revision history, returning-user recovery, and device-data controls
-- Fictional advisor and pilot-administration views with immediate packet revocation and expiration boundaries
-- One browser-local state model at `navigate.pathway.demo.v1`, with one-time recovery from `navigate-demo:v3` and `navigate.pipeline.progress.v1`
-- Server-side playtest-code comparison and a signed 12-hour `HttpOnly` access cookie
+<p align="center">
+  <a href="https://github.com/Manyweather/navigate-the-pathway/actions/workflows/ci.yml"><img src="https://github.com/Manyweather/navigate-the-pathway/actions/workflows/ci.yml/badge.svg?branch=main" alt="Prototype checks" /></a>
+  <img src="https://img.shields.io/badge/status-fictional%20browser--local%20demo-7B1837" alt="Fictional browser-local demonstration" />
+  <img src="https://img.shields.io/badge/license-pending%20Roseman%20approval-C69214" alt="License pending Roseman University approval" />
+</p>
 
-## Deliberately not implemented
+## What students experience
 
-- Student accounts, institutional authentication, or identity records
-- Supabase, D1, email, analytics, or external message delivery
-- Real student, patient, research-participant, admissions, or advising records
-- Admissions scoring, predictions, rankings, streaks, or competitive points
-- Production community moderation operations or research instruments
+Students begin with a brief adaptive setup, explore a visual district, complete short missions, save application-ready evidence, and return to a map that reflects their progress. Rosie the Roadrunner offers guidance without turning the experience into a points competition.
 
-The Supabase SQL file under [`docs/architecture/`](docs/architecture/) is a production-shaped reference only. It is not imported by the application.
+| Explore | Practice | Prepare |
+| --- | --- | --- |
+| Six open stations and eight recommended starting routes | Visual missions, tap-through diagrams, study experiments, and reflection prompts | Portfolio history, Story Studio, advising packets, and application-note export |
+| Phone-first map, four-destination dock, and quick capture | Low-pressure cohort participation and support mapping | Student-selected sharing with expiration and revocation controls |
+
+## The six-station district
+
+- **Course Camp:** courses, questions, follow-up plans, and study strategies
+- **Experience Vault:** quick capture, detailed experiences, hours, moments, and revisions
+- **Compassion Commons:** service, context, barriers, compassionate responses, and reflection
+- **Cohort Commons:** community participation and support-network building
+- **Reflection Studio:** reflection, story building, and evidence development
+- **Application Outlook:** advising preparation, Portfolio review, and application export
+
+Every station stays available. Recommendations identify a useful next destination without points, rankings, streak pressure, or locked content.
+
+## Media-first design
+
+- Short screens with one clear action
+- Rosie poses for welcome, privacy, recommendations, saved work, and returning moments
+- Muted autoplay-once media with captions, transcript, replay, skip, and poster fallbacks
+- Touch, mouse, and keyboard support across phone, tablet, and desktop layouts
+- Reduced-motion behavior and accessibility text for visual content
+
+## Demonstration boundaries
+
+This is a fictional, browser-local product demonstration. It is not an admissions portal or admissions decision tool.
+
+- Student-created entries stay on the current device.
+- Route recommendations never use GPA, MCAT, demographics, personality labels, or message volume.
+- Reviewer views use fictional records and expose only active, student-selected packet items.
+- No student accounts, institutional authentication, Supabase, D1, email, analytics, or external message delivery are active.
+- No real student, patient, research-participant, admissions, or advising records should be entered.
+
+The hosted prototype uses a shared playtest access gate. Access-code comparison and session signing happen server-side, and secrets are never stored in the repository or browser storage.
+
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+    A[Adaptive setup] --> B[Recommended route]
+    B --> C[Six-station district]
+    C --> D[Visual mission]
+    D --> E[Saved artifact]
+    E --> F[Portfolio and advising]
+    E --> C
+```
+
+The current prototype uses the versioned browser-local state key `navigate.pathway.demo.v1`, with one-time recovery from the two earlier prototype formats. The Supabase SQL under [`docs/architecture/`](docs/architecture/) is a future architecture reference only and is not imported by the application.
 
 ## Local development
 
@@ -35,26 +83,26 @@ pnpm install
 pnpm dev
 ```
 
-Create a local `.env.local` that defines `NAVIGATE_ACCESS_CODE` and a separate, high-entropy `NAVIGATE_SESSION_SECRET`. Environment files are ignored by Git. Never commit a real playtest code or session secret.
+For local access-gate testing, create an ignored `.env.local` containing `NAVIGATE_ACCESS_CODE` and a separate high-entropy `NAVIGATE_SESSION_SECRET`. Never commit real playtest credentials.
 
-Run the complete verification pass with:
+Run the verification suite with:
 
 ```bash
 pnpm lint
 pnpm test
 ```
 
-## Repository landmarks
+## Repository guide
 
-- `app/journey-experience.tsx`: preserved media-first student district and missions
-- `app/components/feature-workspaces.tsx`: expanded station, portfolio, advisor, and pilot workflows
-- `app/prototype-store.tsx`: versioned state, persistence, and legacy migrations
-- `app/access-session.ts`: constant-time code comparison and HMAC session cookies
-- `docs/spec/`: supplied product, playtest, architecture, and v0.2 handoff specifications
-- `docs/architecture/supabase-schema.sql`: dormant architecture reference
+- [`app/journey-experience.tsx`](app/journey-experience.tsx): media-first student district and missions
+- [`app/components/feature-workspaces.tsx`](app/components/feature-workspaces.tsx): station, Portfolio, advisor, and pilot workflows
+- [`app/prototype-store.tsx`](app/prototype-store.tsx): state, persistence, and legacy migrations
+- [`app/access-session.ts`](app/access-session.ts): constant-time code comparison and signed session cookies
+- [`docs/spec/`](docs/spec/): product, playtest, architecture, and v0.2 handoff specifications
+- [`docs/architecture/supabase-schema.sql`](docs/architecture/supabase-schema.sql): dormant production architecture reference
 
-## Delivery and licensing
+The preserved media-first visual baseline is tagged [`frontend-media-v4`](https://github.com/Manyweather/navigate-the-pathway/releases/tag/frontend-media-v4).
 
-The preserved visual baseline is tagged `frontend-media-v4`. Unified work is developed on `agent/merge-v02-pathway` and reviewed through a draft pull request.
+## Licensing
 
 No open-source license is included. Roseman University must approve a licensing position before one is added.
