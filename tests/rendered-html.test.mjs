@@ -2,57 +2,81 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
+async function fetchBuilt(request) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
   return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
+    request,
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
 }
 
-test("server renders the media-first opening", async () => {
+async function render() {
+  return fetchBuilt(new Request("http://localhost/", { headers: { accept: "text/html" } }));
+}
+
+test("server renders the Rosie access gate before protected views", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
-  assert.match(html, /Your experiences already matter/);
-  assert.match(html, /Navigate Learning Coach/);
-  assert.match(html, /Not an admissions decision tool/i);
+  assert.match(html, /Playtest access code/);
+  assert.match(html, /Rosie saved your place/);
+  assert.match(html, /not a student account or institutional login/i);
   assert.doesNotMatch(html, /Your site is taking shape/);
 });
 
-test("ships visual missions, diagrams, persistence, and navigation", async () => {
-  const [source, styles] = await Promise.all([
-    readFile(new URL("../app/journey-experience.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
-  ]);
-  for (const station of ["Course Camp", "Experience Vault", "Compassion Commons", "Cohort Commons", "Reflection Studio", "Application Outlook"]) assert.match(source, new RegExp(station));
-  for (const phrase of ["Course status", "Specific moment", "Compassionate response", "Observe", "What changes next", "Future direction"]) assert.match(source, new RegExp(phrase));
-  for (const mission of ["log-experience", "course-question", "support-outreach", "study-strategy", "cohort-participation", "reflection-review", "service-reflection", "application-evidence"]) assert.match(source, new RegExp(mission));
-  assert.match(source, /navigate\.pipeline\.progress\.v1/);
-  assert.match(source, /Continue my pathway/);
-  assert.match(source, /Start over/);
-  assert.match(source, /Clear this device/);
-  assert.match(source, /Open next move/);
-  assert.match(source, /requiredArtifact/);
-  assert.match(source, /diagramComplete/);
-  assert.match(source, /viewedVideos/);
-  assert.match(source, /autoplayOnce/);
-  assert.match(source, /prefers-reduced-motion/);
-  assert.match(source, /navigate-learning-coach-v1\.png/);
-  assert.match(styles, /--maroon: #791034/);
-  assert.match(styles, /\.diagram-track/);
-  assert.match(styles, /\.station--stamped/);
-  assert.match(styles, /\.app-dock/);
-  assert.doesNotMatch(source, /\u2014/);
+test("built access routes reject, unlock, authorize, and sign out", async () => {
+  process.env.NAVIGATE_ACCESS_CODE = "test-code-4200";
+  process.env.NAVIGATE_SESSION_SECRET = "test-session-secret-with-sufficient-length";
+  const rejected = await fetchBuilt(new Request("http://localhost/api/access/unlock", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: "wrong" }) }));
+  assert.equal(rejected.status, 401);
+  const unlocked = await fetchBuilt(new Request("http://localhost/api/access/unlock", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: "test code 4200" }) }));
+  assert.equal(unlocked.status, 200);
+  const setCookie = unlocked.headers.get("set-cookie") ?? "";
+  assert.match(setCookie, /ntp_access=/);
+  assert.match(setCookie, /HttpOnly/i);
+  assert.match(setCookie, /Secure/i);
+  assert.match(setCookie, /SameSite=Lax/i);
+  assert.match(setCookie, /Max-Age=43200/i);
+  const cookie = setCookie.split(";")[0];
+  const authorized = await fetchBuilt(new Request("http://localhost/", { headers: { accept: "text/html", cookie } }));
+  const authorizedHtml = await authorized.text();
+  assert.match(authorizedHtml, /Open student pathway/);
+  assert.match(authorizedHtml, /Open advisor example/);
+  const signedOut = await fetchBuilt(new Request("http://localhost/api/access/signout", { method: "POST", headers: { cookie } }));
+  assert.equal(signedOut.status, 303);
+  assert.match(signedOut.headers.get("set-cookie") ?? "", /Max-Age=0/i);
 });
 
-test("includes local avatar and caption assets", async () => {
+test("ships visual missions, unified persistence, Rosie, and functional navigation", async () => {
+  const [journey, store, shell, styles] = await Promise.all([
+    readFile(new URL("../app/journey-experience.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/prototype-store.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/prototype-shell.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  for (const station of ["Course Camp", "Experience Vault", "Compassion Commons", "Cohort Commons", "Reflection Studio", "Application Outlook"]) assert.match(journey, new RegExp(station));
+  for (const mission of ["log-experience", "course-question", "support-outreach", "study-strategy", "cohort-participation", "reflection-review", "service-reflection", "application-evidence"]) assert.match(journey, new RegExp(mission));
+  assert.match(store, /navigate\.pathway\.demo\.v1/);
+  assert.match(store, /navigate\.pipeline\.progress\.v1/);
+  assert.match(store, /navigate-demo:v3/);
+  assert.match(shell, /Quick capture/);
+  assert.match(journey, /Continue my pathway/);
+  assert.match(journey, /Open station workspace/);
+  assert.match(journey, /prefers-reduced-motion/);
+  assert.match(styles, /--maroon: #791034/);
+  assert.match(styles, /\.app-dock/);
+  assert.match(styles, /\.rosie-guide/);
+});
+
+test("includes Rosie, caption, and brand assets", async () => {
   await Promise.all([
-    access(new URL("../public/assets/navigate-learning-coach-v1.png", import.meta.url)),
+    ...["idle", "gesture", "nodding", "pointing"].map((pose) => access(new URL(`../public/assets/rosie/${pose}.webp`, import.meta.url))),
+    access(new URL("../public/assets/rosie/tracks.jpg", import.meta.url)),
+    access(new URL("../public/assets/navigate-pathway-mark.svg", import.meta.url)),
     access(new URL("../public/media/welcome.vtt", import.meta.url)),
     access(new URL("../public/media/reflection-studio.vtt", import.meta.url)),
     access(new URL("../public/media/cohort-commons.vtt", import.meta.url)),

@@ -1,0 +1,224 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { buildApplicationExport, buildApplicationExportText } from "../application-export";
+import {
+  advisorVisibleArtifacts,
+  makeArtifact,
+  makeDraft,
+  makeId,
+  nowIso,
+  personaIntakes,
+  recommendRoute,
+  sensitiveSignals,
+  type Artifact,
+  type DestinationId,
+  type PersonaPreset,
+  type WorkflowType,
+} from "../demo-model";
+import { usePrototype } from "../prototype-store";
+import { RosieGuide } from "./rosie-guide";
+
+export type WorkspaceId = "course" | "experience" | "compassion" | "cohort" | "reflection" | "application";
+
+const workspaceLabels: { id: WorkspaceId; name: string; action: string }[] = [
+  { id: "course", name: "Course Camp", action: "Plan" },
+  { id: "experience", name: "Experience Vault", action: "Capture" },
+  { id: "compassion", name: "Compassion Commons", action: "Notice" },
+  { id: "cohort", name: "Cohort Commons", action: "Connect" },
+  { id: "reflection", name: "Reflection Studio", action: "Reflect" },
+  { id: "application", name: "Application Outlook", action: "Assemble" },
+];
+
+const routeDestination: Record<WorkspaceId, DestinationId> = {
+  course: "course",
+  experience: "experience",
+  compassion: "reflection",
+  cohort: "community",
+  reflection: "reflection",
+  application: "advisor",
+};
+
+function useAutosavedDraft(
+  key: string,
+  workflow: WorkflowType,
+  fields: Record<string, string | number | boolean | string[]>,
+  enabled = true,
+) {
+  const { dispatch } = usePrototype();
+  const serialized = JSON.stringify(fields);
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = window.setTimeout(() => {
+      const savedFields = JSON.parse(serialized) as Record<string, string | number | boolean | string[]>;
+      dispatch({ type: "UPSERT_DRAFT", draft: makeDraft(key, workflow, savedFields) });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [dispatch, enabled, key, serialized, workflow]);
+}
+
+function PrivacySignals({ value }: { value: string }) {
+  const signals = sensitiveSignals(value);
+  if (!signals.length) return <p className="workspace-safe">No common identifiers detected.</p>;
+  return <p className="workspace-warning" role="alert">Remove {signals.join(", ")} before saving.</p>;
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="workspace-field"><span>{label}</span>{children}</label>;
+}
+
+function WorkspaceHeader({ id, onBack }: { id: WorkspaceId; onBack: () => void }) {
+  const current = workspaceLabels.find((item) => item.id === id) ?? workspaceLabels[0];
+  return <header className="workspace-header"><button className="text-button" onClick={onBack}>Back to district</button><div><p className="kicker">{current.action}</p><h1>{current.name}</h1></div></header>;
+}
+
+function CourseWorkspace() {
+  const { state, dispatch } = usePrototype();
+  const [name, setName] = useState("");
+  const [courseState, setCourseState] = useState<"completed" | "enrolled" | "planned" | "uncertain" | "advisor-review">("planned");
+  const [term, setTerm] = useState("");
+  const [question, setQuestion] = useState("");
+  const [strategy, setStrategy] = useState("");
+  const [prediction, setPrediction] = useState("");
+  const [schedule, setSchedule] = useState("");
+
+  const saveCourse = () => {
+    dispatch({ type: "UPSERT_COURSE", course: { id: makeId("course"), name: name.trim(), state: courseState, term: term.trim(), requirement: "Student planning note", question: question.trim(), updatedAt: nowIso() } });
+    setName(""); setTerm(""); setQuestion("");
+  };
+  const saveExperiment = () => {
+    dispatch({ type: "UPSERT_EXPERIMENT", experiment: { id: makeId("experiment"), strategy: strategy.trim(), prediction: prediction.trim(), intention: `When the study block begins, I will ${strategy.trim()}.`, schedule: schedule.trim(), observation: "", result: "", adjustment: "", status: "planned" } });
+    dispatch({ type: "ADD_ARTIFACT", artifact: makeArtifact("learning_experiment", strategy.trim(), prediction.trim(), "Learning") });
+    setStrategy(""); setPrediction(""); setSchedule("");
+  };
+
+  return <div className="workspace-grid"><section className="workspace-card"><div className="visual-sequence"><span>Course status</span><span>Question</span><span>Person</span><span>Date</span></div><h2>Clarify one course</h2><Field label="Course"><input value={name} onChange={(event) => setName(event.target.value)} /></Field><div className="field-pair"><Field label="Status"><select value={courseState} onChange={(event) => setCourseState(event.target.value as typeof courseState)}><option value="completed">Completed</option><option value="enrolled">Enrolled</option><option value="planned">Planned</option><option value="uncertain">Uncertain</option><option value="advisor-review">Advisor review</option></select></Field><Field label="Term"><input value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Fall 2026" /></Field></div><Field label="Focused question"><textarea value={question} onChange={(event) => setQuestion(event.target.value)} /></Field><button className="primary-button" disabled={!name.trim()} onClick={saveCourse}>Save course plan</button></section><section className="workspace-card"><div className="visual-sequence"><span>Strategy</span><span>Prediction</span><span>Try</span><span>Review</span></div><h2>Run a study experiment</h2><Field label="Strategy"><input value={strategy} onChange={(event) => setStrategy(event.target.value)} placeholder="Two-minute retrieval check" /></Field><Field label="What do you predict?"><textarea value={prediction} onChange={(event) => setPrediction(event.target.value)} /></Field><Field label="When will you try it?"><input value={schedule} onChange={(event) => setSchedule(event.target.value)} /></Field><button className="primary-button" disabled={!strategy.trim() || !prediction.trim()} onClick={saveExperiment}>Save experiment</button></section><section className="workspace-card workspace-card--wide"><h2>Course and strategy board</h2><div className="workspace-list">{state.courses.map((course) => <article key={course.id}><strong>{course.name}</strong><span>{course.state.replace("-", " ")} · {course.term || "Term open"}</span><small>{course.question || "No question saved"}</small></article>)}{state.experiments.map((experiment) => <article key={experiment.id}><strong>{experiment.strategy}</strong><span>{experiment.status} · {experiment.schedule}</span><small>{experiment.prediction}</small></article>)}</div></section></div>;
+}
+
+function ExperienceWorkspace({ quick = false }: { quick?: boolean }) {
+  const { state, dispatch } = usePrototype();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [type, setType] = useState("Service");
+  const [organization, setOrganization] = useState("");
+  const [role, setRole] = useState("");
+  const [hours, setHours] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const fields = useMemo(() => ({ title, body, type, organization, role, hours, startDate, endDate }), [body, endDate, hours, organization, role, startDate, title, type]);
+  useAutosavedDraft("experience:active", "experience", fields);
+  const signals = sensitiveSignals(`${title} ${body} ${organization}`);
+  const experiences = state.artifacts.filter((item) => item.kind === "experience");
+
+  const edit = (artifact: Artifact) => {
+    setEditingId(artifact.id); setTitle(artifact.title); setBody(artifact.body);
+    setType(String(artifact.metadata.type || "Service")); setOrganization(String(artifact.metadata.organization || ""));
+    setRole(String(artifact.metadata.role || "")); setHours(String(artifact.metadata.hours || ""));
+    setStartDate(String(artifact.metadata.startDate || "")); setEndDate(String(artifact.metadata.endDate || ""));
+  };
+  const reset = () => { setEditingId(null); setTitle(""); setBody(""); setOrganization(""); setRole(""); setHours(""); setStartDate(""); setEndDate(""); dispatch({ type: "CLEAR_DRAFT", key: "experience:active" }); };
+  const save = () => {
+    const metadata = { type, organization, role, hours: Number(hours) || 0, startDate, endDate };
+    const existing = editingId ? state.artifacts.find((item) => item.id === editingId) : null;
+    if (existing) {
+      dispatch({ type: "UPDATE_ARTIFACT", artifact: { ...existing, title: title.trim(), body: body.trim(), metadata, revisions: [{ id: makeId("revision"), body: existing.body, createdAt: existing.updatedAt }, ...existing.revisions], updatedAt: nowIso() } });
+    } else {
+      dispatch({ type: "ADD_ARTIFACT", artifact: makeArtifact("experience", title.trim() || "Quick experience note", body.trim(), "Experience", metadata) });
+    }
+    reset();
+  };
+
+  return <div className="workspace-grid"><section className="workspace-card workspace-card--wide"><div className="visual-sequence"><span>Activity</span><span>Moment</span><span>Learning</span><span>Future use</span></div><h2>{editingId ? "Revise experience" : quick ? "Quick capture" : "Capture an experience"}</h2><div className="field-pair"><Field label="Title"><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="One memorable moment" /></Field><Field label="Type"><select value={type} onChange={(event) => setType(event.target.value)}><option>Service</option><option>Clinical</option><option>Research</option><option>Leadership</option><option>Employment</option><option>Other</option></select></Field></div>{!quick ? <><div className="field-pair"><Field label="Organization"><input value={organization} onChange={(event) => setOrganization(event.target.value)} /></Field><Field label="Role"><input value={role} onChange={(event) => setRole(event.target.value)} /></Field></div><div className="field-triple"><Field label="Start"><input type="month" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></Field><Field label="End"><input type="month" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></Field><Field label="Hours"><input type="number" min="0" value={hours} onChange={(event) => setHours(event.target.value)} /></Field></div></> : null}<Field label="Specific moment and learning"><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Keep names and identifying details out." /></Field><PrivacySignals value={`${title} ${body} ${organization}`} /><div className="workspace-actions"><button className="primary-button" disabled={!body.trim() || signals.length > 0} onClick={save}>{editingId ? "Save revision" : "Save experience"}</button>{editingId ? <button className="text-button" onClick={reset}>Cancel revision</button> : null}<span>Autosaved on this device</span></div></section><section className="workspace-card workspace-card--wide"><h2>Experience history</h2><div className="workspace-list">{experiences.map((artifact) => <article key={artifact.id}><strong>{artifact.title}</strong><span>{String(artifact.metadata.type || "Experience")} · {String(artifact.metadata.hours || 0)} hours · {artifact.revisions.length} revisions</span><small>{artifact.body}</small><button className="text-button" onClick={() => edit(artifact)}>Revise</button></article>)}</div></section></div>;
+}
+
+function CompassionWorkspace() {
+  const { state, dispatch } = usePrototype();
+  const [context, setContext] = useState("");
+  const [barrier, setBarrier] = useState("");
+  const [response, setResponse] = useState("");
+  const [reflection, setReflection] = useState("");
+  const combined = `${context} ${barrier} ${response} ${reflection}`;
+  useAutosavedDraft("compassion:active", "reflection", { context, barrier, response, reflection });
+  const save = () => {
+    dispatch({ type: "ADD_ARTIFACT", artifact: makeArtifact("reflection", "Compassion in context", `Context: ${context}\nBarrier: ${barrier}\nResponse: ${response}\nReflection: ${reflection}`, "Compassion", { mode: "service" }) });
+    dispatch({ type: "CLEAR_DRAFT", key: "compassion:active" }); setContext(""); setBarrier(""); setResponse(""); setReflection("");
+  };
+  const items = state.artifacts.filter((item) => item.domain === "Compassion");
+  return <div className="workspace-grid"><section className="workspace-card workspace-card--wide"><div className="visual-sequence"><span>Person + context</span><span>Need or barrier</span><span>Compassionate response</span><span>Reflection</span></div><h2>Notice compassion in action</h2><div className="field-pair"><Field label="Person and context"><textarea value={context} onChange={(event) => setContext(event.target.value)} /></Field><Field label="Need or barrier"><textarea value={barrier} onChange={(event) => setBarrier(event.target.value)} /></Field></div><div className="field-pair"><Field label="Compassionate response"><textarea value={response} onChange={(event) => setResponse(event.target.value)} /></Field><Field label="What will you carry forward?"><textarea value={reflection} onChange={(event) => setReflection(event.target.value)} /></Field></div><PrivacySignals value={combined} /><button className="primary-button" disabled={!barrier.trim() || !reflection.trim() || sensitiveSignals(combined).length > 0} onClick={save}>Save reflection</button></section>{items.length ? <section className="workspace-card workspace-card--wide"><h2>Compassion reflections</h2><div className="workspace-list">{items.map((item) => <article key={item.id}><strong>{item.title}</strong><small>{item.body}</small></article>)}</div></section> : null}</div>;
+}
+
+function CohortWorkspace() {
+  const { state, dispatch } = usePrototype();
+  const [supportLabel, setSupportLabel] = useState("");
+  const [helpsWith, setHelpsWith] = useState("");
+  const [nextContact, setNextContact] = useState("");
+  const [postTitle, setPostTitle] = useState("");
+  const [postBody, setPostBody] = useState("");
+  const [reply, setReply] = useState<Record<string, string>>({});
+  const postSignals = sensitiveSignals(`${postTitle} ${postBody}`);
+  const saveSupport = () => { dispatch({ type: "UPSERT_SUPPORT", support: { id: makeId("support"), role: "academic", label: supportLabel.trim(), helpsWith: helpsWith.trim(), contactMethod: "Student choice", nextContact: nextContact.trim(), privateDetails: "Device-only planning note" } }); setSupportLabel(""); setHelpsWith(""); setNextContact(""); };
+  const post = () => { dispatch({ type: "ADD_POST", post: { id: makeId("post"), author: "You", type: "ask", title: postTitle.trim(), body: postBody.trim(), createdAt: nowIso(), reactions: 0, reacted: false, replies: [], reported: false, muted: false } }); setPostTitle(""); setPostBody(""); };
+  return <div className="workspace-grid"><section className="workspace-card"><div className="visual-sequence"><span>Notice</span><span>Choose role</span><span>Ask</span><span>Follow up</span></div><h2>Map one support role</h2><Field label="Role or person"><input value={supportLabel} onChange={(event) => setSupportLabel(event.target.value)} placeholder="Faculty advisor" /></Field><Field label="What can they help with?"><input value={helpsWith} onChange={(event) => setHelpsWith(event.target.value)} /></Field><Field label="Next contact"><input value={nextContact} onChange={(event) => setNextContact(event.target.value)} /></Field><button className="primary-button" disabled={!supportLabel.trim()} onClick={saveSupport}>Save privately</button><div className="support-orbit">{state.supports.map((item) => <span key={item.id}>{item.label}<small>{item.helpsWith}</small></span>)}</div></section><section className="workspace-card"><div className="visual-sequence"><span>Observe</span><span>React</span><span>Respond</span><span>Connect, if useful</span></div><h2>Choose your participation mode</h2><Field label="Fictional post title"><input value={postTitle} onChange={(event) => setPostTitle(event.target.value)} /></Field><Field label="Message"><textarea value={postBody} onChange={(event) => setPostBody(event.target.value)} /></Field><PrivacySignals value={`${postTitle} ${postBody}`} /><button className="primary-button" disabled={!postTitle.trim() || !postBody.trim() || postSignals.length > 0} onClick={post}>Post to this device demo</button></section><section className="workspace-card workspace-card--wide"><h2>Fictional cohort board</h2><div className="cohort-board">{state.communityPosts.filter((item) => !item.muted).map((item) => <article key={item.id}><span>{item.type}</span><strong>{item.title}</strong><p>{item.body}</p><div><button onClick={() => dispatch({ type: "UPDATE_POST", post: { ...item, reacted: !item.reacted, reactions: item.reactions + (item.reacted ? -1 : 1) } })}>{item.reacted ? "Supported" : "React"} · {item.reactions}</button><button onClick={() => dispatch({ type: "UPDATE_POST", post: { ...item, reported: true } })}>Report</button></div><Field label="Low-pressure response"><input value={reply[item.id] || ""} onChange={(event) => setReply((current) => ({ ...current, [item.id]: event.target.value }))} /></Field><button className="text-button" disabled={!reply[item.id]?.trim()} onClick={() => { dispatch({ type: "UPDATE_POST", post: { ...item, replies: [...item.replies, reply[item.id].trim()] } }); setReply((current) => ({ ...current, [item.id]: "" })); }}>Add response</button></article>)}</div></section></div>;
+}
+
+function ReflectionWorkspace() {
+  const { state, dispatch } = usePrototype();
+  const experiences = state.artifacts.filter((item) => item.kind === "experience");
+  const [linked, setLinked] = useState(experiences[0]?.id || "");
+  const [happened, setHappened] = useState("");
+  const [mattered, setMattered] = useState("");
+  const [next, setNext] = useState("");
+  const [theme, setTheme] = useState("");
+  const [story, setStory] = useState("");
+  const [sourceIds, setSourceIds] = useState<string[]>([]);
+  const reflectionText = `${happened} ${mattered} ${next}`;
+  useAutosavedDraft("reflection:active", "reflection", { linked, happened, mattered, next });
+  const saveReflection = () => { dispatch({ type: "ADD_ARTIFACT", artifact: makeArtifact("reflection", happened.trim().slice(0, 54) || "Reflection", `What happened: ${happened}\nWhy it mattered: ${mattered}\nWhat changes next: ${next}`, "Reflection", { linkedArtifactId: linked }) }); setHappened(""); setMattered(""); setNext(""); dispatch({ type: "CLEAR_DRAFT", key: "reflection:active" }); };
+  const saveStory = () => { dispatch({ type: "ADD_ARTIFACT", artifact: makeArtifact("story", theme.trim() || "Story pattern", story.trim(), "Story Studio", { theme, sourceIds: sourceIds.join(",") }) }); setTheme(""); setStory(""); setSourceIds([]); };
+  return <div className="workspace-grid"><section className="workspace-card"><div className="visual-sequence"><span>What happened</span><span>Why it mattered</span><span>What changes next</span></div><h2>Build a reflection</h2><Field label="Linked experience"><select value={linked} onChange={(event) => setLinked(event.target.value)}><option value="">None yet</option>{experiences.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></Field><Field label="What happened?"><textarea value={happened} onChange={(event) => setHappened(event.target.value)} /></Field><Field label="Why did it matter?"><textarea value={mattered} onChange={(event) => setMattered(event.target.value)} /></Field><Field label="What changes next?"><textarea value={next} onChange={(event) => setNext(event.target.value)} /></Field><PrivacySignals value={reflectionText} /><button className="primary-button" disabled={!happened.trim() || !mattered.trim() || sensitiveSignals(reflectionText).length > 0} onClick={saveReflection}>Save reflection</button></section><section className="workspace-card"><div className="visual-sequence"><span>Evidence</span><span>Pattern</span><span>Theme</span><span>Direction</span></div><h2>Story Studio</h2><Field label="Theme"><input value={theme} onChange={(event) => setTheme(event.target.value)} placeholder="Clear communication" /></Field><fieldset className="source-picker"><legend>Choose source entries</legend>{state.artifacts.filter((item) => item.kind === "experience" || item.kind === "reflection").map((item) => <label key={item.id}><input type="checkbox" checked={sourceIds.includes(item.id)} onChange={(event) => setSourceIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} />{item.title}</label>)}</fieldset><Field label="Story fragment"><textarea value={story} onChange={(event) => setStory(event.target.value)} /></Field><button className="primary-button" disabled={!story.trim() || !sourceIds.length} onClick={saveStory}>Save story fragment</button></section></div>;
+}
+
+function ApplicationWorkspace() {
+  const { state, dispatch } = usePrototype();
+  const [selectedIds, setSelectedIds] = useState<string[]>(state.packet.packetItemIds);
+  const [advisorId, setAdvisorId] = useState(state.packet.advisorId || state.advisors[0]?.id || "");
+  const [goal, setGoal] = useState(state.packet.meetingGoal);
+  const [question, setQuestion] = useState(state.packet.questions.join("\n"));
+  const [action, setAction] = useState(state.packet.proposedActions.join("\n"));
+  const [expiresAt, setExpiresAt] = useState(state.packet.expiresAt.slice(0, 10));
+  const data = useMemo(() => buildApplicationExport(state), [state]);
+  const download = () => { const blob = new Blob([buildApplicationExportText(data)], { type: "text/markdown;charset=utf-8" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "navigate-the-pathway-application-notes.md"; link.click(); URL.revokeObjectURL(url); };
+  const share = () => { const advisor = state.advisors.find((item) => item.id === advisorId); dispatch({ type: "PATCH_PACKET", patch: { advisorId, advisorName: advisor?.name || "Fictional advisor", meetingGoal: goal.trim(), questions: question.split("\n").filter(Boolean), proposedActions: action.split("\n").filter(Boolean), packetItemIds: selectedIds, status: "shared", expiresAt: new Date(`${expiresAt}T23:59:59`).toISOString() }, event: { id: makeId("event"), type: "shared", createdAt: nowIso(), safeDetail: "Student opened a limited advising share" } }); };
+  const revoke = () => dispatch({ type: "PATCH_PACKET", patch: { status: "revoked", packetItemIds: [] }, event: { id: makeId("event"), type: "revoked", createdAt: nowIso(), safeDetail: "Student ended advisor visibility" } });
+  return <div className="workspace-grid"><section className="workspace-card workspace-card--wide"><div className="visual-sequence"><span>Choose evidence</span><span>Name the goal</span><span>Set access</span><span>Review together</span></div><h2>Prepare an advising packet</h2><div className="packet-builder"><fieldset className="source-picker"><legend>Student-selected items</legend>{state.artifacts.map((item) => <label key={item.id}><input type="checkbox" checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} />{item.title}<small>{item.kind.replaceAll("_", " ")}</small></label>)}</fieldset><div><Field label="Fictional advisor"><select value={advisorId} onChange={(event) => setAdvisorId(event.target.value)}>{state.advisors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Meeting goal"><input value={goal} onChange={(event) => setGoal(event.target.value)} /></Field><Field label="Questions, one per line"><textarea value={question} onChange={(event) => setQuestion(event.target.value)} /></Field><Field label="Possible next actions"><textarea value={action} onChange={(event) => setAction(event.target.value)} /></Field><Field label="Access ends"><input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></Field><div className="workspace-actions"><button className="primary-button" disabled={!selectedIds.length || !goal.trim()} onClick={share}>Open limited share</button>{state.packet.status === "shared" ? <button className="text-button" onClick={revoke}>Revoke now</button> : null}</div></div></div><p className="workspace-safe">Status: {state.packet.status}. Advisors see only selected items while this share is active.</p></section><section className="workspace-card workspace-card--wide"><h2>Application notes export</h2><div className="export-summary"><span>{data.experienceGroups.reduce((total, group) => total + group.entries.length, 0)} experiences</span><span>{data.reflections.length} reflections</span><span>{data.stories.length} story fragments</span></div><div className="workspace-actions"><button className="primary-button" onClick={() => window.print()}>Print or save PDF</button><button className="secondary-button" onClick={download}>Download text</button></div><p className="character-note">Activity descriptions often use 700 characters. Most Meaningful responses often use 1,325.</p></section></div>;
+}
+
+function PortfolioWorkspace() {
+  const { state } = usePrototype();
+  const [kind, setKind] = useState("all");
+  const items = state.artifacts.filter((item) => kind === "all" || item.kind === kind);
+  return <section className="workspace-card workspace-card--wide portfolio-workspace"><div><p className="kicker">Portfolio history</p><h2>Every saved artifact and revision</h2></div><Field label="Filter"><select value={kind} onChange={(event) => setKind(event.target.value)}><option value="all">All work</option><option value="experience">Experiences</option><option value="reflection">Reflections</option><option value="learning_experiment">Study strategies</option><option value="story">Stories</option><option value="course_plan">Course plans</option></select></Field><div className="workspace-list">{items.map((item) => <article key={item.id}><strong>{item.title}</strong><span>{item.kind.replaceAll("_", " ")} · {new Date(item.updatedAt).toLocaleDateString()}</span><small>{item.body}</small>{item.revisions.length ? <details><summary>{item.revisions.length} earlier version{item.revisions.length === 1 ? "" : "s"}</summary>{item.revisions.map((revision) => <p key={revision.id}>{revision.body}</p>)}</details> : null}</article>)}</div></section>;
+}
+
+export function FeatureWorkspaces({ initial = "experience", quick = false, onBack }: { initial?: WorkspaceId; quick?: boolean; onBack: () => void }) {
+  const [active, setActive] = useState<WorkspaceId>(initial);
+  const [portfolio, setPortfolio] = useState(false);
+  const current = workspaceLabels.find((item) => item.id === active) ?? workspaceLabels[1];
+  return <main className="feature-workspace"><WorkspaceHeader id={active} onBack={onBack} /><RosieGuide pose="pointing" compact eyebrow="Recommended station" title={current.name} body="Choose one practical action. Everything saves on this device." /><nav className="workspace-nav" aria-label="Pathway stations">{workspaceLabels.map((item) => <button key={item.id} className={active === item.id && !portfolio ? "active" : ""} onClick={() => { setActive(item.id); setPortfolio(false); }}>{item.name}</button>)}<button className={portfolio ? "active" : ""} onClick={() => setPortfolio(true)}>Portfolio</button></nav>{portfolio ? <PortfolioWorkspace /> : active === "course" ? <CourseWorkspace /> : active === "experience" ? <ExperienceWorkspace quick={quick} /> : active === "compassion" ? <CompassionWorkspace /> : active === "cohort" ? <CohortWorkspace /> : active === "reflection" ? <ReflectionWorkspace /> : <ApplicationWorkspace />}</main>;
+}
+
+export function ReviewerWorkspace({ mode, onBack }: { mode: "advisor" | "admin"; onBack: () => void }) {
+  const { state, dispatch } = usePrototype();
+  const [comment, setComment] = useState("");
+  const visible = advisorVisibleArtifacts(state);
+  const presets = Object.keys(personaIntakes) as PersonaPreset[];
+  if (mode === "admin") return <main className="feature-workspace reviewer-workspace"><header className="workspace-header"><button className="text-button" onClick={onBack}>Back</button><div><p className="kicker">Fictional reviewer view</p><h1>Pilot Administration</h1></div></header><RosieGuide pose="idle" compact title="Nothing here represents a real student." body="Use eight fictional routes to review recommendations and readiness decisions." /><section className="workspace-card workspace-card--wide"><h2>Eight route presets</h2><div className="preset-grid">{presets.map((preset) => { const route = recommendRoute(personaIntakes[preset]); return <button key={preset} onClick={() => dispatch({ type: "LOAD_PRESET", preset })}><strong>{preset}</strong><span>{route.recommendedRoute}</span><small>{route.reasons[0]}</small></button>; })}</div></section><section className="workspace-card workspace-card--wide"><h2>Pilot readiness</h2><ul className="readiness-list"><li>Backup moderator named</li><li>Advising relationships confirmed</li><li>Content sources reviewed for accuracy</li><li>Access and invitation strategy decided</li><li>Privacy, evaluation, and possible IRB conversation completed</li></ul><p className="workspace-safe">The Supabase schema is an architecture reference only. No production persistence is active.</p></section></main>;
+  return <main className="feature-workspace reviewer-workspace"><header className="workspace-header"><button className="text-button" onClick={onBack}>Back</button><div><p className="kicker">Fictional reviewer view</p><h1>Advisor packet</h1></div></header><RosieGuide pose="idle" compact title="Only active, selected items appear here." body="Revocation or expiration removes visibility immediately." /><section className="workspace-card workspace-card--wide"><div className="packet-status"><strong>{state.packet.title}</strong><span>{state.packet.status} · Access ends {new Date(state.packet.expiresAt).toLocaleDateString()}</span></div>{visible.length ? <div className="workspace-list">{visible.map((item) => <article key={item.id}><strong>{item.title}</strong><span>{item.kind.replaceAll("_", " ")}</span><small>{item.body}</small></article>)}</div> : <p className="workspace-warning">No active student-selected packet is visible.</p>}<Field label="Coaching question or next action"><textarea value={comment} onChange={(event) => setComment(event.target.value)} /></Field><button className="primary-button" disabled={!comment.trim() || !visible.length} onClick={() => { dispatch({ type: "PATCH_PACKET", patch: { comments: [...state.packet.comments, { id: makeId("comment"), author: "advisor", kind: "next_action", body: comment.trim(), createdAt: nowIso() }] } }); setComment(""); }}>Return one next action</button></section></main>;
+}
+
+export function workspaceForStation(station: string): WorkspaceId {
+  return station === "courses" ? "course" : station === "evidence" ? "experience" : station === "service" ? "compassion" : station === "cohort" ? "cohort" : station === "reflection" ? "reflection" : "application";
+}
+
+export { routeDestination };

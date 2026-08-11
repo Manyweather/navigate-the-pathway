@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-
-type Focus = "records" | "courses" | "story" | "support" | "unsure";
-type View = "welcome" | "trust" | "setup" | "map" | "mission" | "stamp" | "home" | "cohort" | "vault";
-type StationId = "courses" | "evidence" | "service" | "cohort" | "reflection" | "application";
+import { makeArtifact, makeId, nowIso } from "./demo-model";
+import { RosieGuide } from "./components/rosie-guide";
+import { workspaceForStation, type WorkspaceId } from "./components/feature-workspaces";
+import {
+  usePrototype,
+  type MediaArtifact,
+  type MediaFocus as Focus,
+  type MediaProgressState,
+  type MediaView as View,
+  type StationId,
+} from "./prototype-store";
 
 type MediaSource = { src: string; type: "video/mp4" | "video/webm" };
 
@@ -40,27 +47,7 @@ export type MissionDefinition = {
   stamp: string;
 };
 
-type Artifact = {
-  id: string;
-  missionId: string;
-  stationId: StationId;
-  label: string;
-  response: string;
-  savedAt: string;
-};
-
-export type ProgressState = {
-  artifacts: Artifact[];
-  stamps: StationId[];
-  suggestedStation: StationId;
-  diagramProgress: Record<string, number>;
-  viewedVideos: string[];
-  commitment: string | null;
-  reminderDate: string;
-  focus: Focus | null;
-  lastUpdate: string;
-  lastView: View;
-};
+export type ProgressState = MediaProgressState;
 
 type Station = {
   id: StationId;
@@ -70,7 +57,6 @@ type Station = {
   missionId: string;
 };
 
-const STORAGE_KEY = "navigate.pipeline.progress.v1";
 const stationOrder: StationId[] = ["evidence", "reflection", "cohort", "courses", "service", "application"];
 
 const diagrams: Record<StationId, DiagramDefinition> = {
@@ -150,11 +136,11 @@ const diagrams: Record<StationId, DiagramDefinition> = {
 const media: Record<string, MediaDefinition> = {
   welcome: {
     id: "welcome",
-    title: "Welcome from your Navigate Learning Coach",
+    title: "Welcome from Rosie",
     sources: [],
-    poster: "/assets/navigate-learning-coach-v1.png",
+    poster: "/assets/rosie/gesture.webp",
     captions: "/media/welcome.vtt",
-    transcript: "Welcome to Navigate. Your experiences already matter. This device keeps your private drafts. After setup, you will see a district built around your next useful action. You can skip any media and keep moving.",
+    transcript: "Welcome to Navigate the Pathway. Your experiences already matter. This device keeps your private drafts. After setup, you will see a district built around your next useful action. You can skip any media and keep moving.",
     duration: 36,
     autoplayOnce: true,
     storyboard: ["Your experiences matter.", "Drafts stay on this device.", "Choose one useful next move."],
@@ -219,19 +205,6 @@ const commitmentOptions = [
   { id: "cohort-participation", label: "Join a cohort prompt", icon: "+" },
   { id: "reflection-review", label: "Review a reflection", icon: "R" },
 ];
-
-const emptyProgress: ProgressState = {
-  artifacts: [],
-  stamps: [],
-  suggestedStation: "evidence",
-  diagramProgress: {},
-  viewedVideos: [],
-  commitment: null,
-  reminderDate: "In 3 days",
-  focus: null,
-  lastUpdate: "",
-  lastView: "welcome",
-};
 
 function MediaMoment({ definition, viewed, onViewed }: { definition: MediaDefinition; viewed: boolean; onViewed: (id: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -327,7 +300,7 @@ function StationDiagram({ definition, revealed, onReveal }: { definition: Diagra
 }
 
 function BrandLockup() {
-  return <span className="brand-lockup"><img src="/assets/navigate-pipeline-roseman.png" alt="Navigate the Pipeline" /></span>;
+  return <span className="brand-lockup"><img src="/assets/navigate-pathway-mark.svg" alt="Navigate the Pathway" /></span>;
 }
 
 function AppDock({ view, enabled, navigate }: { view: View; enabled: boolean; navigate: (view: View) => void }) {
@@ -340,40 +313,33 @@ function AppDock({ view, enabled, navigate }: { view: View; enabled: boolean; na
   return <nav className="app-dock" aria-label="App destinations">{items.map((item) => <button key={item.id} type="button" disabled={!enabled} className={view === item.id ? "app-dock__active" : ""} onClick={() => navigate(item.id)}><b aria-hidden="true">{item.icon}</b><span>{item.label}</span></button>)}</nav>;
 }
 
-export function JourneyExperience() {
+export function JourneyExperience({
+  onOpenWorkspace,
+  onOpenReviewers,
+}: {
+  onOpenWorkspace: (workspace: WorkspaceId) => void;
+  onOpenReviewers: () => void;
+}) {
+  const {
+    state,
+    dispatch,
+    hydrated,
+    setMediaProgress: setProgress,
+    clearDeviceData: clearPrototypeData,
+  } = usePrototype();
   const [view, setView] = useState<View>("welcome");
   const [focus, setFocus] = useState<Focus | null>(null);
   const [activeStationId, setActiveStationId] = useState<StationId>("evidence");
   const [activeMissionId, setActiveMissionId] = useState("log-experience");
   const [response, setResponse] = useState("");
-  const [progress, setProgress] = useState<ProgressState>(emptyProgress);
-  const [resumeProgress, setResumeProgress] = useState<ProgressState | null>(null);
-  const [hydrated, setHydrated] = useState(false);
   const [lastStamp, setLastStamp] = useState("");
+  const progress = state.media;
+  const resumeProgress: ProgressState | null = hydrated && progress.lastUpdate ? progress : null;
 
   const activeStation = stations.find((station) => station.id === activeStationId) ?? stations[1];
   const activeMission = missions.find((mission) => mission.id === activeMissionId) ?? missions[0];
   const diagramRevealed = progress.diagramProgress[activeMission.diagram.id] ?? -1;
   const diagramComplete = diagramRevealed >= activeMission.diagram.steps.length - 1;
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved) setResumeProgress({ ...emptyProgress, ...JSON.parse(saved) } as ProgressState);
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-    setHydrated(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated || view === "welcome") return;
-    const snapshot = { ...progress, focus, lastUpdate: new Date().toISOString(), lastView: view };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-  }, [focus, hydrated, progress, view]);
 
   const suggestedStation = stations.find((station) => station.id === progress.suggestedStation) ?? stations[1];
   const completion = Math.round((progress.stamps.length / stations.length) * 100);
@@ -381,7 +347,13 @@ export function JourneyExperience() {
   const markVideoViewed = (id: string) => setProgress((current) => current.viewedVideos.includes(id) ? current : { ...current, viewedVideos: [...current.viewedVideos, id] });
 
   const scrollTop = () => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-  const navigate = (nextView: View) => { setView(nextView); scrollTop(); };
+  const navigate = (nextView: View) => {
+    setView(nextView);
+    if (nextView !== "welcome") {
+      setProgress((current) => ({ ...current, lastView: nextView, lastUpdate: nowIso() }));
+    }
+    scrollTop();
+  };
 
   const beginMission = (missionId: string) => {
     const mission = missions.find((item) => item.id === missionId) ?? missions[0];
@@ -402,12 +374,15 @@ export function JourneyExperience() {
   const completeMission = () => {
     if (!diagramComplete || !response.trim()) return;
     const savedAt = new Date().toISOString();
-    const artifact: Artifact = { id: `${activeMission.id}-${savedAt}`, missionId: activeMission.id, stationId: activeMission.stationId, label: activeMission.requiredArtifact, response: response.trim(), savedAt };
+    const artifact: MediaArtifact = { id: `${activeMission.id}-${savedAt}`, missionId: activeMission.id, stationId: activeMission.stationId, label: activeMission.requiredArtifact, response: response.trim(), savedAt };
     setProgress((current) => {
       const stamps = current.stamps.includes(activeMission.stationId) ? current.stamps : [...current.stamps, activeMission.stationId];
       const suggestedStation = stationOrder.find((id) => !stamps.includes(id)) ?? "evidence";
       return { ...current, artifacts: [artifact, ...current.artifacts], stamps, suggestedStation, lastUpdate: savedAt };
     });
+    const kind = activeMission.stationId === "evidence" ? "experience" : activeMission.stationId === "reflection" || activeMission.stationId === "service" ? "reflection" : activeMission.stationId === "courses" ? "course_plan" : "action_plan";
+    dispatch({ type: "ADD_ARTIFACT", artifact: { ...makeArtifact(kind, activeMission.requiredArtifact, response.trim(), activeStation.name, { missionId: activeMission.id }), id: artifact.id, createdAt: savedAt, updatedAt: savedAt } });
+    dispatch({ type: "ADD_TRAIL", event: { id: makeId("stamp"), actionType: `${activeMission.id}_completed`, sourceId: artifact.id, earnedAt: savedAt, label: activeMission.stamp } });
     setLastStamp(activeMission.stamp);
     navigate("stamp");
   };
@@ -423,15 +398,12 @@ export function JourneyExperience() {
 
   const restartSetup = () => {
     setFocus(null);
-    setResumeProgress(null);
     setView("trust");
     scrollTop();
   };
 
   const clearDeviceData = () => {
-    window.localStorage.removeItem(STORAGE_KEY);
-    setProgress(emptyProgress);
-    setResumeProgress(null);
+    clearPrototypeData();
     setFocus(null);
     setActiveStationId("evidence");
     setActiveMissionId("log-experience");
@@ -444,7 +416,7 @@ export function JourneyExperience() {
     const option = focusOptions.find((item) => item.id === focus) ?? focusOptions[0];
     const mission = missions.find((item) => item.id === option.missionId) ?? missions[0];
     setActiveStationId(mission.stationId);
-    setProgress((current) => ({ ...current, focus, commitment: mission.id, suggestedStation: mission.stationId }));
+    setProgress((current) => ({ ...current, focus, commitment: mission.id, suggestedStation: mission.stationId, lastUpdate: nowIso() }));
     navigate("map");
   };
 
@@ -454,13 +426,13 @@ export function JourneyExperience() {
   return (
     <main className="site-shell">
       <div className="ambient ambient--one" aria-hidden="true" /><div className="ambient ambient--two" aria-hidden="true" />
-      <header className="topbar"><button className="brand-button" type="button" onClick={() => view === "welcome" ? scrollTop() : navigate("home")}><BrandLockup /></button><span className="concept-label">Interactive concept</span></header>
+      <header className="topbar"><button className="brand-button" type="button" onClick={() => view === "welcome" ? scrollTop() : navigate("home")}><BrandLockup /></button><div className="topbar-actions"><button className="text-button" type="button" onClick={onOpenReviewers}>Reviewer views</button><span className="concept-label">Interactive concept</span></div></header>
 
       <div className="experience" id="top">
         {view === "welcome" ? <section className="screen welcome-screen" aria-labelledby="welcome-title">
           <div className="institutional-line"><span>Roseman University</span><span>College of Medicine concept</span></div>
           <div className="welcome-grid">
-            <div className="welcome-copy"><p className="kicker">Navigate Learning Coach</p><h1 id="welcome-title">Your experiences already matter.</h1><p className="lede">Build one useful piece at a time.</p><button className="primary-button" type="button" onClick={() => navigate("trust")}>Begin setup <span aria-hidden="true">→</span></button></div>
+            <div className="welcome-copy"><p className="kicker">Rosie, your pathway guide</p><h1 id="welcome-title">Your experiences already matter.</h1><p className="lede">Build one useful piece at a time.</p><button className="primary-button" type="button" onClick={() => navigate("trust")}>Begin setup <span aria-hidden="true">→</span></button></div>
             <MediaMoment definition={media.welcome} viewed={progress.viewedVideos.includes("welcome")} onViewed={markVideoViewed} />
           </div>
           {resumeProgress ? <div className="resume-card"><div><span>Saved on this device</span><strong>{resumeProgress.artifacts.length} artifacts · {resumeProgress.stamps.length} stamps</strong></div><div><button className="primary-button" type="button" onClick={continuePathway}>Continue my pathway</button><button className="text-button" type="button" onClick={restartSetup}>Start over</button></div></div> : null}
@@ -468,6 +440,7 @@ export function JourneyExperience() {
 
         {view === "trust" ? <section className="screen compact-screen" aria-labelledby="trust-title">
           <div className="screen-heading"><p className="kicker">Before setup</p><h1 id="trust-title">Private by default.</h1><p>Drafts stay on this device.</p></div>
+          <RosieGuide pose="idle" compact title="Keep identifying details out." body="You control every saved artifact and advising share." />
           <div className="trust-grid">
             <article><span>01</span><strong>You choose what to share.</strong></article>
             <article><span>02</span><strong>No admissions predictions.</strong></article>
@@ -485,8 +458,9 @@ export function JourneyExperience() {
         {view === "map" ? <section className="screen map-screen" aria-labelledby="map-title">
           <div className="screen-heading map-heading"><div><p className="kicker">Premed district</p><h1 id="map-title">Choose a station.</h1><p>All stations are open.</p></div><div className="stamp-count"><span>{progress.stamps.length}</span><small>stamps</small></div></div>
           <div className="map-recommendation"><span>★</span><p>Suggested now: <strong>{suggestedStation.name}</strong></p></div>
+          <RosieGuide pose="pointing" compact eyebrow="Rosie recommends" title={suggestedStation.name} body="Use the suggestion or choose any open station." />
           <div className="district-map" aria-label="Scrollable station map"><div className="district-map__canvas"><img src="/assets/premed-district-map.png" alt="Illustrated pathway through six premed learning stations" />{stations.map((station) => <button key={station.id} type="button" className={`station station--${station.id} ${activeStationId === station.id ? "station--active" : ""} ${progress.suggestedStation === station.id ? "station--recommended" : ""} ${progress.stamps.includes(station.id) ? "station--stamped" : ""}`} onClick={() => openStation(station)}><span>{progress.stamps.includes(station.id) ? "✓" : station.icon}</span><strong>{station.name}</strong></button>)}</div></div>
-          <article className="station-sheet"><div className="station-sheet__title"><span>{activeStation.icon}</span><div><small>{activeStation.short}</small><h2>{activeStation.name}</h2></div>{progress.stamps.includes(activeStation.id) ? <b className="earned-label">Stamped</b> : null}</div><StationDiagram definition={diagrams[activeStation.id]} revealed={Math.max(-1, progress.diagramProgress[diagrams[activeStation.id].id] ?? -1)} onReveal={(index) => setProgress((current) => ({ ...current, diagramProgress: { ...current.diagramProgress, [diagrams[activeStation.id].id]: Math.max(current.diagramProgress[diagrams[activeStation.id].id] ?? -1, index) } }))} /><button className="primary-button primary-button--wide" type="button" onClick={() => beginMission(activeStation.missionId)}>Start this mission</button></article>
+          <article className="station-sheet"><div className="station-sheet__title"><span>{activeStation.icon}</span><div><small>{activeStation.short}</small><h2>{activeStation.name}</h2></div>{progress.stamps.includes(activeStation.id) ? <b className="earned-label">Stamped</b> : null}</div><StationDiagram definition={diagrams[activeStation.id]} revealed={Math.max(-1, progress.diagramProgress[diagrams[activeStation.id].id] ?? -1)} onReveal={(index) => setProgress((current) => ({ ...current, diagramProgress: { ...current.diagramProgress, [diagrams[activeStation.id].id]: Math.max(current.diagramProgress[diagrams[activeStation.id].id] ?? -1, index) } }))} /><div className="station-actions"><button className="primary-button primary-button--wide" type="button" onClick={() => beginMission(activeStation.missionId)}>Start this mission</button><button className="secondary-button" type="button" onClick={() => onOpenWorkspace(workspaceForStation(activeStation.id))}>Open station workspace</button></div></article>
         </section> : null}
 
         {view === "mission" ? <section className="screen mission-screen" aria-labelledby="mission-title">
@@ -497,22 +471,22 @@ export function JourneyExperience() {
           <div className="action-row"><button className="text-button" type="button" onClick={() => navigate("map")}>Back to map</button><button className="primary-button" type="button" disabled={!diagramComplete || !response.trim()} onClick={completeMission}>Save and stamp</button></div>
         </section> : null}
 
-        {view === "stamp" ? <section className="screen stamp-screen" aria-labelledby="stamp-title"><div className="stamp-seal" aria-hidden="true"><span>✓</span><small>Navigate</small></div><p className="kicker">Station complete</p><h1 id="stamp-title">{lastStamp}</h1><p>{activeMission.diagram.completionState}.</p><button className="primary-button" type="button" onClick={() => navigate("map")}>Return to the district</button></section> : null}
+        {view === "stamp" ? <section className="screen stamp-screen" aria-labelledby="stamp-title"><RosieGuide pose="nodding" compact eyebrow="Saved" title="Your work is in the Vault." /><div className="stamp-seal" aria-hidden="true"><span>✓</span><small>Navigate</small></div><p className="kicker">Station complete</p><h1 id="stamp-title">{lastStamp}</h1><p>{activeMission.diagram.completionState}.</p><button className="primary-button" type="button" onClick={() => navigate("map")}>Return to the district</button></section> : null}
 
         {view === "home" ? <section className="screen dashboard" aria-labelledby="home-title">
           <div className="dashboard-hero"><div><p className="kicker">Your pathway</p><h1 id="home-title">One clear next move.</h1><p>{progress.artifacts.length} saved artifacts · {progress.stamps.length} station stamps</p></div><div className="completion-ring" aria-label={`${completion}% of stations stamped`}><span>{completion}%</span><small>explored</small></div></div>
-          <div className="next-move-card"><div><span>Recommended</span><h2>{selectedMission.title}</h2></div><button className="primary-button" type="button" onClick={() => beginMission(selectedMission.id)}>Open next move</button></div>
+          <div className="next-move-card"><div><span>Recommended</span><h2>{selectedMission.title}</h2></div><div className="next-move-actions"><button className="primary-button" type="button" onClick={() => beginMission(selectedMission.id)}>Open next move</button><button className="secondary-button" type="button" onClick={() => onOpenWorkspace(workspaceForStation(selectedMission.stationId))}>Open station workspace</button></div></div>
           <section className="commitment-panel" aria-labelledby="commitment-title"><h2 id="commitment-title">Change my next move</h2><div className="commitment-grid">{commitmentOptions.map((item) => <button key={item.id} type="button" aria-pressed={selectedCommitment === item.id} className={selectedCommitment === item.id ? "commitment--selected" : ""} onClick={() => setProgress((current) => ({ ...current, commitment: item.id }))}><span>{item.icon}</span>{item.label}</button>)}</div></section>
           <div className="device-actions"><label>Reminder<select value={progress.reminderDate} onChange={(event) => setProgress((current) => ({ ...current, reminderDate: event.target.value }))}><option>Tomorrow</option><option>In 3 days</option><option>Next week</option><option>No reminder</option></select></label><button className="text-button" type="button" onClick={clearDeviceData}>Clear this device&apos;s data</button></div>
         </section> : null}
 
-        {view === "cohort" ? <section className="screen compact-screen" aria-labelledby="cohort-title"><div className="screen-heading"><p className="kicker">Cohort Commons</p><h1 id="cohort-title">Participation has modes.</h1><p>Start where your energy allows.</p></div><MediaMoment definition={media.cohort} viewed={progress.viewedVideos.includes("cohort")} onViewed={markVideoViewed} /><div className="participation-modes">{diagrams.cohort.steps.map((item, index) => <button type="button" key={item.label} onClick={() => beginMission("cohort-participation")}><span>{index + 1}</span><strong>{item.label}</strong><small>{index === 3 ? "Optional" : "Valid participation"}</small></button>)}</div><p className="privacy-note">Drafts stay here. Nothing is sent.</p></section> : null}
+        {view === "cohort" ? <section className="screen compact-screen" aria-labelledby="cohort-title"><div className="screen-heading"><p className="kicker">Cohort Commons</p><h1 id="cohort-title">Participation has modes.</h1><p>Start where your energy allows.</p></div><MediaMoment definition={media.cohort} viewed={progress.viewedVideos.includes("cohort")} onViewed={markVideoViewed} /><div className="participation-modes">{diagrams.cohort.steps.map((item, index) => <button type="button" key={item.label} onClick={() => beginMission("cohort-participation")}><span>{index + 1}</span><strong>{item.label}</strong><small>{index === 3 ? "Optional" : "Valid participation"}</small></button>)}</div><button className="secondary-button" type="button" onClick={() => onOpenWorkspace("cohort")}>Open cohort workspace</button><p className="privacy-note">Drafts stay here. Nothing is sent.</p></section> : null}
 
-        {view === "vault" ? <section className="screen compact-screen" aria-labelledby="vault-title"><div className="screen-heading"><p className="kicker">Experience Vault</p><h1 id="vault-title">Your saved evidence.</h1><p>Device only. Reuse when ready.</p></div>{progress.artifacts.length ? <div className="artifact-list">{progress.artifacts.map((artifact) => <article key={artifact.id}><div><span>{stations.find((station) => station.id === artifact.stationId)?.icon}</span><strong>{artifact.label}</strong></div><p>{artifact.response}</p><small>{new Date(artifact.savedAt).toLocaleDateString()}</small></article>)}</div> : <div className="empty-vault"><span>V</span><h2>No artifacts yet.</h2><button className="primary-button" type="button" onClick={() => beginMission("log-experience")}>Capture one experience</button></div>}<button className="text-button clear-button" type="button" onClick={clearDeviceData}>Clear this device&apos;s data</button></section> : null}
+        {view === "vault" ? <section className="screen compact-screen" aria-labelledby="vault-title"><div className="screen-heading"><p className="kicker">Experience Vault</p><h1 id="vault-title">Your saved evidence.</h1><p>Device only. Reuse when ready.</p></div>{progress.artifacts.length ? <div className="artifact-list">{progress.artifacts.map((artifact) => <article key={artifact.id}><div><span>{stations.find((station) => station.id === artifact.stationId)?.icon}</span><strong>{artifact.label}</strong></div><p>{artifact.response}</p><small>{new Date(artifact.savedAt).toLocaleDateString()}</small></article>)}</div> : <div className="empty-vault"><span>V</span><h2>No artifacts yet.</h2><button className="primary-button" type="button" onClick={() => beginMission("log-experience")}>Capture one experience</button></div>}<div className="vault-actions"><button className="secondary-button" type="button" onClick={() => onOpenWorkspace("experience")}>Open experience workspace</button><button className="text-button clear-button" type="button" onClick={clearDeviceData}>Clear this device&apos;s data</button></div></section> : null}
       </div>
 
       <AppDock view={view} enabled={["map", "mission", "stamp", "home", "cohort", "vault"].includes(view)} navigate={navigate} />
-      <footer className="site-footer"><p>Navigate the Pipeline concept</p><p>Not an admissions decision tool</p></footer>
+      <footer className="site-footer"><p>Navigate the Pathway concept</p><p>Not an admissions decision tool</p></footer>
     </main>
   );
 }
