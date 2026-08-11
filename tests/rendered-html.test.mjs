@@ -136,3 +136,23 @@ test("course and experience workspaces steer toward AMCAS organization without b
   assert.match(styles, /\.guidance-details/);
   assert.match(styles, /\.alignment-grid/);
 });
+
+test("Story Studio turns AAMC essay guidance into student-authored visual lenses", async () => {
+  const [workspaces, guidance, exportSource, styles] = await Promise.all([
+    readFile(new URL("../app/components/feature-workspaces.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/aamc-guidance.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/application-export.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  for (const label of ["Why medicine?", "What shaped you?", "What should they know?", "Where are you going?"]) assert.match(guidance, new RegExp(label.replace("?", "\\?")));
+  assert.match(workspaces, /Personal essay map/);
+  assert.match(workspaces, /You do not need to disclose hardship/);
+  assert.match(workspaces, /Draft in plain text when you are ready/);
+  assert.match(workspaces, /final submission must reflect your own work and experiences/);
+  assert.match(guidance, /personalCommentsCharacters: 5300/);
+  assert.match(guidance, /mdPhdCharacters: 3000/);
+  assert.match(guidance, /significantResearchCharacters: 10000/);
+  assert.match(exportSource, /Personal Comments essay preparation/);
+  assert.match(styles, /\.essay-lens-picker/);
+  assert.match(styles, /\.essay-prompt-card/);
+});

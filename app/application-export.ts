@@ -46,6 +46,9 @@ export type ApplicationExportStory = {
   theme?: string;
   body: string;
   sourceTitles: string[];
+  essayType?: string;
+  workingDraft?: string;
+  targetCharacters?: number;
 };
 
 export type ApplicationExport = {
@@ -150,6 +153,9 @@ export function buildApplicationExport(state: DemoState): ApplicationExport {
     ...(optionalText(item.metadata.theme) ? { theme: optionalText(item.metadata.theme) } : {}),
     body: item.body,
     sourceTitles: sourceIds(item).map((id) => artifactsById.get(id)?.title).filter((title): title is string => Boolean(title)),
+    ...(optionalText(item.metadata.essayType) ? { essayType: optionalText(item.metadata.essayType) } : {}),
+    ...(optionalText(item.metadata.workingDraft) ? { workingDraft: optionalText(item.metadata.workingDraft) } : {}),
+    ...(typeof item.metadata.targetCharacters === "number" ? { targetCharacters: item.metadata.targetCharacters } : {}),
   }));
 
   return { experienceGroups, reflections, stories };
@@ -195,9 +201,13 @@ export function buildApplicationExportText(data: ApplicationExport) {
   if (!data.stories.length) lines.push("No saved story fragments yet.", "");
   for (const item of data.stories) {
     lines.push(`### ${item.title}`, "");
+    if (item.essayType === "personal_comments") lines.push("Personal Comments essay preparation", "");
     if (item.theme) lines.push(`Theme: ${item.theme}`, "");
     if (item.sourceTitles.length) lines.push(`Sources: ${item.sourceTitles.join(", ")}`, "");
     lines.push(item.body, "");
+    if (item.workingDraft) {
+      lines.push(`Working draft (${item.workingDraft.length}${item.targetCharacters ? ` of ${item.targetCharacters}` : ""} characters):`, "", item.workingDraft, "");
+    }
   }
 
   return `${lines.join("\n").trim()}\n`;

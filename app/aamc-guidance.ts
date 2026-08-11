@@ -11,7 +11,53 @@ export const aamcLimits = {
   mostMeaningfulEntries: 3,
   experienceDescriptionCharacters: 700,
   mostMeaningfulCharacters: 1325,
+  personalCommentsCharacters: 5300,
+  mdPhdCharacters: 3000,
+  significantResearchCharacters: 10000,
 } as const;
+
+export const aamcPersonalEssayLenses = [
+  {
+    id: "motivation",
+    label: "Why medicine?",
+    prompt: "What has drawn you toward medicine, and what keeps you curious about it?",
+  },
+  {
+    id: "evidence",
+    label: "What shaped you?",
+    prompt: "Which experiences changed your understanding, choices, or sense of responsibility?",
+  },
+  {
+    id: "perspective",
+    label: "What should they know?",
+    prompt: "What perspective or part of your story is not already clear elsewhere in the application?",
+  },
+  {
+    id: "direction",
+    label: "Where are you going?",
+    prompt: "How do these experiences connect to the physician and learner you hope to become?",
+  },
+] as const;
+
+export const aamcEssayChecks = [
+  "The essay accurately reflects your perspective and experiences.",
+  "The final writing is your own, even when people or AI tools helped with brainstorming or editing.",
+  "The essay adds meaning instead of repeating information already reported elsewhere.",
+  "The draft works as plain text and has been proofread carefully.",
+  "You are comfortable sending this essay to every medical school on your application.",
+] as const;
+
+export const aamcOptionalContextPrompts = [
+  "A challenge or obstacle that influenced your educational path",
+  "Context for a meaningful change or fluctuation in your academic record",
+  "An experience or perspective that is not easily captured elsewhere",
+] as const;
+
+export const aamcMdPhdGuidance = [
+  "Use the MD-PhD essay to explain why the combined degree fits your goals.",
+  "For significant research, identify the supervisor and affiliation, duration, problem studied, and your contributions.",
+  "Place a full publication citation in Work/Activities when applicable.",
+] as const;
 
 export const aamcCourseClassifications = [
   "Biology (BIOL)",

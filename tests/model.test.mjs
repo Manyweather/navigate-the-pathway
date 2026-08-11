@@ -56,5 +56,8 @@ test("cycle-specific application preparation limits stay centralized", () => {
     mostMeaningfulEntries: 3,
     experienceDescriptionCharacters: 700,
     mostMeaningfulCharacters: 1325,
+    personalCommentsCharacters: 5300,
+    mdPhdCharacters: 3000,
+    significantResearchCharacters: 10000,
   });
 });

@@ -334,6 +334,16 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 .alignment-grid article { min-height: 105px; display: grid; align-content: center; gap: 5px; padding: 14px; border: 1px solid var(--line); border-radius: 15px; background: #fffdf9; text-align: center; }
 .alignment-grid span { color: var(--maroon); font-family: Georgia, serif; font-size: 1.6rem; font-weight: 700; }
 .alignment-grid p { margin: 0; color: var(--gray); font-size: 0.67rem; line-height: 1.4; }
+.essay-lens-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.essay-lens-picker button { min-height: 62px; display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 5px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: #fffdf9; color: var(--gray); text-align: left; font-size: 0.68rem; font-weight: 850; }
+.essay-lens-picker button span { color: var(--maroon); font-size: 1rem; }
+.essay-lens-picker button.active { border-color: var(--maroon); background: #f4e6ea; color: var(--maroon); box-shadow: inset 0 0 0 1px var(--maroon); }
+.essay-prompt-card { margin-bottom: 14px; padding: 16px; border-radius: 18px; background: #f8f0e4; }
+.essay-prompt-card strong { color: var(--maroon); font-family: Georgia, serif; font-size: 1.1rem; }
+.essay-prompt-card p { margin: 6px 0 12px; color: var(--gray); font-size: 0.78rem; line-height: 1.5; }
+.essay-prompt-card textarea { width: 100%; min-height: 130px; padding: 12px; border: 1px solid #cbbfaf; border-radius: 12px; background: white; color: var(--ink); line-height: 1.5; resize: vertical; }
+.prompt-list { padding-left: 20px; color: var(--gray); font-size: 0.72rem; line-height: 1.55; }
+.workspace-field textarea.essay-draft { min-height: 280px; }
 .support-orbit { min-height: 180px; position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin-top: 18px; border: 1px dashed #cbbfaf; border-radius: 50%; background: radial-gradient(circle, #fff 0 18%, #f7eee8 19% 36%, #fff 37% 56%, #f3e7e9 57%); }
 .support-orbit span { max-width: 130px; padding: 9px 12px; border-radius: 999px; background: var(--maroon); color: white; text-align: center; font-size: 0.72rem; font-weight: 850; }
 .support-orbit small { display: block; margin-top: 2px; color: #f4c9d6; font-size: 0.6rem; }
@@ -477,6 +487,7 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
   .section-count { align-items: flex-start; flex-direction: column; }
   .section-count > strong { width: 100%; }
   .alignment-grid { grid-template-columns: 1fr; }
+  .essay-lens-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workspace-why { grid-template-columns: 1fr; gap: 5px; }
   .visual-sequence { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .visual-sequence span:not(:last-child)::after { display: none; }

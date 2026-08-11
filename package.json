@@ -12,7 +12,7 @@
     "start": "vinext start",
     "test": "vinext build && pnpm build:pages && node --import tsx --test tests/*.test.mjs",
     "check": "pnpm lint && pnpm test",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern dist-pages --ignore-pattern .next --ignore-pattern cloudflare/worker-configuration.d.ts",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern dist-pages --ignore-pattern .next --ignore-pattern tmp --ignore-pattern cloudflare/worker-configuration.d.ts",
     "worker:check": "wrangler deploy --dry-run -c cloudflare/wrangler.jsonc",
     "worker:deploy": "wrangler deploy -c cloudflare/wrangler.jsonc",
     "worker:types": "wrangler types cloudflare/worker-configuration.d.ts -c cloudflare/wrangler.jsonc",
