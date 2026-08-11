@@ -38,6 +38,24 @@ export type TrailEvent = { id: string; actionType: string; sourceId: string; ear
 export type CheckInValue = "steady" | "stretched" | "reset";
 export type CheckInEntry = { value: CheckInValue; at: string };
 export type AdvisorProfile = { id: string; name: string; initials: string; role: string };
+export type AdvisorDemoStudent = {
+  id: string;
+  name: string;
+  initials: string;
+  stage: string;
+  focus: string;
+  cycle: string;
+  lastUpdated: string;
+  packet: {
+    status: "shared" | "expired" | "revoked";
+    expiresAt: string;
+    meetingGoal: string;
+    questions: string[];
+    proposedActions: string[];
+    items: Array<Pick<Artifact, "id" | "kind" | "title" | "body" | "domain">>;
+    comments: PacketComment[];
+  };
+};
 export type WorkflowDraft = { key: string; workflow: WorkflowType; sourceId: string | null; fields: Record<string, DraftValue>; mode: string; updatedAt: string; submissionId: string };
 
 export type DemoState = {
@@ -144,6 +162,71 @@ export function createSharedScenarioState(role: "advisor" | "admin" = "advisor")
 export const personaIntakes: Record<PersonaPreset, IntakeAnswers> = {
   sparse: { ...filledIntake, stage: "senior", intention: "experiences", records: "sparse", experienceAreas: ["Clinical or service", "Research"], reflection: "some" }, quiet: { ...filledIntake, intention: "support", coursework: "mapped", records: "detailed", reflection: "regular", participation: "observe", supportRoles: 3 }, overloaded: { ...filledIntake, intention: "courses", bandwidth: "low", coursework: "mapped", records: "detailed", reflection: "regular", supportRoles: 3 }, course: { ...filledIntake, intention: "courses", coursework: "uncertain", records: "detailed", reflection: "regular", supportRoles: 3 }, story: { ...filledIntake, intention: "learning", coursework: "mapped", records: "detailed", reflection: "none", supportRoles: 3 }, exposure: { ...filledIntake, intention: "exposure", coursework: "mapped", experienceAreas: ["Coursework"], records: "detailed", reflection: "regular", supportRoles: 3 }, support: { ...filledIntake, intention: "support", coursework: "mapped", records: "detailed", reflection: "regular", supportRoles: 1 }, application: { ...filledIntake, intention: "application", coursework: "mapped", records: "detailed", reflection: "regular", cycle: "near", supportRoles: 3 },
 };
+export const advisorDemoStudents: AdvisorDemoStudent[] = [
+  {
+    id: "student-jordan-lee",
+    name: "Jordan Lee",
+    initials: "JL",
+    stage: "Senior",
+    focus: "Course load and experience evidence",
+    cycle: "Planning for a later cycle",
+    lastUpdated: "2026-08-08T16:00:00.000Z",
+    packet: {
+      status: "shared",
+      expiresAt: "2026-12-31T23:59:59.000Z",
+      meetingGoal: "Build a sustainable fall plan",
+      questions: ["What tradeoffs should I consider before adding biochemistry?"],
+      proposedActions: ["Sketch two course loads and mark the tradeoffs I notice.", "Choose one experience entry to revise before the meeting."],
+      items: [
+        { id: "jordan-experience", kind: "experience", title: "Saturday clinic shift", body: "Helped a visitor understand what would happen next and noticed how much calm, specific language mattered.", domain: "Service and care" },
+        { id: "jordan-reflection", kind: "reflection", title: "What listening changed", body: "I entered the room focused on efficiency. Slowing down helped me understand that uncertainty was the visitor's biggest concern.", domain: "Communication" },
+        { id: "jordan-goal", kind: "goal", title: "Build a realistic fall plan", body: "Clarify whether to take biochemistry before applying and protect one evening each week for rest.", domain: "Planning" },
+      ],
+      comments: [{ id: "jordan-comment", author: "advisor", kind: "coaching_question", body: "What would make the fall feel sustainable, not just possible?", createdAt: "2026-08-08T16:00:00.000Z" }],
+    },
+  },
+  {
+    id: "student-maya-bennett",
+    name: "Maya Bennett",
+    initials: "MB",
+    stage: "Junior",
+    focus: "Research exploration and support",
+    cycle: "Application cycle is more than one year away",
+    lastUpdated: "2026-08-10T18:30:00.000Z",
+    packet: {
+      status: "shared",
+      expiresAt: "2026-11-30T23:59:59.000Z",
+      meetingGoal: "Choose a realistic first research exploration step",
+      questions: ["How can I evaluate whether a research setting will offer useful mentoring?"],
+      proposedActions: ["Attend one research information session.", "Draft two questions about entry-level participation and mentoring."],
+      items: [
+        { id: "maya-goal", kind: "goal", title: "Thirty-day research exploration", body: "Attend one fictional research information session and ask what entry-level participation involves.", domain: "Exploration" },
+        { id: "maya-action", kind: "action_plan", title: "Questions for a research conversation", body: "Ask how new students are supported, how feedback is provided, and what a manageable weekly commitment looks like.", domain: "Support" },
+      ],
+      comments: [],
+    },
+  },
+  {
+    id: "student-theo-morgan",
+    name: "Theo Morgan",
+    initials: "TM",
+    stage: "Senior",
+    focus: "Reflection and story development",
+    cycle: "Application timing is undecided",
+    lastUpdated: "2026-08-09T15:15:00.000Z",
+    packet: { status: "expired", expiresAt: "2026-08-09T23:59:59.000Z", meetingGoal: "", questions: [], proposedActions: [], items: [], comments: [] },
+  },
+  {
+    id: "student-alex-rivera",
+    name: "Alex Rivera",
+    initials: "AR",
+    stage: "Gap-year planning",
+    focus: "Application preparation",
+    cycle: "Planning to apply within 12 months",
+    lastUpdated: "2026-08-07T20:00:00.000Z",
+    packet: { status: "revoked", expiresAt: "2026-10-31T23:59:59.000Z", meetingGoal: "", questions: [], proposedActions: [], items: [], comments: [] },
+  },
+];
 export function makeId(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
 export function nowIso() { return new Date().toISOString(); }
 export function makeArtifact(kind: ArtifactKind, title: string, body: string, domain: string, metadata: Artifact["metadata"] = {}): Artifact { const createdAt = nowIso(); return { id: makeId("artifact"), kind, title, body, domain, visibility: "private", metadata, revisions: [], createdAt, updatedAt: createdAt }; }

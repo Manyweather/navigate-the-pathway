@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  advisorDemoStudents,
   advisorVisibleArtifacts,
   createSharedScenarioState,
   personaIntakes,
@@ -29,6 +30,12 @@ test("advisor visibility ends immediately after revocation or expiration", () =>
   assert.ok(advisorVisibleArtifacts(shared).length > 0);
   assert.deepEqual(advisorVisibleArtifacts({ ...shared, packet: { ...shared.packet, status: "revoked" } }), []);
   assert.deepEqual(advisorVisibleArtifacts({ ...shared, packet: { ...shared.packet, expiresAt: "2020-01-01T00:00:00.000Z" } }), []);
+});
+
+test("fictional advisor roster keeps packet content behind active sharing", () => {
+  assert.equal(advisorDemoStudents.length, 4);
+  assert.ok(advisorDemoStudents.filter((student) => student.packet.status === "shared").every((student) => student.packet.items.length > 0));
+  assert.ok(advisorDemoStudents.filter((student) => student.packet.status !== "shared").every((student) => student.packet.items.length === 0));
 });
 
 test("application export includes finished work and omits drafts", () => {

@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildApplicationExport, buildApplicationExportText } from "../application-export";
 import {
-  advisorVisibleArtifacts,
+  advisorDemoStudents,
   makeArtifact,
   makeDraft,
   makeId,
   nowIso,
   personaIntakes,
   recommendRoute,
+  routeContent,
   sensitiveSignals,
   type Artifact,
   type DestinationId,
@@ -37,6 +38,28 @@ const routeDestination: Record<WorkspaceId, DestinationId> = {
   cohort: "community",
   reflection: "reflection",
   application: "advisor",
+};
+
+const presetLabels: Record<PersonaPreset, string> = {
+  sparse: "Sparse records",
+  quiet: "Quiet participation",
+  overloaded: "Limited bandwidth",
+  course: "Course uncertainty",
+  story: "Reflection gap",
+  exposure: "Narrow exposure",
+  support: "Thin support network",
+  application: "Application preparation",
+};
+
+const destinationWorkspace: Record<DestinationId, WorkspaceId> = {
+  course: "course",
+  experience: "experience",
+  reflection: "reflection",
+  learning: "course",
+  support: "cohort",
+  community: "cohort",
+  story: "reflection",
+  advisor: "application",
 };
 
 function useAutosavedDraft(
@@ -208,13 +231,97 @@ export function FeatureWorkspaces({ initial = "experience", quick = false, onBac
   return <main className="feature-workspace"><WorkspaceHeader id={active} onBack={onBack} /><RosieGuide pose="pointing" compact eyebrow="Recommended station" title={current.name} body="Choose one practical action. Everything saves on this device." /><nav className="workspace-nav" aria-label="Pathway stations">{workspaceLabels.map((item) => <button key={item.id} className={active === item.id && !portfolio ? "active" : ""} onClick={() => { setActive(item.id); setPortfolio(false); }}>{item.name}</button>)}<button className={portfolio ? "active" : ""} onClick={() => setPortfolio(true)}>Portfolio</button></nav>{portfolio ? <PortfolioWorkspace /> : active === "course" ? <CourseWorkspace /> : active === "experience" ? <ExperienceWorkspace quick={quick} /> : active === "compassion" ? <CompassionWorkspace /> : active === "cohort" ? <CohortWorkspace /> : active === "reflection" ? <ReflectionWorkspace /> : <ApplicationWorkspace />}</main>;
 }
 
-export function ReviewerWorkspace({ mode, onBack }: { mode: "advisor" | "admin"; onBack: () => void }) {
-  const { state, dispatch } = usePrototype();
+export function ReviewerWorkspace({
+  mode,
+  onBack,
+  onOpenWorkspace,
+}: {
+  mode: "advisor" | "admin";
+  onBack: () => void;
+  onOpenWorkspace?: (workspace: WorkspaceId) => void;
+}) {
   const [comment, setComment] = useState("");
-  const visible = advisorVisibleArtifacts(state);
+  const [selectedStudentId, setSelectedStudentId] = useState(advisorDemoStudents[0].id);
+  const [advisorReplies, setAdvisorReplies] = useState<Record<string, string[]>>({});
+  const [selectedPreset, setSelectedPreset] = useState<PersonaPreset>("sparse");
   const presets = Object.keys(personaIntakes) as PersonaPreset[];
-  if (mode === "admin") return <main className="feature-workspace reviewer-workspace"><header className="workspace-header"><button className="text-button" onClick={onBack}>Back</button><div><p className="kicker">Fictional reviewer view</p><h1>Pilot Administration</h1></div></header><RosieGuide pose="idle" compact title="Nothing here represents a real student." body="Use eight fictional routes to review recommendations and readiness decisions." /><section className="workspace-card workspace-card--wide"><h2>Eight route presets</h2><div className="preset-grid">{presets.map((preset) => { const route = recommendRoute(personaIntakes[preset]); return <button key={preset} onClick={() => dispatch({ type: "LOAD_PRESET", preset })}><strong>{preset}</strong><span>{route.recommendedRoute}</span><small>{route.reasons[0]}</small></button>; })}</div></section><section className="workspace-card workspace-card--wide"><h2>Pilot readiness</h2><ul className="readiness-list"><li>Backup moderator named</li><li>Advising relationships confirmed</li><li>Content sources reviewed for accuracy</li><li>Access and invitation strategy decided</li><li>Privacy, evaluation, and possible IRB conversation completed</li></ul><p className="workspace-safe">The Supabase schema is an architecture reference only. No production persistence is active.</p></section></main>;
-  return <main className="feature-workspace reviewer-workspace"><header className="workspace-header"><button className="text-button" onClick={onBack}>Back</button><div><p className="kicker">Fictional reviewer view</p><h1>Advisor packet</h1></div></header><RosieGuide pose="idle" compact title="Only active, selected items appear here." body="Revocation or expiration removes visibility immediately." /><section className="workspace-card workspace-card--wide"><div className="packet-status"><strong>{state.packet.title}</strong><span>{state.packet.status} · Access ends {new Date(state.packet.expiresAt).toLocaleDateString()}</span></div>{visible.length ? <div className="workspace-list">{visible.map((item) => <article key={item.id}><strong>{item.title}</strong><span>{item.kind.replaceAll("_", " ")}</span><small>{item.body}</small></article>)}</div> : <p className="workspace-warning">No active student-selected packet is visible.</p>}<Field label="Coaching question or next action"><textarea value={comment} onChange={(event) => setComment(event.target.value)} /></Field><button className="primary-button" disabled={!comment.trim() || !visible.length} onClick={() => { dispatch({ type: "PATCH_PACKET", patch: { comments: [...state.packet.comments, { id: makeId("comment"), author: "advisor", kind: "next_action", body: comment.trim(), createdAt: nowIso() }] } }); setComment(""); }}>Return one next action</button></section></main>;
+  const selectedStudent = advisorDemoStudents.find((student) => student.id === selectedStudentId) ?? advisorDemoStudents[0];
+  const packetIsActive = selectedStudent.packet.status === "shared";
+  const selectedIntake = personaIntakes[selectedPreset];
+  const selectedRecommendation = recommendRoute(selectedIntake);
+  const selectedRoute = routeContent[selectedRecommendation.recommendedRoute];
+
+  const previewRoute = (preset: PersonaPreset) => {
+    setSelectedPreset(preset);
+    window.setTimeout(() => {
+      const preview = document.getElementById("admin-route-preview");
+      if (!preview) return;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      preview.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+      preview.focus({ preventScroll: true });
+    }, 0);
+  };
+
+  const saveReply = () => {
+    if (!comment.trim() || !packetIsActive) return;
+    setAdvisorReplies((current) => ({ ...current, [selectedStudent.id]: [...(current[selectedStudent.id] || []), comment.trim()] }));
+    setComment("");
+  };
+
+  if (mode === "admin") {
+    const intakeSummary = [
+      ["Stage", selectedIntake.stage || "Not answered"],
+      ["First focus", selectedIntake.intention || "Not answered"],
+      ["Coursework", selectedIntake.coursework || "Not answered"],
+      ["Records", selectedIntake.records || "Not answered"],
+      ["Reflection", selectedIntake.reflection || "Not answered"],
+      ["Bandwidth", selectedIntake.bandwidth || "Not answered"],
+      ["Participation", selectedIntake.participation || "Not answered"],
+      ["Support roles", selectedIntake.supportRoles === null ? "Not answered" : String(selectedIntake.supportRoles)],
+    ];
+    return (
+      <main className="feature-workspace reviewer-workspace">
+        <header className="workspace-header"><button className="text-button" onClick={onBack}>Back</button><div><p className="kicker">Fictional reviewer view</p><h1>Pilot Administration</h1></div></header>
+        <RosieGuide pose="idle" compact title="Nothing here represents a real student." body="Select a route to inspect the student context, recommendation logic, and destination it opens." />
+        <section className="workspace-card workspace-card--wide">
+          <div className="reviewer-section-heading"><div><p className="kicker">Route testing</p><h2>Eight functional route previews</h2></div><p>Select any fictional profile to open its full explanation below.</p></div>
+          <div className="preset-grid">{presets.map((preset) => { const route = recommendRoute(personaIntakes[preset]); return <button key={preset} type="button" className={selectedPreset === preset ? "active" : ""} aria-pressed={selectedPreset === preset} onClick={() => previewRoute(preset)}><strong>{presetLabels[preset]}</strong><span>{routeContent[route.recommendedRoute].title}</span><small>{route.reasons[0]}</small><b>View route</b></button>; })}</div>
+        </section>
+        <section id="admin-route-preview" className="workspace-card workspace-card--wide route-preview" tabIndex={-1}>
+          <div className="route-preview-header"><div><p className="kicker">Recommended for {presetLabels[selectedPreset]}</p><h2>{selectedRoute.title}</h2><p>{selectedRoute.meaning}</p></div><span>{selectedRecommendation.recommendedRoute}</span></div>
+          <div className="student-snapshot-grid">{intakeSummary.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value.replaceAll("_", " ")}</strong></article>)}</div>
+          <div className="route-preview-columns">
+            <section><h3>Why this route appeared</h3><ul>{selectedRecommendation.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul><p><strong>Alternate routes:</strong> {selectedRecommendation.alternateRoutes.map((route) => routeContent[route].title).join(", ")}</p></section>
+            <section><h3>What the student sees next</h3><p>{selectedRoute.prompt}</p><p className="workspace-safe">The route uses readiness context only. It does not use GPA, MCAT, demographics, personality labels, or message volume.</p><button className="primary-button" type="button" onClick={() => onOpenWorkspace?.(destinationWorkspace[selectedRoute.destination])}>Open matching station tools</button></section>
+          </div>
+        </section>
+        <section className="workspace-card workspace-card--wide"><h2>Pilot readiness</h2><ul className="readiness-list"><li>Backup moderator named</li><li>Advising relationships confirmed</li><li>Content sources reviewed for accuracy</li><li>Access and invitation strategy decided</li><li>Privacy, evaluation, and possible IRB conversation completed</li></ul><p className="workspace-safe">The Supabase schema is an architecture reference only. No production persistence is active.</p></section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="feature-workspace reviewer-workspace">
+      <header className="workspace-header"><button className="text-button" onClick={onBack}>Back</button><div><p className="kicker">Fictional reviewer view</p><h1>Advisor student packets</h1></div></header>
+      <RosieGuide pose="idle" compact title="Student information is organized one student at a time." body="Choose a fictional student. Only an active packet and the items that student selected will appear." />
+      <section className="workspace-card workspace-card--wide advisor-student-picker">
+        <Field label="Fictional student"><select value={selectedStudentId} onChange={(event) => { setSelectedStudentId(event.target.value); setComment(""); }}>{advisorDemoStudents.map((student) => <option key={student.id} value={student.id}>{student.name} · {student.packet.status}</option>)}</select></Field>
+        <p>Four fictional records demonstrate active, expired, and revoked sharing states.</p>
+      </section>
+      <section className="workspace-card workspace-card--wide advisor-student-overview">
+        <div className="student-profile-header"><span>{selectedStudent.initials}</span><div><p className="kicker">Fictional student</p><h2>{selectedStudent.name}</h2><p>{selectedStudent.focus}</p></div><b className={`packet-state packet-state--${selectedStudent.packet.status}`}>{selectedStudent.packet.status}</b></div>
+        <div className="student-snapshot-grid"><article><span>Stage</span><strong>{selectedStudent.stage}</strong></article><article><span>Application timing</span><strong>{selectedStudent.cycle}</strong></article><article><span>Last packet update</span><strong>{new Date(selectedStudent.lastUpdated).toLocaleDateString()}</strong></article><article><span>Student-selected items</span><strong>{packetIsActive ? selectedStudent.packet.items.length : 0}</strong></article></div>
+      </section>
+      {packetIsActive ? <section className="workspace-card workspace-card--wide advisor-packet-detail">
+        <div className="packet-status"><strong>{selectedStudent.packet.meetingGoal}</strong><span>shared · Access ends {new Date(selectedStudent.packet.expiresAt).toLocaleDateString()}</span></div>
+        <div className="advisor-context-grid"><section><h3>Meeting goal</h3><p>{selectedStudent.packet.meetingGoal}</p></section><section><h3>Student questions</h3><ul>{selectedStudent.packet.questions.map((question) => <li key={question}>{question}</li>)}</ul></section><section><h3>Proposed next actions</h3><ul>{selectedStudent.packet.proposedActions.map((action) => <li key={action}>{action}</li>)}</ul></section></div>
+        <div className="reviewer-section-heading"><div><p className="kicker">Visible to advisor</p><h2>Student-selected packet items</h2></div><p>Private reflections, contacts, drafts, and check-ins are not included.</p></div>
+        <div className="workspace-list">{selectedStudent.packet.items.map((item) => <article key={item.id}><strong>{item.title}</strong><span>{item.kind.replaceAll("_", " ")} · {item.domain}</span><small>{item.body}</small></article>)}</div>
+        <section className="advisor-thread"><h3>Coaching thread</h3>{selectedStudent.packet.comments.map((item) => <article key={item.id}><span>Advisor</span><p>{item.body}</p></article>)}{(advisorReplies[selectedStudent.id] || []).map((reply, index) => <article key={`${selectedStudent.id}-${index}`}><span>Your draft response</span><p>{reply}</p></article>)}</section>
+        <Field label="Coaching question or next action"><textarea value={comment} onChange={(event) => setComment(event.target.value)} /></Field><button className="primary-button" disabled={!comment.trim()} onClick={saveReply}>Return one next action</button>
+      </section> : <section className="workspace-card workspace-card--wide"><p className="workspace-warning">This packet is {selectedStudent.packet.status}. Its shared items, questions, and comments are no longer visible to the advisor.</p><p className="workspace-intro">The fictional student can open a new limited share later. Revocation and expiration remove packet visibility immediately.</p></section>}
+    </main>
+  );
 }
 
 export function workspaceForStation(station: string): WorkspaceId {

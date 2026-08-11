@@ -100,3 +100,19 @@ test("includes Rosie, caption, and brand assets", async () => {
     access(new URL("../docs/content/ROSIE_SPEECH_HEYGEN_REVIEW.md", import.meta.url)),
   ]);
 });
+
+test("reviewer views include student-organized packets and functional route previews", async () => {
+  const [reviewers, model, styles] = await Promise.all([
+    readFile(new URL("../app/components/feature-workspaces.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/demo-model.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(model, /advisorDemoStudents/);
+  assert.match(reviewers, /Fictional student/);
+  assert.match(reviewers, /Student-selected packet items/);
+  assert.match(reviewers, /admin-route-preview/);
+  assert.match(reviewers, /Open matching station tools/);
+  assert.match(reviewers, /Why this route appeared/);
+  assert.match(styles, /\.student-snapshot-grid/);
+  assert.match(styles, /\.route-preview-columns/);
+});

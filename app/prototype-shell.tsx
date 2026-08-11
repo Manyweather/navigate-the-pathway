@@ -19,18 +19,20 @@ function PrototypeRouter({ onSignOut }: { onSignOut?: () => void }) {
   const { dispatch } = usePrototype();
   const [surface, setSurface] = useState<Surface>("pathway");
   const [workspace, setWorkspace] = useState<WorkspaceId>("experience");
+  const [workspaceReturn, setWorkspaceReturn] = useState<Surface>("pathway");
   const [quick, setQuick] = useState(false);
 
-  const openWorkspace = (next: WorkspaceId, quickCapture = false) => {
+  const openWorkspace = (next: WorkspaceId, quickCapture = false, returnTo: Surface = "pathway") => {
     setWorkspace(next);
+    setWorkspaceReturn(returnTo);
     setQuick(quickCapture);
     setSurface("workspace");
     window.scrollTo({ top: 0, behavior: "auto" });
   };
 
   if (surface === "entry") return <EntryScreen onStudent={() => setSurface("pathway")} onAdvisor={() => { dispatch({ type: "LOAD_SCENARIO", scenario: "advisor" }); setSurface("advisor"); }} onAdmin={() => { dispatch({ type: "LOAD_SCENARIO", scenario: "admin" }); setSurface("admin"); }} onSignOut={onSignOut} />;
-  if (surface === "workspace") return <FeatureWorkspaces initial={workspace} quick={quick} onBack={() => setSurface("pathway")} />;
-  if (surface === "advisor" || surface === "admin") return <ReviewerWorkspace mode={surface} onBack={() => setSurface("entry")} />;
+  if (surface === "workspace") return <FeatureWorkspaces initial={workspace} quick={quick} onBack={() => setSurface(workspaceReturn)} />;
+  if (surface === "advisor" || surface === "admin") return <ReviewerWorkspace mode={surface} onBack={() => setSurface("entry")} onOpenWorkspace={(next) => openWorkspace(next, false, surface)} />;
 
   return <><JourneyExperience onOpenWorkspace={(next) => openWorkspace(next)} onOpenReviewers={() => setSurface("entry")} /><button className="quick-capture" type="button" onClick={() => openWorkspace("experience", true)}><span>+</span>Quick capture</button></>;
 }
