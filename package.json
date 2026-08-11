@@ -8,10 +8,14 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build",
+    "build:pages": "vite build --config vite.pages.config.ts",
     "start": "vinext start",
-    "test": "vinext build && node --import tsx --test tests/*.test.mjs",
+    "test": "vinext build && pnpm build:pages && node --import tsx --test tests/*.test.mjs",
     "check": "pnpm lint && pnpm test",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern dist-pages --ignore-pattern .next --ignore-pattern cloudflare/worker-configuration.d.ts",
+    "worker:check": "wrangler deploy --dry-run -c cloudflare/wrangler.jsonc",
+    "worker:deploy": "wrangler deploy -c cloudflare/wrangler.jsonc",
+    "worker:types": "wrangler types cloudflare/worker-configuration.d.ts -c cloudflare/wrangler.jsonc",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

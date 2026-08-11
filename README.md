@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://navigate-pathways.roseman-coll-6465.chatgpt.site"><strong>Open the live prototype</strong></a>
+  <a href="https://manyweather.github.io/navigate-the-pathway/"><strong>Open the live prototype</strong></a>
   &nbsp;|&nbsp;
   <a href="docs/spec/PRODUCT_AND_SOFTWARE_SPECIFICATION.md">Read the product specification</a>
 </p>
@@ -58,7 +58,7 @@ This is a fictional, browser-local product demonstration. It is not an admission
 - No student accounts, institutional authentication, Supabase, D1, email, analytics, or external message delivery are active.
 - No real student, patient, research-participant, admissions, or advising records should be entered.
 
-The hosted prototype uses a shared playtest access gate. Access-code comparison and session signing happen server-side, and secrets are never stored in the repository or browser storage.
+The GitHub Pages prototype uses a shared playtest access gate backed by a Cloudflare Worker. Access-code comparison and session signing happen at the edge, and secrets are never stored in GitHub or the browser bundle. The static application files remain public, so this is a playtest gate rather than institutional authentication.
 
 ## Architecture at a glance
 
@@ -73,6 +73,8 @@ flowchart LR
 ```
 
 The current prototype uses the versioned browser-local state key `navigate.pathway.demo.v1`, with one-time recovery from the two earlier prototype formats. The Supabase SQL under [`docs/architecture/`](docs/architecture/) is a future architecture reference only and is not imported by the application.
+
+The earlier Sites deployment remains available as a rollback while GitHub Pages is the primary student-facing address.
 
 ## Local development
 
