@@ -116,3 +116,23 @@ test("reviewer views include student-organized packets and functional route prev
   assert.match(styles, /\.student-snapshot-grid/);
   assert.match(styles, /\.route-preview-columns/);
 });
+
+test("course and experience workspaces steer toward AMCAS organization without blocking early capture", async () => {
+  const [workspaces, guidance, styles] = await Promise.all([
+    readFile(new URL("../app/components/feature-workspaces.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/aamc-guidance.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(workspaces, /Start with what you know/);
+  assert.match(workspaces, /Align with a transcript when you are ready/);
+  assert.match(workspaces, /Review or add details/);
+  assert.match(workspaces, /completed and future hours separate/i);
+  assert.match(workspaces, /possible Most Meaningful/);
+  assert.match(workspaces, /Leave anything blank until you can verify it/);
+  assert.match(guidance, /experienceEntries: 15/);
+  assert.match(guidance, /recurringDateRanges: 4/);
+  assert.match(guidance, /experienceDescriptionCharacters: 700/);
+  assert.match(guidance, /mostMeaningfulCharacters: 1325/);
+  assert.match(styles, /\.guidance-details/);
+  assert.match(styles, /\.alignment-grid/);
+});

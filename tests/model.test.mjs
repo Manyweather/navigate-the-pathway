@@ -9,6 +9,7 @@ import {
   sensitiveSignals,
 } from "../app/demo-model.ts";
 import { buildApplicationExport, buildApplicationExportText } from "../app/application-export.ts";
+import { aamcLimits } from "../app/aamc-guidance.ts";
 
 test("all eight fictional presets produce all eight intended starting routes", () => {
   const routes = Object.values(personaIntakes).map((intake) => recommendRoute(intake).recommendedRoute);
@@ -45,4 +46,15 @@ test("application export includes finished work and omits drafts", () => {
   assert.match(text, /Saturday clinic shift/);
   assert.doesNotMatch(text, /Unfinished private draft/);
   assert.match(text, /does not change any advising share/i);
+  assert.match(text, /Confirm the current AMCAS guide before submitting/);
+});
+
+test("cycle-specific application preparation limits stay centralized", () => {
+  assert.deepEqual(aamcLimits, {
+    experienceEntries: 15,
+    recurringDateRanges: 4,
+    mostMeaningfulEntries: 3,
+    experienceDescriptionCharacters: 700,
+    mostMeaningfulCharacters: 1325,
+  });
 });

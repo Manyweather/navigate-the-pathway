@@ -27,7 +27,25 @@ export type IntakeAnswers = {
   fictionalFields: IntakeKey[];
 };
 export type RouteRecommendation = { recommendedRoute: RouteId; alternateRoutes: RouteId[]; reasons: string[]; generatedAt: string };
-export type CoursePlan = { id: string; name: string; state: "completed" | "enrolled" | "planned" | "uncertain" | "advisor-review"; term: string; requirement: string; question: string; updatedAt: string };
+export type CoursePlan = {
+  id: string;
+  name: string;
+  state: "completed" | "enrolled" | "planned" | "uncertain" | "advisor-review";
+  term: string;
+  requirement: string;
+  question: string;
+  updatedAt: string;
+  institution?: string;
+  courseNumber?: string;
+  academicYear?: string;
+  academicStatus?: string;
+  classification?: string;
+  credits?: string;
+  transcriptGrade?: string;
+  labType?: string;
+  specialCourseType?: string;
+  transcriptChecked?: boolean;
+};
 export type LearningExperiment = { id: string; strategy: string; prediction: string; intention: string; schedule: string; observation: string; result: string; adjustment: string; status: "planned" | "active" | "reviewed" };
 export type SupportContact = { id: string; role: "academic" | "personal" | "professional"; label: string; helpsWith: string; contactMethod: string; nextContact: string; privateDetails: string };
 export type CommunityPost = { id: string; author: string; type: "ask" | "study" | "offer" | "celebrate"; title: string; body: string; createdAt: string; reactions: number; reacted: boolean; replies: string[]; reported: boolean; muted: boolean };

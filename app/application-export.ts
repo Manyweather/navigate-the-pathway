@@ -1,6 +1,8 @@
 import type { Artifact, DemoState } from "./demo-model";
+import { aamcGuide, pathwayExperienceTypes } from "./aamc-guidance";
 
 export const applicationExperienceTypes = [
+  ...pathwayExperienceTypes,
   "Service",
   "Clinical exposure",
   "Research",
@@ -20,6 +22,14 @@ export type ApplicationExportExperience = {
   startDate?: string;
   endDate?: string;
   hours?: string | number;
+  completedHours?: string | number;
+  anticipatedStart?: string;
+  anticipatedEnd?: string;
+  anticipatedHours?: string | number;
+  additionalDateRanges?: string;
+  verifier?: string;
+  mostMeaningful?: boolean;
+  mostMeaningfulSummary?: string;
   context?: string;
 };
 
@@ -72,6 +82,7 @@ export function buildApplicationExport(state: DemoState): ApplicationExport {
       || optionalText(item.metadata.endDate)
       || optionalText(item.metadata.context)
       || optionalText(item.metadata.supervisor)
+      || optionalText(item.metadata.verifier)
       || item.metadata.recurring
       || (typeof item.metadata.hours === "string" && item.metadata.hours.trim()),
     );
@@ -84,6 +95,14 @@ export function buildApplicationExport(state: DemoState): ApplicationExport {
     const endDate = optionalText(item.metadata.endDate);
     const capturedHours = optionalHours(item.metadata.hours);
     const hours = capturedHours === 0 && !hasOptionalDetails ? undefined : capturedHours;
+    const completedHours = optionalHours(item.metadata.completedHours) ?? hours;
+    const anticipatedStart = optionalText(item.metadata.anticipatedStart);
+    const anticipatedEnd = optionalText(item.metadata.anticipatedEnd);
+    const anticipatedHours = optionalHours(item.metadata.anticipatedHours);
+    const additionalDateRanges = optionalText(item.metadata.additionalDateRanges);
+    const verifier = optionalText(item.metadata.verifier);
+    const mostMeaningful = item.metadata.mostMeaningful === true;
+    const mostMeaningfulSummary = optionalText(item.metadata.mostMeaningfulSummary);
     const context = optionalText(item.metadata.context);
 
     return {
@@ -96,11 +115,19 @@ export function buildApplicationExport(state: DemoState): ApplicationExport {
       ...(startDate ? { startDate } : {}),
       ...(endDate ? { endDate } : {}),
       ...(hours !== undefined ? { hours } : {}),
+      ...(completedHours !== undefined ? { completedHours } : {}),
+      ...(anticipatedStart ? { anticipatedStart } : {}),
+      ...(anticipatedEnd ? { anticipatedEnd } : {}),
+      ...(anticipatedHours !== undefined ? { anticipatedHours } : {}),
+      ...(additionalDateRanges ? { additionalDateRanges } : {}),
+      ...(verifier ? { verifier } : {}),
+      ...(mostMeaningful ? { mostMeaningful } : {}),
+      ...(mostMeaningfulSummary ? { mostMeaningfulSummary } : {}),
       ...(context ? { context } : {}),
     };
   });
 
-  const groupOrder: ApplicationExperienceType[] = [...applicationExperienceTypes, "Unspecified"];
+  const groupOrder = Array.from(new Set<ApplicationExperienceType>([...applicationExperienceTypes, "Unspecified"]));
   const experienceGroups = groupOrder.map((type) => ({
     type,
     entries: experiences.filter((item) => item.type === type),
@@ -133,7 +160,7 @@ function fieldLine(label: string, value: string | number | undefined) {
 }
 
 export function buildApplicationExportText(data: ApplicationExport) {
-  const lines = ["# Navigate the Pathway application notes", "", "Personal export. This file does not change any advising share.", "", "## Experiences", ""];
+  const lines = ["# Navigate the Pathway application notes", "", "Personal export. This file does not change any advising share.", aamcGuide.preparationNotice, "", "## Experiences", ""];
 
   if (!data.experienceGroups.length) lines.push("No saved experiences yet.", "");
   for (const group of data.experienceGroups) {
@@ -143,10 +170,16 @@ export function buildApplicationExportText(data: ApplicationExport) {
       lines.push(...fieldLine("Organization", item.organization));
       lines.push(...fieldLine("Role", item.role));
       if (item.startDate || item.endDate) lines.push(`- Dates: ${[item.startDate, item.endDate].filter(Boolean).join(" to ")}`);
-      lines.push(...fieldLine("Hours", item.hours));
+      lines.push(...fieldLine("Completed hours", item.completedHours ?? item.hours));
+      if (item.anticipatedStart || item.anticipatedEnd) lines.push(`- Anticipated dates: ${[item.anticipatedStart, item.anticipatedEnd].filter(Boolean).join(" to ")}`);
+      lines.push(...fieldLine("Anticipated hours", item.anticipatedHours));
+      lines.push(...fieldLine("Additional recurring date ranges", item.additionalDateRanges));
+      lines.push(...fieldLine("Potential verifier", item.verifier));
+      if (item.mostMeaningful) lines.push("- Possible Most Meaningful: Yes");
       lines.push(...fieldLine("Context", item.context));
-      if (item.organization || item.role || item.startDate || item.endDate || item.hours !== undefined || item.context) lines.push("");
+      if (item.organization || item.role || item.startDate || item.endDate || item.hours !== undefined || item.anticipatedHours !== undefined || item.context) lines.push("");
       lines.push(item.body, "");
+      if (item.mostMeaningfulSummary) lines.push("Most Meaningful working note:", item.mostMeaningfulSummary, "");
     }
   }
 

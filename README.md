@@ -102,6 +102,7 @@ pnpm test
 - [`app/prototype-store.tsx`](app/prototype-store.tsx): state, persistence, and legacy migrations
 - [`app/access-session.ts`](app/access-session.ts): constant-time code comparison and signed session cookies
 - [`docs/spec/`](docs/spec/): product, playtest, architecture, and v0.2 handoff specifications
+- [`docs/content/AAMC_2027_ORGANIZATION_GUIDANCE.md`](docs/content/AAMC_2027_ORGANIZATION_GUIDANCE.md): coursework and experience organization mapped from the 2027 AMCAS guide
 - [`docs/architecture/supabase-schema.sql`](docs/architecture/supabase-schema.sql): dormant production architecture reference
 
 The preserved media-first visual baseline is tagged [`frontend-media-v4`](https://github.com/Manyweather/navigate-the-pathway/releases/tag/frontend-media-v4).

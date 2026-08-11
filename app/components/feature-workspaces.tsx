@@ -3,6 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildApplicationExport, buildApplicationExportText } from "../application-export";
 import {
+  aamcAcademicStatuses,
+  aamcCourseClassifications,
+  aamcCourseworkChecks,
+  aamcExperienceChecks,
+  aamcGuide,
+  aamcLimits,
+  aamcSpecialCourseTypes,
+  pathwayExperienceTypes,
+} from "../aamc-guidance";
+import {
   advisorDemoStudents,
   makeArtifact,
   makeDraft,
@@ -13,6 +23,7 @@ import {
   routeContent,
   sensitiveSignals,
   type Artifact,
+  type CoursePlan,
   type DestinationId,
   type PersonaPreset,
   type WorkflowType,
@@ -97,17 +108,51 @@ function WorkspaceHeader({ id, onBack }: { id: WorkspaceId; onBack: () => void }
 
 function CourseWorkspace() {
   const { state, dispatch } = usePrototype();
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [courseState, setCourseState] = useState<"completed" | "enrolled" | "planned" | "uncertain" | "advisor-review">("planned");
   const [term, setTerm] = useState("");
   const [question, setQuestion] = useState("");
+  const [institution, setInstitution] = useState("");
+  const [courseNumber, setCourseNumber] = useState("");
+  const [academicYear, setAcademicYear] = useState("");
+  const [academicStatus, setAcademicStatus] = useState("");
+  const [classification, setClassification] = useState("");
+  const [credits, setCredits] = useState("");
+  const [transcriptGrade, setTranscriptGrade] = useState("");
+  const [labType, setLabType] = useState("");
+  const [specialCourseType, setSpecialCourseType] = useState("");
+  const [transcriptChecked, setTranscriptChecked] = useState(false);
   const [strategy, setStrategy] = useState("");
   const [prediction, setPrediction] = useState("");
   const [schedule, setSchedule] = useState("");
 
+  useAutosavedDraft("course:active", "course", {
+    name, courseState, term, question, institution, courseNumber, academicYear,
+    academicStatus, classification, credits, transcriptGrade, labType,
+    specialCourseType, transcriptChecked,
+  });
+
   const saveCourse = () => {
-    dispatch({ type: "UPSERT_COURSE", course: { id: makeId("course"), name: name.trim(), state: courseState, term: term.trim(), requirement: "Student planning note", question: question.trim(), updatedAt: nowIso() } });
-    setName(""); setTerm(""); setQuestion("");
+    dispatch({ type: "UPSERT_COURSE", course: {
+      id: editingCourseId ?? makeId("course"), name: name.trim(), state: courseState, term: term.trim(),
+      requirement: "Student planning note", question: question.trim(), updatedAt: nowIso(),
+      institution: institution.trim(), courseNumber: courseNumber.trim(), academicYear: academicYear.trim(),
+      academicStatus, classification, credits: credits.trim(), transcriptGrade: transcriptGrade.trim(),
+      labType, specialCourseType, transcriptChecked,
+    } });
+    dispatch({ type: "CLEAR_DRAFT", key: "course:active" });
+    setName(""); setTerm(""); setQuestion(""); setInstitution(""); setCourseNumber("");
+    setAcademicYear(""); setAcademicStatus(""); setClassification(""); setCredits("");
+    setTranscriptGrade(""); setLabType(""); setSpecialCourseType(""); setTranscriptChecked(false);
+    setEditingCourseId(null);
+  };
+  const editCourse = (course: CoursePlan) => {
+    setEditingCourseId(course.id); setName(course.name); setCourseState(course.state); setTerm(course.term); setQuestion(course.question);
+    setInstitution(course.institution || ""); setCourseNumber(course.courseNumber || ""); setAcademicYear(course.academicYear || "");
+    setAcademicStatus(course.academicStatus || ""); setClassification(course.classification || ""); setCredits(course.credits || "");
+    setTranscriptGrade(course.transcriptGrade || ""); setLabType(course.labType || ""); setSpecialCourseType(course.specialCourseType || "");
+    setTranscriptChecked(Boolean(course.transcriptChecked));
   };
   const saveExperiment = () => {
     dispatch({ type: "UPSERT_EXPERIMENT", experiment: { id: makeId("experiment"), strategy: strategy.trim(), prediction: prediction.trim(), intention: `When the study block begins, I will ${strategy.trim()}.`, schedule: schedule.trim(), observation: "", result: "", adjustment: "", status: "planned" } });
@@ -115,7 +160,21 @@ function CourseWorkspace() {
     setStrategy(""); setPrediction(""); setSchedule("");
   };
 
-  return <div className="workspace-grid"><section className="workspace-card"><div className="visual-sequence"><span>Course status</span><span>Question</span><span>Person</span><span>Date</span></div><h2>Clarify one course</h2><Field label="Course"><input value={name} onChange={(event) => setName(event.target.value)} /></Field><div className="field-pair"><Field label="Status"><select value={courseState} onChange={(event) => setCourseState(event.target.value as typeof courseState)}><option value="completed">Completed</option><option value="enrolled">Enrolled</option><option value="planned">Planned</option><option value="uncertain">Uncertain</option><option value="advisor-review">Advisor review</option></select></Field><Field label="Term"><input value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Fall 2026" /></Field></div><Field label="Focused question"><textarea value={question} onChange={(event) => setQuestion(event.target.value)} /></Field><button className="primary-button" disabled={!name.trim()} onClick={saveCourse}>Save course plan</button></section><section className="workspace-card"><div className="visual-sequence"><span>Strategy</span><span>Prediction</span><span>Try</span><span>Review</span></div><h2>Run a study experiment</h2><Field label="Strategy"><input value={strategy} onChange={(event) => setStrategy(event.target.value)} placeholder="Two-minute retrieval check" /></Field><Field label="What do you predict?"><textarea value={prediction} onChange={(event) => setPrediction(event.target.value)} /></Field><Field label="When will you try it?"><input value={schedule} onChange={(event) => setSchedule(event.target.value)} /></Field><button className="primary-button" disabled={!strategy.trim() || !prediction.trim()} onClick={saveExperiment}>Save experiment</button></section><section className="workspace-card workspace-card--wide"><h2>Course and strategy board</h2><div className="workspace-list">{state.courses.map((course) => <article key={course.id}><strong>{course.name}</strong><span>{course.state.replace("-", " ")} · {course.term || "Term open"}</span><small>{course.question || "No question saved"}</small></article>)}{state.experiments.map((experiment) => <article key={experiment.id}><strong>{experiment.strategy}</strong><span>{experiment.status} · {experiment.schedule}</span><small>{experiment.prediction}</small></article>)}</div></section></div>;
+  return <div className="workspace-grid">
+    <section className="workspace-card workspace-card--wide">
+      <div className="visual-sequence"><span>Transcript</span><span>Course details</span><span>Classification</span><span>Review</span></div>
+      <h2>{editingCourseId ? "Review course details" : "Organize one course"}</h2>
+      <p className="workspace-intro">Start with what you know. You can save a working note now and compare it with a transcript later.</p>
+      <Field label="Course"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="The name you remember is enough for now" /></Field>
+      <div className="field-pair"><Field label="Status"><select value={courseState} onChange={(event) => setCourseState(event.target.value as typeof courseState)}><option value="completed">Completed</option><option value="enrolled">Enrolled</option><option value="planned">Planned</option><option value="uncertain">Uncertain</option><option value="advisor-review">Needs advisor review</option></select></Field><Field label="Term"><input value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Fall 2026" /></Field></div>
+      <details className="guidance-details"><summary>Align with a transcript when you are ready</summary><p className="guidance-intro">These optional details make later application preparation easier. Leave anything blank until you can verify it.</p><div className="field-pair"><Field label="Institution"><input value={institution} onChange={(event) => setInstitution(event.target.value)} placeholder="Institution on transcript" /></Field><Field label="Course number"><input value={courseNumber} onChange={(event) => setCourseNumber(event.target.value)} placeholder="BIO 101" /></Field></div><div className="field-pair"><Field label="Academic year"><input value={academicYear} onChange={(event) => setAcademicYear(event.target.value)} placeholder="2025-2026" /></Field><Field label="Year in school"><select value={academicStatus} onChange={(event) => setAcademicStatus(event.target.value)}><option value="">Choose later</option>{aamcAcademicStatuses.map(([code, label]) => <option key={code} value={code}>{code}: {label}</option>)}</select></Field></div><Field label="Classification by primary content"><select value={classification} onChange={(event) => setClassification(event.target.value)}><option value="">Choose later</option>{aamcCourseClassifications.map((item) => <option key={item}>{item}</option>)}</select></Field><div className="field-triple"><Field label="Credits"><input value={credits} onChange={(event) => setCredits(event.target.value)} inputMode="decimal" /></Field><Field label="Transcript grade"><input value={transcriptGrade} onChange={(event) => setTranscriptGrade(event.target.value)} /></Field><Field label="Lab"><select value={labType} onChange={(event) => setLabType(event.target.value)}><option value="">Choose later</option><option>Lecture only</option><option>Lab only</option><option>Combined lecture and lab</option></select></Field></div><Field label="Special course type, if applicable"><select value={specialCourseType} onChange={(event) => setSpecialCourseType(event.target.value)}><option value="">None selected</option>{aamcSpecialCourseTypes.map((item) => <option key={item}>{item}</option>)}</select></Field><label className="check-row"><input type="checkbox" checked={transcriptChecked} onChange={(event) => setTranscriptChecked(event.target.checked)} /><span>I compared these details with a personal copy of the official transcript.</span></label></details>
+      <Field label="Question for an advisor"><textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What still needs review?" /></Field>
+      <button className="primary-button" disabled={!name.trim()} onClick={saveCourse}>{editingCourseId ? "Update course record" : "Save course record"}</button>
+      <details className="source-note"><summary>Why these fields?</summary><ul>{aamcCourseworkChecks.map((item) => <li key={item}>{item}</li>)}</ul><p>{aamcGuide.preparationNotice}</p></details>
+    </section>
+    <section className="workspace-card"><div className="visual-sequence"><span>Strategy</span><span>Prediction</span><span>Try</span><span>Review</span></div><h2>Run a study experiment</h2><Field label="Strategy"><input value={strategy} onChange={(event) => setStrategy(event.target.value)} placeholder="Two-minute retrieval check" /></Field><Field label="What do you predict?"><textarea value={prediction} onChange={(event) => setPrediction(event.target.value)} /></Field><Field label="When will you try it?"><input value={schedule} onChange={(event) => setSchedule(event.target.value)} /></Field><button className="primary-button" disabled={!strategy.trim() || !prediction.trim()} onClick={saveExperiment}>Save experiment</button></section>
+    <section className="workspace-card"><h2>Course and strategy board</h2><div className="workspace-list">{state.courses.map((course) => <article key={course.id}><strong>{course.courseNumber ? `${course.courseNumber}: ` : ""}{course.name}</strong><span>{course.state.replace("-", " ")} · {course.term || "Term open"}</span><small>{[course.institution, course.classification, course.specialCourseType].filter(Boolean).join(" · ") || course.question || "Preparation details not added yet"}</small><button className="text-button" onClick={() => editCourse(course)}>Review or add details</button></article>)}{state.experiments.map((experiment) => <article key={experiment.id}><strong>{experiment.strategy}</strong><span>{experiment.status} · {experiment.schedule}</span><small>{experiment.prediction}</small></article>)}</div></section>
+  </div>;
 }
 
 function ExperienceWorkspace({ quick = false }: { quick?: boolean }) {
@@ -123,26 +182,39 @@ function ExperienceWorkspace({ quick = false }: { quick?: boolean }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [type, setType] = useState("Service");
+  const [type, setType] = useState<string>(pathwayExperienceTypes[0]);
   const [organization, setOrganization] = useState("");
   const [role, setRole] = useState("");
-  const [hours, setHours] = useState("");
+  const [completedHours, setCompletedHours] = useState("");
+  const [anticipatedHours, setAnticipatedHours] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const fields = useMemo(() => ({ title, body, type, organization, role, hours, startDate, endDate }), [body, endDate, hours, organization, role, startDate, title, type]);
+  const [anticipatedStart, setAnticipatedStart] = useState("");
+  const [anticipatedEnd, setAnticipatedEnd] = useState("");
+  const [additionalDateRanges, setAdditionalDateRanges] = useState("");
+  const [verifier, setVerifier] = useState("");
+  const [mostMeaningful, setMostMeaningful] = useState(false);
+  const [mostMeaningfulSummary, setMostMeaningfulSummary] = useState("");
+  const fields = useMemo(() => ({ title, body, type, organization, role, completedHours, anticipatedHours, startDate, endDate, anticipatedStart, anticipatedEnd, additionalDateRanges, verifier, mostMeaningful, mostMeaningfulSummary }), [additionalDateRanges, anticipatedEnd, anticipatedHours, anticipatedStart, body, completedHours, endDate, mostMeaningful, mostMeaningfulSummary, organization, role, startDate, title, type, verifier]);
   useAutosavedDraft("experience:active", "experience", fields);
   const signals = sensitiveSignals(`${title} ${body} ${organization}`);
   const experiences = state.artifacts.filter((item) => item.kind === "experience");
+  const mostMeaningfulCount = experiences.filter((item) => item.metadata.mostMeaningful === true).length;
+  const editingArtifact = editingId ? experiences.find((item) => item.id === editingId) : null;
+  const canChooseMostMeaningful = mostMeaningful || editingArtifact?.metadata.mostMeaningful === true || mostMeaningfulCount < aamcLimits.mostMeaningfulEntries;
 
   const edit = (artifact: Artifact) => {
     setEditingId(artifact.id); setTitle(artifact.title); setBody(artifact.body);
-    setType(String(artifact.metadata.type || "Service")); setOrganization(String(artifact.metadata.organization || ""));
-    setRole(String(artifact.metadata.role || "")); setHours(String(artifact.metadata.hours || ""));
+    setType(String(artifact.metadata.type || pathwayExperienceTypes[0])); setOrganization(String(artifact.metadata.organization || ""));
+    setRole(String(artifact.metadata.role || "")); setCompletedHours(String(artifact.metadata.completedHours ?? artifact.metadata.hours ?? ""));
+    setAnticipatedHours(String(artifact.metadata.anticipatedHours || "")); setAnticipatedStart(String(artifact.metadata.anticipatedStart || "")); setAnticipatedEnd(String(artifact.metadata.anticipatedEnd || ""));
+    setAdditionalDateRanges(String(artifact.metadata.additionalDateRanges || "")); setVerifier(String(artifact.metadata.verifier || ""));
+    setMostMeaningful(artifact.metadata.mostMeaningful === true); setMostMeaningfulSummary(String(artifact.metadata.mostMeaningfulSummary || ""));
     setStartDate(String(artifact.metadata.startDate || "")); setEndDate(String(artifact.metadata.endDate || ""));
   };
-  const reset = () => { setEditingId(null); setTitle(""); setBody(""); setOrganization(""); setRole(""); setHours(""); setStartDate(""); setEndDate(""); dispatch({ type: "CLEAR_DRAFT", key: "experience:active" }); };
+  const reset = () => { setEditingId(null); setTitle(""); setBody(""); setOrganization(""); setRole(""); setCompletedHours(""); setAnticipatedHours(""); setStartDate(""); setEndDate(""); setAnticipatedStart(""); setAnticipatedEnd(""); setAdditionalDateRanges(""); setVerifier(""); setMostMeaningful(false); setMostMeaningfulSummary(""); dispatch({ type: "CLEAR_DRAFT", key: "experience:active" }); };
   const save = () => {
-    const metadata = { type, organization, role, hours: Number(hours) || 0, startDate, endDate };
+    const metadata = { type, organization, role, hours: Number(completedHours) || 0, completedHours: Number(completedHours) || 0, anticipatedHours: Number(anticipatedHours) || 0, startDate, endDate, anticipatedStart, anticipatedEnd, additionalDateRanges, verifier, mostMeaningful, mostMeaningfulSummary };
     const existing = editingId ? state.artifacts.find((item) => item.id === editingId) : null;
     if (existing) {
       dispatch({ type: "UPDATE_ARTIFACT", artifact: { ...existing, title: title.trim(), body: body.trim(), metadata, revisions: [{ id: makeId("revision"), body: existing.body, createdAt: existing.updatedAt }, ...existing.revisions], updatedAt: nowIso() } });
@@ -152,7 +224,7 @@ function ExperienceWorkspace({ quick = false }: { quick?: boolean }) {
     reset();
   };
 
-  return <div className="workspace-grid"><section className="workspace-card workspace-card--wide"><div className="visual-sequence"><span>Activity</span><span>Moment</span><span>Learning</span><span>Future use</span></div><h2>{editingId ? "Revise experience" : quick ? "Quick capture" : "Capture an experience"}</h2><div className="field-pair"><Field label="Title"><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="One memorable moment" /></Field><Field label="Type"><select value={type} onChange={(event) => setType(event.target.value)}><option>Service</option><option>Clinical</option><option>Research</option><option>Leadership</option><option>Employment</option><option>Other</option></select></Field></div>{!quick ? <><div className="field-pair"><Field label="Organization"><input value={organization} onChange={(event) => setOrganization(event.target.value)} /></Field><Field label="Role"><input value={role} onChange={(event) => setRole(event.target.value)} /></Field></div><div className="field-triple"><Field label="Start"><input type="month" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></Field><Field label="End"><input type="month" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></Field><Field label="Hours"><input type="number" min="0" value={hours} onChange={(event) => setHours(event.target.value)} /></Field></div></> : null}<Field label="Specific moment and learning"><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Keep names and identifying details out." /></Field><PrivacySignals value={`${title} ${body} ${organization}`} /><div className="workspace-actions"><button className="primary-button" disabled={!body.trim() || signals.length > 0} onClick={save}>{editingId ? "Save revision" : "Save experience"}</button>{editingId ? <button className="text-button" onClick={reset}>Cancel revision</button> : null}<span>Autosaved on this device</span></div></section><section className="workspace-card workspace-card--wide"><h2>Experience history</h2><div className="workspace-list">{experiences.map((artifact) => <article key={artifact.id}><strong>{artifact.title}</strong><span>{String(artifact.metadata.type || "Experience")} · {String(artifact.metadata.hours || 0)} hours · {artifact.revisions.length} revisions</span><small>{artifact.body}</small><button className="text-button" onClick={() => edit(artifact)}>Revise</button></article>)}</div></section></div>;
+  return <div className="workspace-grid"><section className="workspace-card workspace-card--wide"><div className="visual-sequence"><span>Activity</span><span>Time</span><span>Meaning</span><span>Future use</span></div><h2>{editingId ? "Revise experience" : quick ? "Quick capture" : "Capture an experience"}</h2><p className="workspace-intro">Save what you remember now. Dates, hours, and application details can be added when you are ready.</p><div className="field-pair"><Field label="Experience name"><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="A name that future-you will recognize" /></Field><Field label="Planning category"><select value={type} onChange={(event) => setType(event.target.value)}>{!pathwayExperienceTypes.includes(type as typeof pathwayExperienceTypes[number]) ? <option>{type}</option> : null}{pathwayExperienceTypes.map((item) => <option key={item}>{item}</option>)}</select></Field></div><Field label="Specific moment and learning"><textarea maxLength={aamcLimits.experienceDescriptionCharacters} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Keep names and identifying details out." /></Field><p className="field-counter">{body.length} / {aamcLimits.experienceDescriptionCharacters} characters for a future plain-text description</p>{!quick ? <details className="guidance-details"><summary>Add dates, hours, and application preparation</summary><p className="guidance-intro">These details are optional today. Keeping completed and future hours separate prevents confusion later.</p><div className="field-pair"><Field label="Organization"><input value={organization} onChange={(event) => setOrganization(event.target.value)} /></Field><Field label="Role or title"><input value={role} onChange={(event) => setRole(event.target.value)} /></Field></div><fieldset className="range-card"><legend>Completed time</legend><div className="field-triple"><Field label="Start"><input type="month" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></Field><Field label="End"><input type="month" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></Field><Field label="Completed hours"><input type="number" min="0" value={completedHours} onChange={(event) => setCompletedHours(event.target.value)} /></Field></div></fieldset><fieldset className="range-card"><legend>Anticipated time</legend><div className="field-triple"><Field label="Future start"><input type="month" value={anticipatedStart} onChange={(event) => setAnticipatedStart(event.target.value)} /></Field><Field label="Future end"><input type="month" value={anticipatedEnd} onChange={(event) => setAnticipatedEnd(event.target.value)} /></Field><Field label="Anticipated hours"><input type="number" min="0" value={anticipatedHours} onChange={(event) => setAnticipatedHours(event.target.value)} /></Field></div></fieldset><Field label="Other recurring date ranges"><textarea value={additionalDateRanges} onChange={(event) => setAdditionalDateRanges(event.target.value)} placeholder="Optional. Add up to three more ranges, one per line." /></Field><Field label="Who could verify this experience?"><input value={verifier} onChange={(event) => setVerifier(event.target.value)} placeholder="Name or role. Add contact details only in the official application." /></Field><label className="check-row"><input type="checkbox" checked={mostMeaningful} disabled={!canChooseMostMeaningful} onChange={(event) => setMostMeaningful(event.target.checked)} /><span>Keep this as a possible Most Meaningful experience ({mostMeaningfulCount} of {aamcLimits.mostMeaningfulEntries} selected)</span></label>{mostMeaningful ? <><Field label="Why might this be especially meaningful?"><textarea maxLength={aamcLimits.mostMeaningfulCharacters} value={mostMeaningfulSummary} onChange={(event) => setMostMeaningfulSummary(event.target.value)} /></Field><p className="field-counter">{mostMeaningfulSummary.length} / {aamcLimits.mostMeaningfulCharacters} characters</p></> : null}<details className="source-note"><summary>Application direction</summary><ul>{aamcExperienceChecks.map((item) => <li key={item}>{item}</li>)}</ul><p>{aamcGuide.preparationNotice}</p></details></details> : null}<PrivacySignals value={`${title} ${body} ${organization}`} /><div className="workspace-actions"><button className="primary-button" disabled={!body.trim() || signals.length > 0} onClick={save}>{editingId ? "Save revision" : "Save experience"}</button>{editingId ? <button className="text-button" onClick={reset}>Cancel revision</button> : null}<span>Autosaved on this device</span></div></section><section className="workspace-card workspace-card--wide"><div className="section-count"><div><h2>Experience history</h2><p>{experiences.length} saved. Later, you can choose up to {aamcLimits.experienceEntries} for an AMCAS application.</p></div><strong>{mostMeaningfulCount}/{aamcLimits.mostMeaningfulEntries}<small>possible Most Meaningful</small></strong></div><div className="workspace-list">{experiences.map((artifact) => <article key={artifact.id}><strong>{artifact.title}</strong><span>{String(artifact.metadata.type || "Experience")} · {String(artifact.metadata.completedHours ?? artifact.metadata.hours ?? 0)} completed hours{Number(artifact.metadata.anticipatedHours || 0) > 0 ? ` · ${artifact.metadata.anticipatedHours} anticipated` : ""}</span><small>{artifact.body}</small>{artifact.metadata.mostMeaningful === true ? <em className="meaningful-badge">Possible Most Meaningful</em> : null}<button className="text-button" onClick={() => edit(artifact)}>Revise</button></article>)}</div></section></div>;
 }
 
 function CompassionWorkspace() {
@@ -211,10 +283,13 @@ function ApplicationWorkspace() {
   const [action, setAction] = useState(state.packet.proposedActions.join("\n"));
   const [expiresAt, setExpiresAt] = useState(state.packet.expiresAt.slice(0, 10));
   const data = useMemo(() => buildApplicationExport(state), [state]);
+  const experienceCount = data.experienceGroups.reduce((total, group) => total + group.entries.length, 0);
+  const mostMeaningfulCount = data.experienceGroups.flatMap((group) => group.entries).filter((item) => item.mostMeaningful).length;
+  const transcriptCheckedCount = state.courses.filter((course) => course.transcriptChecked).length;
   const download = () => { const blob = new Blob([buildApplicationExportText(data)], { type: "text/markdown;charset=utf-8" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "navigate-the-pathway-application-notes.md"; link.click(); URL.revokeObjectURL(url); };
   const share = () => { const advisor = state.advisors.find((item) => item.id === advisorId); dispatch({ type: "PATCH_PACKET", patch: { advisorId, advisorName: advisor?.name || "Fictional advisor", meetingGoal: goal.trim(), questions: question.split("\n").filter(Boolean), proposedActions: action.split("\n").filter(Boolean), packetItemIds: selectedIds, status: "shared", expiresAt: new Date(`${expiresAt}T23:59:59`).toISOString() }, event: { id: makeId("event"), type: "shared", createdAt: nowIso(), safeDetail: "Student opened a limited advising share" } }); };
   const revoke = () => dispatch({ type: "PATCH_PACKET", patch: { status: "revoked", packetItemIds: [] }, event: { id: makeId("event"), type: "revoked", createdAt: nowIso(), safeDetail: "Student ended advisor visibility" } });
-  return <div className="workspace-grid"><section className="workspace-card workspace-card--wide"><div className="visual-sequence"><span>Choose evidence</span><span>Name the goal</span><span>Set access</span><span>Review together</span></div><h2>Prepare an advising packet</h2><div className="packet-builder"><fieldset className="source-picker"><legend>Student-selected items</legend>{state.artifacts.map((item) => <label key={item.id}><input type="checkbox" checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} />{item.title}<small>{item.kind.replaceAll("_", " ")}</small></label>)}</fieldset><div><Field label="Fictional advisor"><select value={advisorId} onChange={(event) => setAdvisorId(event.target.value)}>{state.advisors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Meeting goal"><input value={goal} onChange={(event) => setGoal(event.target.value)} /></Field><Field label="Questions, one per line"><textarea value={question} onChange={(event) => setQuestion(event.target.value)} /></Field><Field label="Possible next actions"><textarea value={action} onChange={(event) => setAction(event.target.value)} /></Field><Field label="Access ends"><input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></Field><div className="workspace-actions"><button className="primary-button" disabled={!selectedIds.length || !goal.trim()} onClick={share}>Open limited share</button>{state.packet.status === "shared" ? <button className="text-button" onClick={revoke}>Revoke now</button> : null}</div></div></div><p className="workspace-safe">Status: {state.packet.status}. Advisors see only selected items while this share is active.</p></section><section className="workspace-card workspace-card--wide"><h2>Application notes export</h2><div className="export-summary"><span>{data.experienceGroups.reduce((total, group) => total + group.entries.length, 0)} experiences</span><span>{data.reflections.length} reflections</span><span>{data.stories.length} story fragments</span></div><div className="workspace-actions"><button className="primary-button" onClick={() => window.print()}>Print or save PDF</button><button className="secondary-button" onClick={download}>Download text</button></div><p className="character-note">Activity descriptions often use 700 characters. Most Meaningful responses often use 1,325.</p></section></div>;
+  return <div className="workspace-grid"><section className="workspace-card workspace-card--wide"><div className="visual-sequence"><span>Choose evidence</span><span>Name the goal</span><span>Set access</span><span>Review together</span></div><h2>Prepare an advising packet</h2><div className="packet-builder"><fieldset className="source-picker"><legend>Student-selected items</legend>{state.artifacts.map((item) => <label key={item.id}><input type="checkbox" checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} />{item.title}<small>{item.kind.replaceAll("_", " ")}</small></label>)}</fieldset><div><Field label="Fictional advisor"><select value={advisorId} onChange={(event) => setAdvisorId(event.target.value)}>{state.advisors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Meeting goal"><input value={goal} onChange={(event) => setGoal(event.target.value)} /></Field><Field label="Questions, one per line"><textarea value={question} onChange={(event) => setQuestion(event.target.value)} /></Field><Field label="Possible next actions"><textarea value={action} onChange={(event) => setAction(event.target.value)} /></Field><Field label="Access ends"><input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></Field><div className="workspace-actions"><button className="primary-button" disabled={!selectedIds.length || !goal.trim()} onClick={share}>Open limited share</button>{state.packet.status === "shared" ? <button className="text-button" onClick={revoke}>Revoke now</button> : null}</div></div></div><p className="workspace-safe">Status: {state.packet.status}. Advisors see only selected items while this share is active.</p></section><section className="workspace-card workspace-card--wide"><div className="section-count"><div><h2>Application preparation</h2><p>Your records can become an application draft when you are ready.</p></div><strong>{experienceCount}/{aamcLimits.experienceEntries}<small>experience entries</small></strong></div><div className="alignment-grid"><article><span>{transcriptCheckedCount}/{state.courses.length || 0}</span><p>course records checked with a transcript</p></article><article><span>{mostMeaningfulCount}/{aamcLimits.mostMeaningfulEntries}</span><p>possible Most Meaningful experiences</p></article><article><span>{data.reflections.length}</span><p>saved reflections to revisit</p></article></div><div className="workspace-actions"><button className="primary-button" onClick={() => window.print()}>Print or save PDF</button><button className="secondary-button" onClick={download}>Download text</button></div><p className="character-note">The export keeps completed and anticipated hours separate and preserves plain-text working notes. {aamcGuide.preparationNotice}</p></section></div>;
 }
 
 function PortfolioWorkspace() {
