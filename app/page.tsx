@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
-import { JourneyExperience } from "./journey-experience";
+import { cookies } from "next/headers";
+import { AccessGate } from "./access-gate";
+import { ACCESS_COOKIE_NAME, verifyAccessCookie } from "./access-session";
+import { PrototypeShell } from "./prototype-shell";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Your personalized premed pathway",
-  description:
-    "Set up your premed pathway, explore practical learning stations, and choose one useful next action.",
+  title: "Navigate the Pathway",
+  description: "Explore a visual premed district, capture useful evidence, and prepare focused next actions.",
 };
 
-export default function Home() {
-  return <JourneyExperience />;
+export default async function Home() {
+  const cookieStore = await cookies();
+  const granted = await verifyAccessCookie(
+    cookieStore.get(ACCESS_COOKIE_NAME)?.value,
+    process.env.NAVIGATE_SESSION_SECRET,
+  );
+  return granted ? <PrototypeShell /> : <AccessGate />;
 }

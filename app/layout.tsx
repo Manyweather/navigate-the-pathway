@@ -4,18 +4,18 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://navigate-pathways.roseman-coll-6465.chatgpt.site"),
   title: {
-    default: "Navigate Pathways",
-    template: "%s | Navigate Pathways",
+    default: "Navigate the Pathway",
+    template: "%s | Navigate the Pathway",
   },
   description: "A phone-first visual pathway for premedical students to capture evidence, reflect, connect, and prepare.",
   openGraph: {
-    title: "Navigate Pathways",
+    title: "Navigate the Pathway",
     description: "Explore a visual premed district and complete one useful next move.",
     images: [{ url: "/og.png", width: 1200, height: 630, alt: "Navigate pathway map with connected premed learning stations." }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Navigate the Pipeline",
+    title: "Navigate the Pathway",
     description: "Explore a visual premed district and complete one useful next move.",
     images: ["/og.png"],
   },
