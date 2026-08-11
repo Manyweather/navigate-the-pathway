@@ -44,8 +44,9 @@ test("built access routes reject, unlock, authorize, and sign out", async () => 
   const cookie = setCookie.split(";")[0];
   const authorized = await fetchBuilt(new Request("http://localhost/", { headers: { accept: "text/html", cookie } }));
   const authorizedHtml = await authorized.text();
-  assert.match(authorizedHtml, /Open student pathway/);
-  assert.match(authorizedHtml, /Open advisor example/);
+  assert.match(authorizedHtml, /Navigate The Pathway/);
+  assert.match(authorizedHtml, /Start Rosie&#x27;s explanation/);
+  assert.match(authorizedHtml, /Reviewer views/);
   const signedOut = await fetchBuilt(new Request("http://localhost/api/access/signout", { method: "POST", headers: { cookie } }));
   assert.equal(signedOut.status, 303);
   assert.match(signedOut.headers.get("set-cookie") ?? "", /Max-Age=0/i);
@@ -64,6 +65,7 @@ test("ships visual stations, unified persistence, Rosie, and functional navigati
   assert.match(store, /navigate\.pipeline\.progress\.v1/);
   assert.match(store, /navigate-demo:v3/);
   assert.match(shell, /Quick capture/);
+  assert.match(shell, /useState<Surface>\("pathway"\)/);
   assert.match(journey, /Continue my pathway/);
   assert.match(journey, /Navigate The Pathway/);
   assert.match(journey, /What would you like to focus on first\?/);
@@ -71,10 +73,15 @@ test("ships visual stations, unified persistence, Rosie, and functional navigati
   assert.match(journey, /Why this matters/);
   assert.match(journey, /shared practice message board/);
   assert.match(journey, /Open station tools/);
+  assert.match(journey, /Start Rosie's explanation/);
+  assert.match(journey, /Play explanation/);
   assert.match(journey, /prefers-reduced-motion/);
   assert.match(styles, /--maroon: #791034/);
   assert.match(styles, /\.app-dock/);
   assert.match(styles, /\.rosie-guide/);
+  assert.match(styles, /\.media-start-button/);
+  assert.match(styles, /\.welcome-grid \.media-stage > img/);
+  assert.match(styles, /\.welcome-landscape/);
 });
 
 test("includes Rosie, caption, and brand assets", async () => {

@@ -17,7 +17,7 @@ function EntryScreen({ onStudent, onAdvisor, onAdmin, onSignOut }: { onStudent: 
 
 function PrototypeRouter({ onSignOut }: { onSignOut?: () => void }) {
   const { dispatch } = usePrototype();
-  const [surface, setSurface] = useState<Surface>("entry");
+  const [surface, setSurface] = useState<Surface>("pathway");
   const [workspace, setWorkspace] = useState<WorkspaceId>("experience");
   const [quick, setQuick] = useState(false);
 

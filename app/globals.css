@@ -55,22 +55,26 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 .text-button { padding: 8px 2px; border: 0; border-bottom: 1px solid currentColor; background: transparent; color: var(--gray); font-weight: 800; }
 .action-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 30px; }
 
-.welcome-partners { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
+.welcome-screen { min-height: min(760px, calc(100vh - 108px)); position: relative; isolation: isolate; margin-top: 24px; padding: 26px; overflow: hidden; border-radius: 34px; box-shadow: 0 24px 70px rgba(35,18,28,0.24); }
+.welcome-landscape { position: absolute; z-index: -2; inset: 0; background-position: center; background-size: cover; filter: saturate(0.78); }
+.welcome-screen::after { content: ""; position: absolute; z-index: -1; inset: 0; background: linear-gradient(120deg, rgba(84,10,37,0.18), rgba(84,10,37,0.02)); pointer-events: none; }
+.welcome-partners { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 16px; padding: 12px 16px; border: 1px solid rgba(255,255,255,0.62); border-radius: 20px; background: rgba(255,254,250,0.94); box-shadow: 0 10px 28px rgba(35,18,28,0.15); backdrop-filter: blur(12px); }
 .welcome-partners > p { max-width: 310px; margin: 0; color: var(--maroon); font-size: 0.65rem; font-weight: 850; letter-spacing: 0.1em; line-height: 1.5; text-transform: uppercase; }
 .welcome-partners > div { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
 .welcome-partners img { width: auto; height: 70px; display: block; border-radius: 8px; object-fit: contain; }
 .welcome-partners img:first-child { height: 74px; }
-.welcome-grid { min-height: 590px; display: grid; grid-template-columns: minmax(290px, 0.76fr) minmax(440px, 1.24fr); overflow: hidden; border-radius: 30px; background: var(--maroon); box-shadow: var(--shadow); }
-.welcome-copy { display: grid; align-content: center; padding: 42px; color: white; }
-.welcome-copy .kicker { color: #f2c1b8; }
+.welcome-grid { min-height: 560px; position: relative; z-index: 1; display: grid; grid-template-columns: minmax(310px, 0.88fr) minmax(410px, 1.12fr); overflow: hidden; border: 1px solid rgba(255,255,255,0.62); border-radius: 30px; background: rgba(255,254,250,0.96); box-shadow: 0 24px 70px rgba(35,18,28,0.24); backdrop-filter: blur(14px); }
+.welcome-copy { display: grid; align-content: center; padding: 42px; color: var(--ink); }
+.welcome-copy .kicker { color: var(--maroon); }
 .welcome-copy h1 { max-width: 430px; font-size: clamp(3rem, 5.3vw, 5rem); }
-.welcome-tagline { margin: 4px 0 14px; color: white; font-family: Georgia, serif; font-size: clamp(1.25rem, 2.1vw, 1.75rem); line-height: 1.2; }
-.welcome-copy .lede { color: rgba(255,255,255,0.8); }
-.welcome-copy .primary-button { width: fit-content; margin-top: 24px; background: white; color: var(--maroon); box-shadow: none; }
+.welcome-tagline { margin: 4px 0 14px; color: var(--maroon); font-family: Georgia, serif; font-size: clamp(1.25rem, 2.1vw, 1.75rem); line-height: 1.2; }
+.welcome-copy .lede { color: var(--gray); }
+.welcome-copy .primary-button { width: fit-content; margin-top: 24px; }
 .welcome-grid .media-moment { align-self: stretch; border-radius: 0; border: 0; }
 .welcome-grid .media-stage { height: 100%; min-height: 480px; border-radius: 0; }
+.welcome-grid .media-stage > img { object-fit: contain; object-position: center bottom; padding: 58px 54px 100px; background: radial-gradient(circle at 50% 56%, #fffaf0 0 27%, #e9dfd0 68%); }
 .welcome-grid .media-controls, .welcome-grid .media-transcript, .welcome-grid .media-ready-note { position: relative; z-index: 2; }
-.resume-card { display: flex; justify-content: space-between; gap: 24px; align-items: center; margin-top: 18px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--white); box-shadow: 0 10px 28px rgba(35, 25, 30, 0.06); }
+.resume-card { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 24px; align-items: center; margin-top: 16px; padding: 18px 20px; border: 1px solid rgba(255,255,255,0.62); border-radius: 20px; background: rgba(255,254,250,0.96); box-shadow: 0 10px 28px rgba(35, 25, 30, 0.16); backdrop-filter: blur(12px); }
 .resume-card span, .resume-card strong { display: block; }
 .resume-card span { margin-bottom: 4px; color: var(--maroon); font-size: 0.65rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
 .resume-card > div:last-child { display: flex; align-items: center; gap: 14px; }
@@ -81,6 +85,10 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 .media-stage > img { object-position: center 32%; transition: transform 5s ease; }
 .media-stage--playing > img { transform: scale(1.035); }
 .media-title { position: absolute; z-index: 2; top: 14px; left: 14px; max-width: calc(100% - 90px); padding: 7px 10px; border-radius: 999px; background: rgba(255, 254, 250, 0.92); color: var(--maroon); font-size: 0.68rem; font-weight: 900; box-shadow: 0 5px 18px rgba(35, 25, 30, 0.12); }
+.media-start-button { position: absolute; z-index: 3; top: 46%; left: 50%; min-height: 52px; max-width: calc(100% - 44px); padding: 13px 20px 13px 50px; transform: translate(-50%, -50%); border: 2px solid rgba(255,255,255,0.86); border-radius: 999px; background: rgba(121,16,52,0.94); color: white; font-weight: 900; white-space: nowrap; box-shadow: 0 14px 34px rgba(35,25,30,0.28); backdrop-filter: blur(8px); }
+.media-start-button::before { content: "\25B6"; position: absolute; left: 20px; top: 50%; transform: translateY(-50%); font-size: 0.92rem; }
+.media-start-button:hover { background: var(--plum); }
+.media-start-button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .media-caption { min-height: 62px; position: absolute; left: 18px; right: 18px; bottom: 18px; display: grid; place-items: center; padding: 12px 18px; border-radius: 14px; background: rgba(84, 10, 37, 0.9); color: white; text-align: center; font-size: clamp(0.9rem, 2vw, 1.15rem); font-weight: 850; backdrop-filter: blur(10px); }
 .media-stage--playing .media-caption span { animation: caption-pop 1600ms ease infinite; }
 @keyframes caption-pop { 0% { opacity: 0; transform: translateY(5px); } 20%, 85% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; } }
@@ -333,6 +341,7 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 }
 
 @media (max-width: 760px) {
+  .welcome-screen { min-height: 0; margin-top: 14px; padding: 16px; border-radius: 26px; }
   .welcome-partners { align-items: flex-start; }
   .welcome-partners > div { gap: 8px; }
   .welcome-partners img, .welcome-partners img:first-child { height: 58px; }
@@ -340,6 +349,7 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
   .welcome-copy { padding: 28px 24px; }
   .welcome-copy h1 { font-size: clamp(2.65rem, 12vw, 4rem); }
   .welcome-grid .media-stage { min-height: 390px; }
+  .welcome-grid .media-stage > img { padding: 48px 42px 92px; }
   .resume-card, .resume-card > div:last-child { align-items: stretch; flex-direction: column; }
   .trust-grid { grid-template-columns: 1fr; }
   .trust-grid article { min-height: 98px; grid-template-columns: 42px 1fr; align-items: center; gap: 12px; }
@@ -357,6 +367,7 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 
 @media (max-width: 540px) {
   .screen { padding-top: 30px; }
+  .welcome-screen { padding: 12px; }
   .welcome-partners { align-items: stretch; flex-direction: column; }
   .welcome-partners > div { justify-content: flex-start; }
   .welcome-partners img, .welcome-partners img:first-child { height: 54px; }
@@ -376,6 +387,9 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
   .completion-ring { width: 92px; height: 92px; }
   .media-stage { min-height: 255px; }
   .welcome-grid .media-stage { min-height: 340px; }
+  .welcome-grid .media-stage > img { padding: 42px 36px 88px; }
+  .media-start-button { max-width: calc(100% - 28px); padding: 12px 16px 12px 43px; white-space: normal; text-align: center; }
+  .media-start-button::before { left: 17px; }
   .site-footer { flex-direction: column; }
   .topbar-actions .text-button { display: none; }
   .brand-lockup { width: 185px; }

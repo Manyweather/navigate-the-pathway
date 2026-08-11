@@ -221,10 +221,10 @@ function MediaMoment({ definition, viewed, onViewed }: { definition: MediaDefini
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timer = window.setTimeout(() => {
-      if (definition.autoplayOnce && !viewed && !reduced) setPlaying(true);
+      if (definition.autoplayOnce && !viewed && !reduced && !mediaFailed) setPlaying(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [definition.autoplayOnce, viewed]);
+  }, [definition.autoplayOnce, mediaFailed, viewed]);
 
   useEffect(() => {
     if (!playing || !mediaFailed) return;
@@ -256,8 +256,12 @@ function MediaMoment({ definition, viewed, onViewed }: { definition: MediaDefini
       if (videoRef.current.paused) void videoRef.current.play();
       else videoRef.current.pause();
     }
+    if (!playing && mediaFailed && frame >= definition.storyboard.length - 1) setFrame(0);
     setPlaying((current) => !current);
   };
+
+  const startLabel = definition.id === "welcome" ? "Start Rosie's explanation" : "Start explanation";
+  const replayLabel = definition.id === "welcome" ? "Replay Rosie's explanation" : "Replay explanation";
 
   return (
     <section className="media-moment" aria-label={definition.title}>
@@ -269,18 +273,19 @@ function MediaMoment({ definition, viewed, onViewed }: { definition: MediaDefini
             <track default kind="captions" src={definition.captions} srcLang="en" label="English" />
           </video>
         ) : <img src={definition.poster} alt="" />}
+        {!playing ? <button className="media-start-button" type="button" onClick={replay}>{viewed || frame > 0 ? replayLabel : startLabel}</button> : null}
         <div className="media-caption" aria-live="polite"><span>{definition.storyboard[frame]}</span></div>
         <span className="media-duration">{definition.duration}s</span>
       </div>
       <div className="media-controls" aria-label="Media controls">
-        <button type="button" onClick={togglePlayback}>{playing ? "Pause" : "Play"}</button>
-        <button type="button" onClick={replay}>Replay</button>
+        <button type="button" onClick={togglePlayback}>{playing ? "Pause" : "Play explanation"}</button>
+        <button type="button" onClick={replay}>Replay explanation</button>
         <button type="button" disabled={mediaFailed} onClick={() => { setMuted((current) => !current); if (videoRef.current) videoRef.current.muted = !muted; }}>{muted ? "Sound" : "Mute"}</button>
         <button type="button" onClick={() => { setPlaying(false); videoRef.current?.pause(); onViewed(definition.id); }}>Skip</button>
         <button type="button" aria-expanded={transcriptOpen} onClick={() => setTranscriptOpen((current) => !current)}>Transcript</button>
       </div>
       {transcriptOpen ? <p className="media-transcript">{definition.transcript}</p> : null}
-      {mediaFailed ? <p className="media-ready-note">Captioned visual introduction. Open the transcript for Rosie&apos;s complete explanation.</p> : null}
+      {mediaFailed ? <p className="media-ready-note">Select Start Rosie&apos;s explanation to begin, or open the complete transcript.</p> : null}
     </section>
   );
 }
@@ -435,6 +440,7 @@ export function JourneyExperience({
 
       <div className="experience" id="top">
         {view === "welcome" ? <section className="screen welcome-screen" aria-labelledby="welcome-title">
+          <div className="welcome-landscape" style={{ backgroundImage: `linear-gradient(rgba(84,10,37,0.28), rgba(84,10,37,0.58)), url("${assetUrl("/assets/premed-district-map.png")}")` }} aria-hidden="true" />
           <div className="welcome-partners"><p>Created for Roseman University College of Medicine students</p><div><img src={assetUrl("/assets/brand/aspire-logo.jpg")} alt="ASPIRE, Roseman University College of Medicine" /><img src={assetUrl("/assets/brand/oaca-emblem.png")} alt="Roseman University College of Medicine Office of Academic and Career Advising" /></div></div>
           <div className="welcome-grid">
             <div className="welcome-copy"><p className="kicker">Rosie, your pathway guide</p><h1 id="welcome-title">Navigate The Pathway</h1><p className="welcome-tagline">Your experiences already matter.</p><p className="lede">See where you are, understand why each step matters, and build useful application material over time.</p><button className="primary-button" type="button" onClick={() => navigate("trust")}>Begin setup <span aria-hidden="true">→</span></button></div>
