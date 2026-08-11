@@ -51,21 +51,26 @@ test("built access routes reject, unlock, authorize, and sign out", async () => 
   assert.match(signedOut.headers.get("set-cookie") ?? "", /Max-Age=0/i);
 });
 
-test("ships visual missions, unified persistence, Rosie, and functional navigation", async () => {
+test("ships visual stations, unified persistence, Rosie, and functional navigation", async () => {
   const [journey, store, shell, styles] = await Promise.all([
     readFile(new URL("../app/journey-experience.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/prototype-store.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/prototype-shell.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
-  for (const station of ["Course Camp", "Experience Vault", "Compassion Commons", "Cohort Commons", "Reflection Studio", "Application Outlook"]) assert.match(journey, new RegExp(station));
+  for (const station of ["Courses", "Experiences", "Compassion & Values", "Cohort", "Your Story", "Application"]) assert.match(journey, new RegExp(station));
   for (const mission of ["log-experience", "course-question", "support-outreach", "study-strategy", "cohort-participation", "reflection-review", "service-reflection", "application-evidence"]) assert.match(journey, new RegExp(mission));
   assert.match(store, /navigate\.pathway\.demo\.v1/);
   assert.match(store, /navigate\.pipeline\.progress\.v1/);
   assert.match(store, /navigate-demo:v3/);
   assert.match(shell, /Quick capture/);
   assert.match(journey, /Continue my pathway/);
-  assert.match(journey, /Open station workspace/);
+  assert.match(journey, /Navigate The Pathway/);
+  assert.match(journey, /What would you like to focus on first\?/);
+  assert.match(journey, /Build My Map/);
+  assert.match(journey, /Why this matters/);
+  assert.match(journey, /shared practice message board/);
+  assert.match(journey, /Open station tools/);
   assert.match(journey, /prefers-reduced-motion/);
   assert.match(styles, /--maroon: #791034/);
   assert.match(styles, /\.app-dock/);
@@ -77,6 +82,8 @@ test("includes Rosie, caption, and brand assets", async () => {
     ...["idle", "gesture", "nodding", "pointing"].map((pose) => access(new URL(`../public/assets/rosie/${pose}.webp`, import.meta.url))),
     access(new URL("../public/assets/rosie/tracks.jpg", import.meta.url)),
     access(new URL("../public/assets/navigate-pathway-mark.svg", import.meta.url)),
+    access(new URL("../public/assets/brand/aspire-logo.jpg", import.meta.url)),
+    access(new URL("../public/assets/brand/oaca-emblem.png", import.meta.url)),
     access(new URL("../public/media/welcome.vtt", import.meta.url)),
     access(new URL("../public/media/reflection-studio.vtt", import.meta.url)),
     access(new URL("../public/media/cohort-commons.vtt", import.meta.url)),
