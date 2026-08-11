@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { assetUrl } from "./asset-url";
 import { makeArtifact, makeId, nowIso } from "./demo-model";
 import { RosieGuide } from "./components/rosie-guide";
 import { workspaceForStation, type WorkspaceId } from "./components/feature-workspaces";
@@ -138,8 +139,8 @@ const media: Record<string, MediaDefinition> = {
     id: "welcome",
     title: "Welcome from Rosie",
     sources: [],
-    poster: "/assets/rosie/gesture.webp",
-    captions: "/media/welcome.vtt",
+    poster: assetUrl("/assets/rosie/gesture.webp"),
+    captions: assetUrl("/media/welcome.vtt"),
     transcript: "Welcome to Navigate the Pathway. Your experiences already matter. This device keeps your private drafts. After setup, you will see a district built around your next useful action. You can skip any media and keep moving.",
     duration: 36,
     autoplayOnce: true,
@@ -149,8 +150,8 @@ const media: Record<string, MediaDefinition> = {
     id: "reflection",
     title: "How an hour becomes evidence",
     sources: [],
-    poster: "/assets/premed-pathway-illustration.png",
-    captions: "/media/reflection-studio.vtt",
+    poster: assetUrl("/assets/premed-pathway-illustration.png"),
+    captions: assetUrl("/media/reflection-studio.vtt"),
     transcript: "An hour is a record. A specific moment reveals what happened. Meaning shows why it mattered. A next action turns reflection into evidence you can use later.",
     duration: 25,
     autoplayOnce: true,
@@ -160,8 +161,8 @@ const media: Record<string, MediaDefinition> = {
     id: "cohort",
     title: "Many ways to participate",
     sources: [],
-    poster: "/assets/premed-district-map.png",
-    captions: "/media/cohort-commons.vtt",
+    poster: assetUrl("/assets/premed-district-map.png"),
+    captions: assetUrl("/media/cohort-commons.vtt"),
     transcript: "Cohort participation has more than one valid mode. Observe, react, respond, or connect. Start where your energy allows. You do not have to reach the final step to belong.",
     duration: 24,
     autoplayOnce: true,
@@ -300,7 +301,7 @@ function StationDiagram({ definition, revealed, onReveal }: { definition: Diagra
 }
 
 function BrandLockup() {
-  return <span className="brand-lockup"><img src="/assets/navigate-pathway-mark.svg" alt="Navigate the Pathway" /></span>;
+  return <span className="brand-lockup"><img src={assetUrl("/assets/navigate-pathway-mark.svg")} alt="Navigate the Pathway" /></span>;
 }
 
 function AppDock({ view, enabled, navigate }: { view: View; enabled: boolean; navigate: (view: View) => void }) {
@@ -459,7 +460,7 @@ export function JourneyExperience({
           <div className="screen-heading map-heading"><div><p className="kicker">Premed district</p><h1 id="map-title">Choose a station.</h1><p>All stations are open.</p></div><div className="stamp-count"><span>{progress.stamps.length}</span><small>stamps</small></div></div>
           <div className="map-recommendation"><span>★</span><p>Suggested now: <strong>{suggestedStation.name}</strong></p></div>
           <RosieGuide pose="pointing" compact eyebrow="Rosie recommends" title={suggestedStation.name} body="Use the suggestion or choose any open station." />
-          <div className="district-map" aria-label="Scrollable station map"><div className="district-map__canvas"><img src="/assets/premed-district-map.png" alt="Illustrated pathway through six premed learning stations" />{stations.map((station) => <button key={station.id} type="button" className={`station station--${station.id} ${activeStationId === station.id ? "station--active" : ""} ${progress.suggestedStation === station.id ? "station--recommended" : ""} ${progress.stamps.includes(station.id) ? "station--stamped" : ""}`} onClick={() => openStation(station)}><span>{progress.stamps.includes(station.id) ? "✓" : station.icon}</span><strong>{station.name}</strong></button>)}</div></div>
+          <div className="district-map" aria-label="Scrollable station map"><div className="district-map__canvas"><img src={assetUrl("/assets/premed-district-map.png")} alt="Illustrated pathway through six premed learning stations" />{stations.map((station) => <button key={station.id} type="button" className={`station station--${station.id} ${activeStationId === station.id ? "station--active" : ""} ${progress.suggestedStation === station.id ? "station--recommended" : ""} ${progress.stamps.includes(station.id) ? "station--stamped" : ""}`} onClick={() => openStation(station)}><span>{progress.stamps.includes(station.id) ? "✓" : station.icon}</span><strong>{station.name}</strong></button>)}</div></div>
           <article className="station-sheet"><div className="station-sheet__title"><span>{activeStation.icon}</span><div><small>{activeStation.short}</small><h2>{activeStation.name}</h2></div>{progress.stamps.includes(activeStation.id) ? <b className="earned-label">Stamped</b> : null}</div><StationDiagram definition={diagrams[activeStation.id]} revealed={Math.max(-1, progress.diagramProgress[diagrams[activeStation.id].id] ?? -1)} onReveal={(index) => setProgress((current) => ({ ...current, diagramProgress: { ...current.diagramProgress, [diagrams[activeStation.id].id]: Math.max(current.diagramProgress[diagrams[activeStation.id].id] ?? -1, index) } }))} /><div className="station-actions"><button className="primary-button primary-button--wide" type="button" onClick={() => beginMission(activeStation.missionId)}>Start this mission</button><button className="secondary-button" type="button" onClick={() => onOpenWorkspace(workspaceForStation(activeStation.id))}>Open station workspace</button></div></article>
         </section> : null}
 

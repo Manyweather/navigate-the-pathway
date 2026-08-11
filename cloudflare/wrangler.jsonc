@@ -1,0 +1,17 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "navigate-pathway-access",
+  "main": "access-worker.ts",
+  "compatibility_date": "2026-08-11",
+  "workers_dev": true,
+  "preview_urls": false,
+  "secrets": {
+    "required": [
+      "NAVIGATE_ACCESS_CODE",
+      "NAVIGATE_SESSION_SECRET"
+    ]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

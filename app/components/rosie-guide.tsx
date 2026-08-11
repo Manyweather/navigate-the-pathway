@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { assetUrl } from "../asset-url";
 
 export type RosiePose = "idle" | "gesture" | "nodding" | "pointing" | "tracks";
 
@@ -53,12 +53,13 @@ export function RosieGuide({
   const details = poseDetails[pose];
   return (
     <aside className={`rosie-guide rosie-guide--${pose} ${compact ? "rosie-guide--compact" : ""}`}>
-      <Image
-        src={details.src}
+      <img
+        src={assetUrl(details.src)}
         alt={details.alt}
         width={details.width}
         height={details.height}
-        priority={priority}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
       />
       <div>
         <p className="kicker">{eyebrow}</p>
