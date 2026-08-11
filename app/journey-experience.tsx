@@ -144,7 +144,7 @@ const media: Record<string, MediaDefinition> = {
     sources: [],
     poster: assetUrl("/assets/rosie/gesture.webp"),
     captions: assetUrl("/media/welcome.vtt"),
-    transcript: "Hi, I'm Rosie. Navigate The Pathway is a private practice space that helps you make your premedical journey visible. You will use a map of six stations to organize courses and experiences, reflect on compassion and your values, learn with your cohort, discover the story connecting your experiences, and shape application-ready examples. Each station explains why the work matters, guides one small action, and saves something useful on this device. You choose where to begin, and you can change direction at any time.",
+    transcript: "Hi, I'm Rosie, your guide to Navigate The Pathway. You already have experiences that matter. This is a private practice space where you can track courses and experiences, reflect on compassion and your values, learn with your cohort, and shape the story you may use in your medical school application. Each station explains why the work matters, guides one manageable action, and saves something useful on this device. There are no points, rankings, or perfect routes. You choose where to begin, and you can change direction whenever you need to.",
     duration: 40,
     autoplayOnce: true,
     storyboard: ["Make your premedical journey visible.", "Explore six stations at your pace.", "See why the work matters.", "Complete one useful action.", "Save it for advising and applications."],
@@ -155,10 +155,10 @@ const media: Record<string, MediaDefinition> = {
     sources: [],
     poster: assetUrl("/assets/premed-pathway-illustration.png"),
     captions: assetUrl("/media/reflection-studio.vtt"),
-    transcript: "An hour is a record. A specific moment reveals what happened. Meaning shows why it mattered. A next action turns reflection into evidence you can use later.",
+    transcript: "Hours help you remember how much time you spent. Stories help you remember why the experience mattered. Start with one specific moment. Describe what happened, what you noticed, and what changed in your thinking. That small reflection becomes evidence you can use in advising conversations, applications, and future decisions.",
     duration: 25,
     autoplayOnce: true,
-    storyboard: ["Hour", "Specific moment", "Meaning", "Usable evidence"],
+    storyboard: ["Hours track time.", "Specific moments preserve meaning.", "Notice what changed.", "Save evidence for later."],
   },
   cohort: {
     id: "cohort",
@@ -166,10 +166,10 @@ const media: Record<string, MediaDefinition> = {
     sources: [],
     poster: assetUrl("/assets/premed-district-map.png"),
     captions: assetUrl("/media/cohort-commons.vtt"),
-    transcript: "Cohort participation has more than one valid mode. Observe, react, respond, or connect. Start where your energy allows. You do not have to reach the final step to belong.",
+    transcript: "Your cohort is a group of classmates moving through the same process. Participation does not have to mean speaking first or speaking often. You can observe, encourage, respond, share a resource, or invite one follow-up conversation. Start with the level of interaction that feels useful today. Belonging grows through small, genuine contributions.",
     duration: 24,
     autoplayOnce: true,
-    storyboard: ["Observe", "React", "Respond", "Connect when useful"],
+    storyboard: ["Your cohort shares the process.", "Observe or encourage.", "Respond or share.", "Connect when useful."],
   },
 };
 
@@ -274,7 +274,7 @@ function MediaMoment({ definition, viewed, onViewed }: { definition: MediaDefini
           </video>
         ) : <img src={definition.poster} alt="" />}
         {!playing ? <button className="media-start-button" type="button" onClick={replay}>{viewed || frame > 0 ? replayLabel : startLabel}</button> : null}
-        <div className="media-caption" aria-live="polite"><span>{definition.storyboard[frame]}</span></div>
+        <div className="media-caption" aria-live="polite"><strong>Rosie</strong><span>{definition.storyboard[frame]}</span></div>
         <span className="media-duration">{definition.duration}s</span>
       </div>
       <div className="media-controls" aria-label="Media controls">

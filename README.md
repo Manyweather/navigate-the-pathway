@@ -44,6 +44,7 @@ Every station stays available. Recommendations identify a useful next destinatio
 
 - Short screens with one clear action
 - Rosie poses for welcome, privacy, recommendations, saved work, and returning moments
+- [Rosie speech and HeyGen script review](docs/content/ROSIE_SPEECH_HEYGEN_REVIEW.md) for narration approval before voice production
 - Muted autoplay-once media with captions, transcript, replay, skip, and poster fallbacks
 - Touch, mouse, and keyboard support across phone, tablet, and desktop layouts
 - Reduced-motion behavior and accessibility text for visual content

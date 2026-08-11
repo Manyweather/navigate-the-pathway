@@ -75,11 +75,14 @@ test("ships visual stations, unified persistence, Rosie, and functional navigati
   assert.match(journey, /Open station tools/);
   assert.match(journey, /Start Rosie's explanation/);
   assert.match(journey, /Play explanation/);
+  assert.match(journey, /<strong>Rosie<\/strong>/);
   assert.match(journey, /prefers-reduced-motion/);
   assert.match(styles, /--maroon: #791034/);
   assert.match(styles, /\.app-dock/);
   assert.match(styles, /\.rosie-guide/);
   assert.match(styles, /\.media-start-button/);
+  assert.match(styles, /\.media-caption::after/);
+  assert.match(styles, /\.rosie-guide > div::before/);
   assert.match(styles, /\.welcome-grid \.media-stage > img/);
   assert.match(styles, /\.welcome-landscape/);
 });
@@ -94,5 +97,6 @@ test("includes Rosie, caption, and brand assets", async () => {
     access(new URL("../public/media/welcome.vtt", import.meta.url)),
     access(new URL("../public/media/reflection-studio.vtt", import.meta.url)),
     access(new URL("../public/media/cohort-commons.vtt", import.meta.url)),
+    access(new URL("../docs/content/ROSIE_SPEECH_HEYGEN_REVIEW.md", import.meta.url)),
   ]);
 });
