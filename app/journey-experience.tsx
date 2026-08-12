@@ -286,7 +286,7 @@ function MediaMoment({ definition, viewed, onViewed }: { definition: MediaDefini
           </video>
         ) : <img src={definition.poster} alt="" />}
         {!playing ? <button className="media-start-button" type="button" onClick={replay}>{viewed || frame > 0 ? replayLabel : startLabel}</button> : null}
-        <div className="media-caption" aria-live="polite"><strong>Rosie</strong><span>{definition.storyboard[frame]}</span></div>
+        {mediaFailed ? <div className="media-caption" aria-live="polite"><strong>Rosie</strong><span>{definition.storyboard[frame]}</span></div> : null}
         <span className="media-duration">{definition.duration}s</span>
       </div>
       <div className="media-controls" aria-label="Media controls">

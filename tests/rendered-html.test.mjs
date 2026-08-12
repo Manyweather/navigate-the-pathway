@@ -75,7 +75,7 @@ test("ships visual stations, unified persistence, Rosie, and functional navigati
   assert.match(journey, /Open station tools/);
   assert.match(journey, /Start Rosie's explanation/);
   assert.match(journey, /Play explanation/);
-  assert.match(journey, /<strong>Rosie<\/strong>/);
+  assert.match(journey, /mediaFailed \? <div className="media-caption"/);
   assert.match(journey, /prefers-reduced-motion/);
   assert.match(styles, /--maroon: #791034/);
   assert.match(styles, /\.app-dock/);
@@ -84,6 +84,8 @@ test("ships visual stations, unified persistence, Rosie, and functional navigati
   assert.match(styles, /\.media-caption::after/);
   assert.match(styles, /\.rosie-guide > div::before/);
   assert.match(styles, /\.welcome-grid \.media-stage > img/);
+  assert.match(styles, /\.welcome-grid \.media-stage \{[^}]*aspect-ratio: 16 \/ 9/);
+  assert.match(styles, /\.welcome-grid \.media-stage video \{[^}]*object-fit: contain/);
   assert.match(styles, /\.welcome-landscape/);
 });
 
