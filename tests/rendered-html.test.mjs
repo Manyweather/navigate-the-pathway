@@ -97,8 +97,25 @@ test("includes Rosie, caption, and brand assets", async () => {
     access(new URL("../public/media/welcome.vtt", import.meta.url)),
     access(new URL("../public/media/reflection-studio.vtt", import.meta.url)),
     access(new URL("../public/media/cohort-commons.vtt", import.meta.url)),
+    ...["welcome", "reflection-studio", "cohort-commons"].flatMap((name) => [
+      access(new URL(`../public/media/${name}.mp4`, import.meta.url)),
+      access(new URL(`../public/media/${name}.webm`, import.meta.url)),
+      access(new URL(`../public/media/${name}-poster.jpg`, import.meta.url)),
+    ]),
     access(new URL("../docs/content/ROSIE_SPEECH_HEYGEN_REVIEW.md", import.meta.url)),
   ]);
+});
+
+test("uses the finished explanation videos with resilient playback", async () => {
+  const journey = await readFile(new URL("../app/journey-experience.tsx", import.meta.url), "utf8");
+  for (const name of ["welcome", "reflection-studio", "cohort-commons"]) {
+    assert.match(journey, new RegExp(`/media/${name}\\.webm`));
+    assert.match(journey, new RegExp(`/media/${name}\\.mp4`));
+    assert.match(journey, new RegExp(`/media/${name}-poster\\.jpg`));
+  }
+  assert.match(journey, /preload="metadata"/);
+  assert.match(journey, /videoRef\.current\.play\(\)\.catch/);
+  assert.doesNotMatch(journey, /<video[^>]+autoPlay/);
 });
 
 test("reviewer views include student-organized packets and functional route previews", async () => {

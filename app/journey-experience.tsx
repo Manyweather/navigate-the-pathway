@@ -141,33 +141,42 @@ const media: Record<string, MediaDefinition> = {
   welcome: {
     id: "welcome",
     title: "Rosie explains Navigate The Pathway",
-    sources: [],
-    poster: assetUrl("/assets/rosie/gesture.webp"),
+    sources: [
+      { src: assetUrl("/media/welcome.webm"), type: "video/webm" },
+      { src: assetUrl("/media/welcome.mp4"), type: "video/mp4" },
+    ],
+    poster: assetUrl("/media/welcome-poster.jpg"),
     captions: assetUrl("/media/welcome.vtt"),
     transcript: "Hi, I'm Rosie, your guide to Navigate The Pathway. You already have experiences that matter. This is a private practice space where you can track courses and experiences, reflect on compassion and your values, learn with your cohort, and shape the story you may use in your medical school application. Each station explains why the work matters, guides one manageable action, and saves something useful on this device. There are no points, rankings, or perfect routes. You choose where to begin, and you can change direction whenever you need to.",
-    duration: 40,
+    duration: 34,
     autoplayOnce: true,
     storyboard: ["Make your premedical journey visible.", "Explore six stations at your pace.", "See why the work matters.", "Complete one useful action.", "Save it for advising and applications."],
   },
   reflection: {
     id: "reflection",
     title: "How an hour becomes evidence",
-    sources: [],
-    poster: assetUrl("/assets/premed-pathway-illustration.png"),
+    sources: [
+      { src: assetUrl("/media/reflection-studio.webm"), type: "video/webm" },
+      { src: assetUrl("/media/reflection-studio.mp4"), type: "video/mp4" },
+    ],
+    poster: assetUrl("/media/reflection-studio-poster.jpg"),
     captions: assetUrl("/media/reflection-studio.vtt"),
     transcript: "Hours help you remember how much time you spent. Stories help you remember why the experience mattered. Start with one specific moment. Describe what happened, what you noticed, and what changed in your thinking. That small reflection becomes evidence you can use in advising conversations, applications, and future decisions.",
-    duration: 25,
+    duration: 22,
     autoplayOnce: true,
     storyboard: ["Hours track time.", "Specific moments preserve meaning.", "Notice what changed.", "Save evidence for later."],
   },
   cohort: {
     id: "cohort",
     title: "Many ways to participate",
-    sources: [],
-    poster: assetUrl("/assets/premed-district-map.png"),
+    sources: [
+      { src: assetUrl("/media/cohort-commons.webm"), type: "video/webm" },
+      { src: assetUrl("/media/cohort-commons.mp4"), type: "video/mp4" },
+    ],
+    poster: assetUrl("/media/cohort-commons-poster.jpg"),
     captions: assetUrl("/media/cohort-commons.vtt"),
     transcript: "Your cohort is a group of classmates moving through the same process. Participation does not have to mean speaking first or speaking often. You can observe, encourage, respond, share a resource, or invite one follow-up conversation. Start with the level of interaction that feels useful today. Belonging grows through small, genuine contributions.",
-    duration: 24,
+    duration: 25,
     autoplayOnce: true,
     storyboard: ["Your cohort shares the process.", "Observe or encourage.", "Respond or share.", "Connect when useful."],
   },
@@ -221,7 +230,10 @@ function MediaMoment({ definition, viewed, onViewed }: { definition: MediaDefini
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timer = window.setTimeout(() => {
-      if (definition.autoplayOnce && !viewed && !reduced && !mediaFailed) setPlaying(true);
+      if (definition.autoplayOnce && !viewed && !reduced && !mediaFailed && videoRef.current) {
+        videoRef.current.muted = true;
+        void videoRef.current.play().catch(() => setPlaying(false));
+      }
     }, 0);
     return () => window.clearTimeout(timer);
   }, [definition.autoplayOnce, mediaFailed, viewed]);
@@ -268,7 +280,7 @@ function MediaMoment({ definition, viewed, onViewed }: { definition: MediaDefini
       <div className={`media-stage ${playing ? "media-stage--playing" : ""}`}>
         <span className="media-title">{definition.title}</span>
         {!mediaFailed ? (
-          <video ref={videoRef} autoPlay={definition.autoplayOnce && !viewed} muted={muted} playsInline poster={definition.poster} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); onViewed(definition.id); }} onError={() => setMediaFailed(true)}>
+          <video ref={videoRef} muted={muted} playsInline preload="metadata" poster={definition.poster} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); onViewed(definition.id); }} onError={() => setMediaFailed(true)}>
             {definition.sources.map((source) => <source key={source.src} src={source.src} type={source.type} />)}
             <track default kind="captions" src={definition.captions} srcLang="en" label="English" />
           </video>
