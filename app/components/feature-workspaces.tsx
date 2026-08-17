@@ -33,11 +33,14 @@ import {
   type WorkflowType,
 } from "../demo-model";
 import { usePrototype } from "../prototype-store";
+import { advisorPilotDemoByStudent } from "../pilot-model";
 import { RosieGuide } from "./rosie-guide";
+import { AdminPilotPanel, AdvisorPilotPanel, CoursesPilotWorkspace, PilotStudentWorkspace, PortfolioPilotWorkspace } from "./pilot-workspaces";
 
-export type WorkspaceId = "course" | "experience" | "compassion" | "cohort" | "reflection" | "application";
+export type WorkspaceId = "pilot" | "course" | "experience" | "compassion" | "cohort" | "reflection" | "application";
 
 const workspaceLabels: { id: WorkspaceId; name: string; action: string }[] = [
+  { id: "pilot", name: "Pilot", action: "Participate" },
   { id: "course", name: "Courses", action: "Plan" },
   { id: "experience", name: "Experiences", action: "Track" },
   { id: "compassion", name: "Compassion & Values", action: "Notice" },
@@ -47,6 +50,7 @@ const workspaceLabels: { id: WorkspaceId; name: string; action: string }[] = [
 ];
 
 const routeDestination: Record<WorkspaceId, DestinationId> = {
+  pilot: "course",
   course: "course",
   experience: "experience",
   compassion: "reflection",
@@ -110,7 +114,7 @@ function WorkspaceHeader({ id, onBack }: { id: WorkspaceId; onBack: () => void }
   return <header className="workspace-header"><button className="text-button" onClick={onBack}>Back to map</button><div><p className="kicker">{current.action}</p><h1>{current.name}</h1></div></header>;
 }
 
-function CourseWorkspace() {
+export function LegacyCourseWorkspace() {
   const { state, dispatch } = usePrototype();
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -305,7 +309,7 @@ function ApplicationWorkspace() {
   return <div className="workspace-grid"><section className="workspace-card workspace-card--wide"><div className="visual-sequence"><span>Choose evidence</span><span>Name the goal</span><span>Set access</span><span>Review together</span></div><h2>Prepare an advising packet</h2><div className="packet-builder"><fieldset className="source-picker"><legend>Student-selected items</legend>{state.artifacts.map((item) => <label key={item.id}><input type="checkbox" checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} />{item.title}<small>{item.kind.replaceAll("_", " ")}</small></label>)}</fieldset><div><Field label="Fictional advisor"><select value={advisorId} onChange={(event) => setAdvisorId(event.target.value)}>{state.advisors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Meeting goal"><input value={goal} onChange={(event) => setGoal(event.target.value)} /></Field><Field label="Questions, one per line"><textarea value={question} onChange={(event) => setQuestion(event.target.value)} /></Field><Field label="Possible next actions"><textarea value={action} onChange={(event) => setAction(event.target.value)} /></Field><Field label="Access ends"><input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></Field><div className="workspace-actions"><button className="primary-button" disabled={!selectedIds.length || !goal.trim()} onClick={share}>Open limited share</button>{state.packet.status === "shared" ? <button className="text-button" onClick={revoke}>Revoke now</button> : null}</div></div></div><p className="workspace-safe">Status: {state.packet.status}. Advisors see only selected items while this share is active.</p></section><section className="workspace-card workspace-card--wide"><div className="section-count"><div><h2>Application preparation</h2><p>Your records can become an application draft when you are ready.</p></div><strong>{experienceCount}/{aamcLimits.experienceEntries}<small>experience entries</small></strong></div><div className="alignment-grid"><article><span>{transcriptCheckedCount}/{state.courses.length || 0}</span><p>course records checked with a transcript</p></article><article><span>{mostMeaningfulCount}/{aamcLimits.mostMeaningfulEntries}</span><p>possible Most Meaningful experiences</p></article><article><span>{data.reflections.length}</span><p>saved reflections to revisit</p></article></div><div className="workspace-actions"><button className="primary-button" onClick={() => window.print()}>Print or save PDF</button><button className="secondary-button" onClick={download}>Download text</button></div><p className="character-note">The export keeps completed and anticipated hours separate and preserves plain-text working notes. {aamcGuide.preparationNotice}</p></section></div>;
 }
 
-function PortfolioWorkspace() {
+export function LegacyPortfolioWorkspace() {
   const { state } = usePrototype();
   const [kind, setKind] = useState("all");
   const items = state.artifacts.filter((item) => kind === "all" || item.kind === kind);
@@ -316,7 +320,7 @@ export function FeatureWorkspaces({ initial = "experience", quick = false, onBac
   const [active, setActive] = useState<WorkspaceId>(initial);
   const [portfolio, setPortfolio] = useState(false);
   const current = workspaceLabels.find((item) => item.id === active) ?? workspaceLabels[1];
-  return <main className="feature-workspace"><WorkspaceHeader id={active} onBack={onBack} /><RosieGuide pose="pointing" compact eyebrow="Recommended station" title={current.name} body="Choose one practical action. Everything saves on this device." /><nav className="workspace-nav" aria-label="Pathway stations">{workspaceLabels.map((item) => <button key={item.id} className={active === item.id && !portfolio ? "active" : ""} onClick={() => { setActive(item.id); setPortfolio(false); }}>{item.name}</button>)}<button className={portfolio ? "active" : ""} onClick={() => setPortfolio(true)}>Portfolio</button></nav>{portfolio ? <PortfolioWorkspace /> : active === "course" ? <CourseWorkspace /> : active === "experience" ? <ExperienceWorkspace quick={quick} /> : active === "compassion" ? <CompassionWorkspace /> : active === "cohort" ? <CohortWorkspace /> : active === "reflection" ? <ReflectionWorkspace /> : <ApplicationWorkspace />}</main>;
+  return <main className="feature-workspace"><WorkspaceHeader id={active} onBack={onBack} /><RosieGuide pose="pointing" compact eyebrow="Recommended station" title={current.name} body="Choose one practical action. Everything saves on this device." /><nav className="workspace-nav" aria-label="Pathway stations">{workspaceLabels.map((item) => <button key={item.id} className={active === item.id && !portfolio ? "active" : ""} onClick={() => { setActive(item.id); setPortfolio(false); }}>{item.name}</button>)}<button className={portfolio ? "active" : ""} onClick={() => setPortfolio(true)}>Portfolio</button></nav>{portfolio ? <PortfolioPilotWorkspace /> : active === "pilot" ? <PilotStudentWorkspace /> : active === "course" ? <CoursesPilotWorkspace /> : active === "experience" ? <ExperienceWorkspace quick={quick} /> : active === "compassion" ? <CompassionWorkspace /> : active === "cohort" ? <CohortWorkspace /> : active === "reflection" ? <ReflectionWorkspace /> : <ApplicationWorkspace />}</main>;
 }
 
 export function ReviewerWorkspace({
@@ -384,6 +388,7 @@ export function ReviewerWorkspace({
           </div>
         </section>
         <section className="workspace-card workspace-card--wide"><h2>Pilot readiness</h2><ul className="readiness-list"><li>Backup moderator named</li><li>Advising relationships confirmed</li><li>Content sources reviewed for accuracy</li><li>Access and invitation strategy decided</li><li>Privacy, evaluation, and possible IRB conversation completed</li></ul><p className="workspace-safe">The Supabase schema is an architecture reference only. No production persistence is active.</p></section>
+        <AdminPilotPanel />
       </main>
     );
   }
@@ -408,6 +413,7 @@ export function ReviewerWorkspace({
         <section className="advisor-thread"><h3>Coaching thread</h3>{selectedStudent.packet.comments.map((item) => <article key={item.id}><span>Advisor</span><p>{item.body}</p></article>)}{(advisorReplies[selectedStudent.id] || []).map((reply, index) => <article key={`${selectedStudent.id}-${index}`}><span>Your draft response</span><p>{reply}</p></article>)}</section>
         <Field label="Coaching question or next action"><textarea value={comment} onChange={(event) => setComment(event.target.value)} /></Field><button className="primary-button" disabled={!comment.trim()} onClick={saveReply}>Return one next action</button>
       </section> : <section className="workspace-card workspace-card--wide"><p className="workspace-warning">This packet is {selectedStudent.packet.status}. Its shared items, questions, and comments are no longer visible to the advisor.</p><p className="workspace-intro">The fictional student can open a new limited share later. Revocation and expiration remove packet visibility immediately.</p></section>}
+      <AdvisorPilotPanel demo={advisorPilotDemoByStudent[selectedStudent.id]} packetActive={packetIsActive} />
     </main>
   );
 }

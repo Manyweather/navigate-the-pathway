@@ -19,6 +19,7 @@ import {
   type DemoState,
   type PersistenceStatus,
 } from "./demo-model";
+import { createDefaultPilotState, type PilotState } from "./pilot-model";
 
 export type MediaFocus = "records" | "courses" | "story" | "support" | "unsure";
 export type MediaView = "welcome" | "trust" | "setup" | "map" | "mission" | "stamp" | "home" | "cohort" | "vault";
@@ -46,12 +47,14 @@ export type MediaProgressState = {
   lastView: MediaView;
 };
 
-export type PrototypeStateV1 = DemoState & {
-  prototypeVersion: 1;
+export type PrototypeStateV2 = DemoState & {
+  prototypeVersion: 2;
   media: MediaProgressState;
+  pilot: PilotState;
 };
 
-export const PROTOTYPE_STORAGE_KEY = "navigate.pathway.demo.v1";
+export const PROTOTYPE_STORAGE_KEY = "navigate.pathway.demo.v2";
+export const PROTOTYPE_V1_STORAGE_KEY = "navigate.pathway.demo.v1";
 export const DONOR_STORAGE_KEY = "navigate-demo:v3";
 export const DONOR_V2_STORAGE_KEY = "navigate-demo:v2";
 export const PIPELINE_STORAGE_KEY = "navigate.pipeline.progress.v1";
@@ -70,11 +73,12 @@ export const emptyMediaProgress: MediaProgressState = {
   lastView: "welcome",
 };
 
-export function createDefaultPrototypeState(): PrototypeStateV1 {
+export function createDefaultPrototypeState(): PrototypeStateV2 {
   return {
     ...createDefaultState(),
-    prototypeVersion: 1,
+    prototypeVersion: 2,
     media: structuredClone(emptyMediaProgress),
+    pilot: createDefaultPilotState(),
   };
 }
 
@@ -117,13 +121,21 @@ function addLegacyMediaArtifacts(base: DemoState, media: MediaProgressState): De
   return { ...base, artifacts: [...migrated, ...base.artifacts] };
 }
 
-export function migratePrototypeState(storage: StorageLike): { state: PrototypeStateV1; recovered: boolean } {
+export function migratePrototypeState(storage: StorageLike): { state: PrototypeStateV2; recovered: boolean } {
   try {
     const currentRaw = storage.getItem(PROTOTYPE_STORAGE_KEY);
     if (currentRaw) {
-      const parsed = JSON.parse(currentRaw) as { version?: number; state?: PrototypeStateV1 };
-      if (parsed.version === 1 && parsed.state?.prototypeVersion === 1) {
+      const parsed = JSON.parse(currentRaw) as { version?: number; state?: PrototypeStateV2 };
+      if (parsed.version === 2 && parsed.state?.prototypeVersion === 2 && parsed.state.pilot) {
         return { state: parsed.state, recovered: false };
+      }
+    }
+
+    const v1Raw = storage.getItem(PROTOTYPE_V1_STORAGE_KEY);
+    if (v1Raw) {
+      const parsed = JSON.parse(v1Raw) as { version?: number; state?: DemoState & { prototypeVersion: 1; media: MediaProgressState } };
+      if (parsed.version === 1 && parsed.state?.prototypeVersion === 1) {
+        return { state: { ...parsed.state, prototypeVersion: 2, pilot: createDefaultPilotState() }, recovered: true };
       }
     }
 
@@ -136,8 +148,9 @@ export function migratePrototypeState(storage: StorageLike): { state: PrototypeS
         state: {
           ...mergedBase,
           scenario: "migrated",
-          prototypeVersion: 1,
+          prototypeVersion: 2,
           media: media ?? structuredClone(emptyMediaProgress),
+          pilot: createDefaultPilotState(),
         },
         recovered: true,
       };
@@ -158,11 +171,13 @@ type MediaAction =
   | { type: "PATCH_MEDIA"; patch: Partial<MediaProgressState> }
   | { type: "UPDATE_MEDIA"; update: MediaProgressState | ((current: MediaProgressState) => MediaProgressState) }
   | { type: "REPLACE_MEDIA"; media: MediaProgressState }
+  | { type: "UPDATE_PILOT"; update: PilotState | ((current: PilotState) => PilotState) }
+  | { type: "REPLACE_PILOT"; pilot: PilotState }
   | { type: "RESET_PROTOTYPE" };
 
 export type PrototypeAction = DemoAction | MediaAction;
 
-function prototypeReducer(state: PrototypeStateV1, action: PrototypeAction): PrototypeStateV1 {
+function prototypeReducer(state: PrototypeStateV2, action: PrototypeAction): PrototypeStateV2 {
   if (action.type === "PATCH_MEDIA") {
     return {
       ...state,
@@ -177,12 +192,17 @@ function prototypeReducer(state: PrototypeStateV1, action: PrototypeAction): Pro
   if (action.type === "REPLACE_MEDIA") {
     return { ...state, media: action.media, lastActiveAt: new Date().toISOString() };
   }
+  if (action.type === "UPDATE_PILOT") {
+    const pilot = typeof action.update === "function" ? action.update(state.pilot) : action.update;
+    return { ...state, pilot, lastActiveAt: new Date().toISOString() };
+  }
+  if (action.type === "REPLACE_PILOT") return { ...state, pilot: action.pilot };
   if (action.type === "RESET_PROTOTYPE") return createDefaultPrototypeState();
-  return { ...demoReducer(state, action), prototypeVersion: 1, media: state.media };
+  return { ...demoReducer(state, action), prototypeVersion: 2, media: state.media, pilot: state.pilot };
 }
 
 type PrototypeContextValue = {
-  state: PrototypeStateV1;
+  state: PrototypeStateV2;
   dispatch: React.Dispatch<PrototypeAction>;
   hydrated: boolean;
   recovered: boolean;
@@ -190,6 +210,7 @@ type PrototypeContextValue = {
   lastSavedAt: string | null;
   inactivityGapStartedAt: string | null;
   setMediaProgress: (update: MediaProgressState | ((current: MediaProgressState) => MediaProgressState)) => void;
+  setPilotState: (update: PilotState | ((current: PilotState) => PilotState)) => void;
   dismissReengagementNudge: () => void;
   clearDeviceData: () => void;
 };
@@ -209,6 +230,7 @@ export function PrototypeProvider({ children }: { children: React.ReactNode }) {
     const restored = migratePrototypeState(window.localStorage);
     dispatch({ type: "PATCH", patch: restored.state });
     dispatch({ type: "REPLACE_MEDIA", media: restored.state.media });
+    dispatch({ type: "REPLACE_PILOT", pilot: restored.state.pilot });
     // These values mirror the browser-storage synchronization above.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setRecovered(restored.recovered);
@@ -230,7 +252,7 @@ export function PrototypeProvider({ children }: { children: React.ReactNode }) {
       try {
         window.localStorage.setItem(
           PROTOTYPE_STORAGE_KEY,
-          JSON.stringify({ version: 1, state }),
+          JSON.stringify({ version: 2, state }),
         );
         setLastSavedAt(new Date().toISOString());
         setPersistenceStatus("saved");
@@ -252,6 +274,7 @@ export function PrototypeProvider({ children }: { children: React.ReactNode }) {
     lastSavedAt,
     inactivityGapStartedAt,
     setMediaProgress: (update) => dispatch({ type: "UPDATE_MEDIA", update }),
+    setPilotState: (update) => dispatch({ type: "UPDATE_PILOT", update }),
     dismissReengagementNudge: () => {
       if (inactivityGapStartedAt) {
         try {
@@ -265,6 +288,7 @@ export function PrototypeProvider({ children }: { children: React.ReactNode }) {
     clearDeviceData: () => {
       for (const key of [
         PROTOTYPE_STORAGE_KEY,
+        PROTOTYPE_V1_STORAGE_KEY,
         DONOR_STORAGE_KEY,
         DONOR_V2_STORAGE_KEY,
         PIPELINE_STORAGE_KEY,

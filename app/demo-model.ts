@@ -45,6 +45,18 @@ export type CoursePlan = {
   labType?: string;
   specialCourseType?: string;
   transcriptChecked?: boolean;
+  subjectArea?: string;
+  prerequisiteRelationship?: string;
+  challenge?: string;
+  contact?: string;
+  followUpDate?: string;
+  privateNote?: string;
+  shareWithAdvisor?: boolean;
+  preferNoGrade?: boolean;
+  rawCourseCode?: string;
+  normalizedCourseCode?: string;
+  matchStatus?: "exact" | "student_confirmed" | "advisor_confirmed" | "unmatched" | "ambiguous";
+  matchedRequirementId?: string;
 };
 export type LearningExperiment = { id: string; strategy: string; prediction: string; intention: string; schedule: string; observation: string; result: string; adjustment: string; status: "planned" | "active" | "reviewed" };
 export type SupportContact = { id: string; role: "academic" | "personal" | "professional"; label: string; helpsWith: string; contactMethod: string; nextContact: string; privateDetails: string };

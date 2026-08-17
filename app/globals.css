@@ -325,6 +325,24 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 .workspace-list small { display: -webkit-box; overflow: hidden; color: var(--gray); line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .workspace-list .text-button { width: fit-content; }
 .workspace-list details { margin-top: 6px; color: var(--gray); font-size: 0.72rem; }
+.pilot-entry-card { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 14px; padding: 20px; border: 1px solid rgba(128, 0, 45, 0.2); border-radius: 22px; background: linear-gradient(135deg, #fffaf2, #f5ebe4); }
+.pilot-entry-card span, .pilot-card-heading .kicker { color: var(--maroon); font-size: 0.68rem; font-weight: 850; letter-spacing: 0.09em; text-transform: uppercase; }
+.pilot-entry-card h2 { margin: 4px 0; font-family: Georgia, serif; font-weight: 600; }
+.pilot-entry-card p { max-width: 620px; color: var(--gray); font-size: 0.78rem; }
+.pilot-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.pilot-card-heading > strong { padding: 9px 12px; border-radius: 999px; background: var(--maroon); color: white; font-size: 0.78rem; }
+.curriculum-terms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.curriculum-terms details { overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: #fffdf9; }
+.curriculum-terms summary { display: flex; justify-content: space-between; gap: 10px; padding: 13px; color: var(--maroon-dark); font-weight: 800; cursor: pointer; }
+.curriculum-terms ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.curriculum-terms li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 13px; border-top: 1px solid var(--line); font-size: 0.72rem; }
+.curriculum-terms li span { flex: 0 0 110px; color: var(--gray); text-align: right; }
+.planning-attention { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+.planning-attention h3 { grid-column: 1 / -1; color: var(--maroon-dark); }
+.planning-attention article { padding: 14px; border-radius: 15px; background: #f8f1e8; }
+.planning-attention p, .planning-attention small { color: var(--gray); font-size: 0.7rem; line-height: 1.45; }
+.file-preview { display: grid; gap: 3px; margin-bottom: 14px; padding: 13px; border: 1px dashed var(--maroon); border-radius: 14px; background: #fffaf2; }
+.file-preview span, .file-preview small { color: var(--gray); font-size: 0.7rem; }
 .meaningful-badge { width: fit-content; padding: 5px 8px; border-radius: 999px; background: #f4e2aa; color: #6d4c00; font-size: 0.62rem; font-style: normal; font-weight: 900; }
 .section-count { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .section-count h2 { margin-bottom: 5px; }
@@ -418,6 +436,8 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 }
 
 @media (max-width: 760px) {
+  .pilot-entry-card, .pilot-card-heading { align-items: flex-start; flex-direction: column; }
+  .curriculum-terms, .planning-attention { grid-template-columns: 1fr; }
   .welcome-screen { min-height: 0; margin-top: 14px; padding: 16px; border-radius: 26px; }
   .welcome-partners { align-items: flex-start; }
   .welcome-partners > div { gap: 8px; }

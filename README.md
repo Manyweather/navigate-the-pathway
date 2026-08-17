@@ -26,7 +26,7 @@ Students begin with a brief adaptive setup, explore a visual district, complete 
 
 | Explore | Practice | Prepare |
 | --- | --- | --- |
-| Six open stations and eight recommended starting routes | Visual missions, tap-through diagrams, study experiments, and reflection prompts | Portfolio history, Story Studio, advising packets, and application-note export |
+| Six open stations, a pilot checklist, and eight recommended starting routes | Visual stations, tap-through diagrams, attendance practice, survey shells, and reflection prompts | Portfolio documents, Story Studio, advising packets, and application-note export |
 | Phone-first map, four-destination dock, and quick capture | Low-pressure cohort participation and support mapping | Student-selected sharing with expiration and revocation controls |
 
 ## The six-station district
@@ -73,7 +73,7 @@ flowchart LR
     E --> C
 ```
 
-The current prototype uses the versioned browser-local state key `navigate.pathway.demo.v1`, with one-time recovery from the two earlier prototype formats. The Supabase SQL under [`docs/architecture/`](docs/architecture/) is a future architecture reference only and is not imported by the application.
+The current prototype uses the versioned browser-local state key `navigate.pathway.demo.v2`, with one-time recovery from the earlier unified, donor, and media-first formats. The SQL under [`docs/architecture/`](docs/architecture/) is future architecture reference material only and is not imported by the application.
 
 The earlier Sites deployment remains available as a rollback while GitHub Pages is the primary student-facing address.
 
@@ -98,12 +98,15 @@ pnpm test
 ## Repository guide
 
 - [`app/journey-experience.tsx`](app/journey-experience.tsx): media-first student district and missions
-- [`app/components/feature-workspaces.tsx`](app/components/feature-workspaces.tsx): station, Portfolio, advisor, and pilot workflows
+- [`app/components/feature-workspaces.tsx`](app/components/feature-workspaces.tsx): station routing and reviewer views
+- [`app/components/pilot-workspaces.tsx`](app/components/pilot-workspaces.tsx): attendance, survey, curriculum, course-snapshot, Portfolio, advisor, and admin pilot workflows
+- [`app/curriculum-data.ts`](app/curriculum-data.ts): transcribed 2025-2026 curriculum references and review annotations
 - [`app/prototype-store.tsx`](app/prototype-store.tsx): state, persistence, and legacy migrations
 - [`app/access-session.ts`](app/access-session.ts): constant-time code comparison and signed session cookies
 - [`docs/spec/`](docs/spec/): product, playtest, architecture, and v0.2 handoff specifications
 - [`docs/content/AAMC_2027_ORGANIZATION_GUIDANCE.md`](docs/content/AAMC_2027_ORGANIZATION_GUIDANCE.md): coursework and experience organization mapped from the 2027 AMCAS guide
 - [`docs/architecture/supabase-schema.sql`](docs/architecture/supabase-schema.sql): dormant production architecture reference
+- [`docs/architecture/PILOT_DEMO_ARCHITECTURE.md`](docs/architecture/PILOT_DEMO_ARCHITECTURE.md): current safety boundary, migration, production gaps, and unresolved decisions
 
 The preserved media-first visual baseline is tagged [`frontend-media-v4`](https://github.com/Manyweather/navigate-the-pathway/releases/tag/frontend-media-v4).
 

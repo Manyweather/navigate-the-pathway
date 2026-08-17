@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createDefaultState } from "../app/demo-model.ts";
-import { createDefaultPrototypeState, migratePrototypeState, PROTOTYPE_STORAGE_KEY } from "../app/prototype-store.tsx";
+import { createDefaultPrototypeState, migratePrototypeState, PROTOTYPE_STORAGE_KEY, PROTOTYPE_V1_STORAGE_KEY } from "../app/prototype-store.tsx";
 
 function memoryStorage(entries = {}) {
   const values = new Map(Object.entries(entries));
@@ -13,13 +13,24 @@ test("new prototype state takes precedence over both legacy stores", () => {
   const current = createDefaultPrototypeState();
   current.media.commitment = "reflection-review";
   const storage = memoryStorage({
-    [PROTOTYPE_STORAGE_KEY]: JSON.stringify({ version: 1, state: current }),
+    [PROTOTYPE_STORAGE_KEY]: JSON.stringify({ version: 2, state: current }),
     "navigate-demo:v3": JSON.stringify({ version: 3, state: createDefaultState() }),
     "navigate.pipeline.progress.v1": JSON.stringify({ artifacts: [], stamps: [], commitment: "course-question" }),
   });
   const result = migratePrototypeState(storage);
   assert.equal(result.state.media.commitment, "reflection-review");
   assert.equal(result.recovered, false);
+});
+
+test("version one state migrates once and adds the pilot shell without deleting the legacy key", () => {
+  const v1 = { ...createDefaultPrototypeState(), prototypeVersion: 1 };
+  delete v1.pilot;
+  const raw = JSON.stringify({ version: 1, state: v1 });
+  const storage = memoryStorage({ [PROTOTYPE_V1_STORAGE_KEY]: raw });
+  const result = migratePrototypeState(storage);
+  assert.equal(result.state.prototypeVersion, 2);
+  assert.equal(result.state.pilot.demoStudentId, "fictional-current-student");
+  assert.equal(storage.getItem(PROTOTYPE_V1_STORAGE_KEY), raw);
 });
 
 test("legacy donor and media data merge without deleting legacy keys", () => {
@@ -42,6 +53,7 @@ test("student-facing application source contains no em dash", async () => {
     "../app/prototype-shell.tsx",
     "../app/journey-experience.tsx",
     "../app/components/feature-workspaces.tsx",
+    "../app/components/pilot-workspaces.tsx",
     "../app/components/rosie-guide.tsx",
   ].map((path) => readFile(new URL(path, import.meta.url), "utf8")));
   assert.doesNotMatch(sources.join("\n"), /\u2014/);

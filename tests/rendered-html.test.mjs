@@ -61,7 +61,7 @@ test("ships visual stations, unified persistence, Rosie, and functional navigati
   ]);
   for (const station of ["Courses", "Experiences", "Compassion & Values", "Cohort", "Your Story", "Application"]) assert.match(journey, new RegExp(station));
   for (const mission of ["log-experience", "course-question", "support-outreach", "study-strategy", "cohort-participation", "reflection-review", "service-reflection", "application-evidence"]) assert.match(journey, new RegExp(mission));
-  assert.match(store, /navigate\.pathway\.demo\.v1/);
+  assert.match(store, /navigate\.pathway\.demo\.v2/);
   assert.match(store, /navigate\.pipeline\.progress\.v1/);
   assert.match(store, /navigate-demo:v3/);
   assert.match(shell, /Quick capture/);
