@@ -24,7 +24,13 @@
           "SUPABASE_ANON_KEY",
           "SUPABASE_SERVICE_ROLE_KEY",
           "ALLOWED_ORIGINS",
-          "INVITE_REDIRECT_URL"
+          "INVITE_REDIRECT_URL",
+          "SURVEY_PRE_HEALTH",
+          "SURVEY_GRIT",
+          "SURVEY_IDENTITY",
+          "SURVEY_RESILIENCE",
+          "SURVEY_ACCS",
+          "SURVEY_ENCRYPTION_KEY"
         ]
       }
     },

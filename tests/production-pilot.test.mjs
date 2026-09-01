@@ -128,6 +128,26 @@ test("protected survey content and scores remain server-only", async () => {
   assert.doesNotMatch(worker, /const\s+(student|advisor)SurveyItems\s*=/);
 });
 
+test("staging accounts receive integrated survey assignments for their active role", async () => {
+  const worker = await read("../cloudflare/pilot-api.ts");
+  assert.match(worker, /ensureStagingSurveyAssignments/);
+  assert.match(worker, /Navigate Pilot Baseline/);
+  assert.match(worker, /resolution=ignore-duplicates,return=minimal/);
+  assert.match(worker, /role === "student" \|\| role === "advisor"/);
+  assert.match(worker, /protected-staging-v1/);
+});
+
+test("administrator home includes completion and quantified result graphs", async () => {
+  const production = await read("../app/production/production-pilot-app.tsx");
+  const styles = await read("../app/globals.css");
+  assert.match(production, /AdminSurveyCompletionChart completion=\{dashboard\.surveyCompletion\}/);
+  assert.match(production, /canViewResults \? <AdminEvaluationResults api=\{api\}/);
+  assert.match(production, /Survey completion graph/);
+  assert.match(production, /Mean survey score by instrument/);
+  assert.match(styles, /\.completion-chart__track/);
+  assert.match(styles, /\.evaluation-summary/);
+});
+
 test("administrator activity log is MFA protected and avoids invasive tracking", async () => {
   const worker = await read("../cloudflare/pilot-api.ts");
   const production = await read("../app/production/production-pilot-app.tsx");

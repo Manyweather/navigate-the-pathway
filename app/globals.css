@@ -717,6 +717,19 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 .survey-completion-grid i, .evaluation-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--maroon), var(--gold)); }
 .evaluation-chart article > div:first-child { display: flex; justify-content: space-between; gap: .8rem; }
 .evaluation-chart p { margin-bottom: 0; color: var(--muted); }
+.evaluation-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 1rem 0; }
+.evaluation-summary article { display: grid; gap: .2rem; padding: .9rem; border-radius: .85rem; background: var(--cream); }
+.evaluation-summary strong { color: var(--maroon); font-family: var(--font-display); font-size: 1.55rem; }
+.evaluation-summary span { color: var(--muted); font-size: .8rem; }
+.evaluation-score-row { display: grid; grid-template-columns: minmax(0, 1fr) 2.5rem; gap: .7rem; align-items: center; margin-top: .7rem; }
+.evaluation-score-row b { color: var(--maroon); text-align: right; }
+.completion-chart__rows { display: grid; gap: .9rem; }
+.completion-chart__rows article { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 2fr) 3rem; align-items: center; gap: .8rem; }
+.completion-chart__rows article > div:first-child { display: grid; gap: .15rem; }
+.completion-chart__rows span { color: var(--muted); font-size: .78rem; }
+.completion-chart__track { height: .8rem; border-radius: 999px; overflow: hidden; background: #eadfd7; }
+.completion-chart__track i { display: block; height: 100%; min-width: 2px; border-radius: inherit; background: linear-gradient(90deg, var(--teal), var(--gold)); }
+.completion-chart__rows article > b { color: var(--maroon); text-align: right; }
 .score-chip { display: inline-flex; margin: .15rem .25rem .15rem 0; padding: .25rem .5rem; border-radius: 999px; background: var(--cream); font-size: .76rem; }
 
 @media (max-width: 760px) {
@@ -725,12 +738,15 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
   .station-tool__fields { grid-template-columns: 1fr; }
   .station-tool__fields label:has(textarea) { grid-column: auto; }
   .station-tool__heading, .discussion-list header { flex-direction: column; }
+  .completion-chart__rows article { grid-template-columns: 1fr 3rem; }
+  .completion-chart__rows article > div:first-child { grid-column: 1 / -1; }
 }
 
 @media (max-width: 480px) {
   .home-action-grid, .station-tool__steps, .vault-grid { grid-template-columns: 1fr; }
   .production-welcome-media video { max-height: 22rem; }
   .vault-grid dl div { grid-template-columns: 1fr; gap: .1rem; }
+  .evaluation-summary { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

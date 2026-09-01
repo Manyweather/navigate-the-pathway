@@ -1,20 +1,3 @@
-type PilotEnvironment = "staging" | "production";
-
-type Env = {
-  SUPABASE_URL: string;
-  SUPABASE_ANON_KEY: string;
-  SUPABASE_SERVICE_ROLE_KEY: string;
-  ALLOWED_ORIGINS: string;
-  PILOT_ENVIRONMENT: PilotEnvironment;
-  INVITE_REDIRECT_URL: string;
-  SURVEY_PRE_HEALTH?: string;
-  SURVEY_GRIT?: string;
-  SURVEY_IDENTITY?: string;
-  SURVEY_RESILIENCE?: string;
-  SURVEY_ACCS?: string;
-  SURVEY_ENCRYPTION_KEY?: string;
-};
-
 type AuthenticatedUser = {
   id: string;
   email: string;
@@ -136,7 +119,8 @@ async function serviceRest<T>(env: Env, path: string, options: RequestInit = {})
     console.warn(JSON.stringify({ event: "supabase_rest_rejected", path, status: response.status, code: details.code || "unknown" }));
     throw new HttpError(400, "The saved work request was not accepted.", details.code || "rest_rejected");
   }
-  return response.json() as Promise<T>;
+  const body = await response.text();
+  return (body ? JSON.parse(body) : undefined) as T;
 }
 
 type AccessEventType = "user_session_opened" | "user_session_heartbeat" | "user_session_signed_out";
@@ -544,6 +528,14 @@ type SecretSurveyDefinition = {
   reversePositions?: number[];
 };
 
+const stagingSurveyCatalog = [
+  { slug: "pre-health-application-profile", name: "Your Pre-Health Application Profile: A Self-Assessment", audience: "student" },
+  { slug: "short-grit-survey", name: "Short Grit Survey", audience: "student" },
+  { slug: "macleod-clark-professional-identity-scale", name: "MacLeod Clark Professional Identity Scale", audience: "student" },
+  { slug: "brief-resilience-scale", name: "Brief Resilience Scale", audience: "student" },
+  { slug: "advisor-coaching-competency-scale", name: "Advisor Coaching Competency Scale (ACCS)", audience: "advisor" },
+] as const;
+
 function secretSurvey(env: Env, slug: string): SecretSurveyDefinition | null {
   const raw = ({
     "pre-health-application-profile": env.SURVEY_PRE_HEALTH,
@@ -560,6 +552,51 @@ function secretSurvey(env: Env, slug: string): SecretSurveyDefinition | null {
     console.error(JSON.stringify({ event: "staging_survey_content_invalid", instrument_slug: slug }));
     return null;
   }
+}
+
+async function stableUuid(value: string) {
+  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))).slice(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+async function ensureStagingSurveyAssignments(env: Env, user: AuthenticatedUser, context: AuthorizationContext, audiences: Array<"student" | "advisor">) {
+  if (env.PILOT_ENVIRONMENT !== "staging" || !context.activeOrganizationId || !context.activeProgramId) return;
+  const eligible = stagingSurveyCatalog.filter((instrument) => audiences.includes(instrument.audience) && secretSurvey(env, instrument.slug));
+  if (!eligible.length) return;
+  const rows = await Promise.all(eligible.map(async (instrument) => ({
+    assignment_id: await stableUuid(`navigate-pathway:assignment:${user.id}:${instrument.slug}`),
+    user_id: user.id,
+    organization_id: context.activeOrganizationId,
+    program_id: context.activeProgramId,
+    cohort_id: context.activeCohortId || null,
+    instrument_slug: instrument.slug,
+    instrument_name: instrument.name,
+    wave_id: await stableUuid(`navigate-pathway:wave:${context.activeOrganizationId}:${context.activeProgramId}:${instrument.slug}`),
+    wave_label: "Navigate Pilot Baseline",
+    audience: instrument.audience,
+    status: "not_started",
+  })));
+  await serviceRest<void>(env, "survey_completion_projection?on_conflict=assignment_id", {
+    method: "POST",
+    headers: { prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify(rows),
+  });
+}
+
+async function ensureStagingEvaluationCapability(env: Env, user: AuthenticatedUser, context: AuthorizationContext) {
+  if (env.PILOT_ENVIRONMENT !== "staging" || !context.roles.includes("administrator") || !context.activeOrganizationId) return;
+  const rows = await serviceRest<Array<{ id: string }>>(env, `permission_assignments?user_id=eq.${encodeURIComponent(user.id)}&permission_key=eq.evaluation.identifiable_results&revoked_at=is.null&select=id&limit=1`);
+  if (!rows.length) {
+    await serviceRest<void>(env, "permission_assignments?on_conflict=user_id,permission_key,organization_id,program_id", {
+      method: "POST",
+      headers: { prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify({ user_id: user.id, permission_key: "evaluation.identifiable_results", organization_id: context.activeOrganizationId, program_id: context.activeProgramId, granted_by: user.id }),
+    });
+  }
+  if (!context.capabilities.includes("evaluation.identifiable_results")) context.capabilities.push("evaluation.identifiable_results");
 }
 
 function base64Bytes(value: string) {
@@ -596,16 +633,19 @@ type SurveyProjection = {
   user_id: string;
   organization_id: string;
   program_id: string;
+  cohort_id: string | null;
   instrument_slug: string;
   instrument_name: string;
   wave_id: string;
   wave_label: string;
   status: string;
+  opens_at: string | null;
+  closes_at: string | null;
   submitted_at: string | null;
 };
 
 async function surveyProjection(env: Env, userId: string, assignmentId: string) {
-  const rows = await serviceRest<SurveyProjection[]>(env, `survey_completion_projection?assignment_id=eq.${encodeURIComponent(assignmentId)}&user_id=eq.${encodeURIComponent(userId)}&select=assignment_id,user_id,organization_id,program_id,instrument_slug,instrument_name,wave_id,wave_label,status,submitted_at&limit=1`);
+  const rows = await serviceRest<SurveyProjection[]>(env, `survey_completion_projection?assignment_id=eq.${encodeURIComponent(assignmentId)}&user_id=eq.${encodeURIComponent(userId)}&select=assignment_id,user_id,organization_id,program_id,cohort_id,instrument_slug,instrument_name,wave_id,wave_label,status,opens_at,closes_at,submitted_at&limit=1`);
   if (!rows[0]) throw new HttpError(404, "That survey assignment is not available to this account.", "survey_assignment_missing");
   return rows[0];
 }
@@ -640,15 +680,36 @@ async function stagingAdvisorSelf(env: Env, user: AuthenticatedUser, context: Au
 }
 
 async function stagingSurveyDetail(env: Env, user: AuthenticatedUser, assignmentId: string) {
-  const official = await rpc<Record<string, unknown>>(env, user.token, "get_my_survey_assignment", { assignment_id: assignmentId });
-  const definition = secretSurvey(env, String(official.instrumentSlug || ""));
+  const projection = await surveyProjection(env, user.id, assignmentId);
+  let official: Record<string, unknown>;
+  if (env.PILOT_ENVIRONMENT === "staging" && projection.wave_label === "Navigate Pilot Baseline") {
+    official = {
+      id: projection.assignment_id,
+      instrumentSlug: projection.instrument_slug,
+      instrumentName: projection.instrument_name,
+      waveLabel: projection.wave_label,
+      required: false,
+      opensAt: projection.opens_at,
+      closesAt: projection.closes_at,
+      status: projection.status,
+      submittedAt: projection.submitted_at,
+      consentVersionId: projection.wave_id,
+      instrumentVersion: "protected-staging-v1",
+      items: [],
+    };
+  } else {
+    official = await rpc<Record<string, unknown>>(env, user.token, "get_my_survey_assignment", { assignment_id: assignmentId });
+  }
+  const definition = secretSurvey(env, String(official.instrumentSlug || projection.instrument_slug));
   if (!definition || (Array.isArray(official.items) && official.items.length)) return official;
   const saved = await stagingSurveyArtifact(env, user.id, assignmentId);
   const protectedPayload = saved ? await decryptSurvey<{ answers: Record<string, string>; scores?: Record<string, number> }>(env, saved.content.encrypted) : null;
   const sharedOptions = definition.items.find((item) => item.options?.length)?.options || [];
   return {
     ...official,
-    status: saved?.content.status === "submitted" ? "submitted" : saved ? "in_progress" : "not_started",
+    itemCount: definition.items.filter((item) => (item.responseType || "single_choice") !== "text").length,
+    openResponseCount: definition.items.filter((item) => item.responseType === "text").length,
+    status: saved?.content.status === "submitted" ? "submitted" : saved ? "in_progress" : projection.status,
     consentTitle: "Navigate the Pathway pilot survey information",
     consentBody: "Your responses support the approved pilot evaluation. Students and advisors see completion status only. Evaluation-authorized administrators may review identifiable responses and calculated results. Survey results do not affect pathway recommendations or admissions decisions.",
     items: definition.items.map((item, index) => ({
@@ -771,6 +832,7 @@ async function route(request: Request, env: Env) {
   const user = await authenticate(request, env);
   if (url.pathname === "/api/me" && request.method === "GET") {
     const context = await authorization(env, user);
+    await ensureStagingEvaluationCapability(env, user, context);
     await recordAccessEvent(env, user, context, "user_session_opened");
     return json(context);
   }
@@ -794,6 +856,7 @@ async function route(request: Request, env: Env) {
     const context = await authorization(env, user);
     requireRole(context, role);
     if (role !== "student") requireStaffMfa(user);
+    if (role === "student" || role === "advisor") await ensureStagingSurveyAssignments(env, user, context, [role]);
     const dashboard = stagingEnabledAssignments(env, await rpc(env, user.token, "pilot_dashboard", { requested_role: role }));
     return json(role === "advisor" ? await stagingAdvisorSelf(env, user, context, dashboard) : dashboard);
   }
@@ -804,7 +867,12 @@ async function route(request: Request, env: Env) {
   const advisorPacket = url.pathname.match(/^\/api\/advisor\/students\/([0-9a-f-]+)\/packet$/i);
   if (advisorPacket && (request.method === "GET" || request.method === "POST")) return advisorStudentPacket(request, env, user, advisorPacket[1]);
   if (url.pathname === "/api/portfolio/documents" && request.method === "POST") return portfolioDocumentMetadata(request, env, user);
-  if (url.pathname === "/api/surveys/assignments" && request.method === "GET") return json(stagingEnabledAssignments(env, { surveyAssignments: await rpc(env, user.token, "my_survey_assignments") }).surveyAssignments);
+  if (url.pathname === "/api/surveys/assignments" && request.method === "GET") {
+    const context = await authorization(env, user);
+    const audiences = [context.roles.includes("student") ? "student" : null, context.roles.includes("advisor") ? "advisor" : null].filter((audience): audience is "student" | "advisor" => audience !== null);
+    await ensureStagingSurveyAssignments(env, user, context, audiences);
+    return json(stagingEnabledAssignments(env, { surveyAssignments: await rpc(env, user.token, "my_survey_assignments") }).surveyAssignments);
+  }
   const assignment = url.pathname.match(/^\/api\/surveys\/assignments\/([0-9a-f-]+)$/i);
   if (assignment && request.method === "GET") return json(await stagingSurveyDetail(env, user, assignment[1]));
   const draft = url.pathname.match(/^\/api\/surveys\/response-sets\/([0-9a-f-]+)\/draft$/i);
