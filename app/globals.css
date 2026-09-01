@@ -22,6 +22,8 @@
 .production-auth-identity { display: flex; gap: 1rem; align-items: center; margin-bottom: 1.25rem; }
 .production-auth-identity img { width: 6.5rem; }
 .production-auth h1, .production-main h1 { margin: .1rem 0; font-family: Georgia, serif; color: #26211f; }
+.production-recovery { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 1.25rem; }
+.production-recovery p { flex-basis: 100%; margin: 0; color: #625b57; font-size: .9rem; }
 .production-form { display: grid; gap: .9rem; margin-top: 1.25rem; }
 .production-form label, .section-heading label { display: grid; gap: .35rem; font-weight: 750; color: #4a3e38; }
 .production-form input, .production-form select, .section-heading select { width: 100%; min-height: 3rem; padding: .7rem .85rem; border: 1px solid #cdbeb4; border-radius: .8rem; background: #fff; color: #26211f; }

@@ -126,8 +126,34 @@ function Dashboard({ session, supabase }: { session: Session; supabase: Supabase
   const [role, setRole] = useState<PilotRole | null>(null);
   const [dashboard, setDashboard] = useState<PilotDashboard | null>(null);
   const [message, setMessage] = useState("Loading your dashboard...");
+  const [contextError, setContextError] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [mfaVerified, setMfaVerified] = useState(false);
-  const loadContext = useCallback(async () => { try { const value = await api.request<AuthorizationContext>("/api/me"); setContext(value); setRole((current) => current && value.roles.includes(current) ? current : value.roles[0] || null); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "The account could not be loaded."); } }, [api]);
+  const loadContext = useCallback(async () => {
+    setRecovering(true);
+    setContextError(false);
+    setMessage("Loading your dashboard...");
+    try {
+      let value: AuthorizationContext;
+      try {
+        value = await api.request<AuthorizationContext>("/api/me");
+      } catch (initialError) {
+        const refreshed = await supabase.auth.refreshSession();
+        if (refreshed.error || !refreshed.data.session) throw initialError;
+        value = await api.request<AuthorizationContext>("/api/me");
+      }
+      setContext(value);
+      setRole((current) => current && value.roles.includes(current)
+        ? current
+        : value.roles.includes("student") ? "student" : value.roles[0] || null);
+      setMessage("");
+    } catch {
+      setContextError(true);
+      setMessage("Your invitation is confirmed, but this browser needs to reconnect to the secure pilot.");
+    } finally {
+      setRecovering(false);
+    }
+  }, [api, supabase]);
   useEffect(() => {
     // The request resolves asynchronously and synchronizes remote authorization state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -141,7 +167,7 @@ function Dashboard({ session, supabase }: { session: Session; supabase: Supabase
       void loadDashboard();
     }
   }, [context, loadDashboard, mfaVerified, role]);
-  if (!context || !role) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Secure pilot" title="Preparing your dashboard..." body={message} /></section></main>;
+  if (!context || !role) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose={contextError ? "idle" : "tracks"} eyebrow="Secure pilot" title={contextError ? "Let’s reconnect your dashboard." : "Preparing your dashboard..."} body={message} />{contextError ? <div className="production-recovery" aria-live="polite"><button className="primary-button" onClick={() => void loadContext()} disabled={recovering}>{recovering ? "Reconnecting..." : "Retry secure connection"}</button><button className="text-button" onClick={() => void supabase.auth.signOut()} disabled={recovering}>Sign out</button><p>Your account and pilot roles are already active. Retrying refreshes only this browser session.</p></div> : null}</section></main>;
   if (role !== "student" && context.aal !== "aal2" && !mfaVerified) return <MfaGate supabase={supabase} onVerified={() => { setMfaVerified(true); void loadContext(); }} />;
   return <div className="production-shell"><AppHeader context={context} role={role} onRole={(next) => { setRole(next); setDashboard(null); }} onSignOut={() => void supabase.auth.signOut()} /><main className="production-main"><div className="production-welcome"><p className="kicker">{role} dashboard</p><h1>{role === "student" ? "Your next step, made clearer." : role === "advisor" ? "Support each assigned student with context." : "Run the pilot with clear boundaries."}</h1></div>{message ? <p className="form-message" aria-live="polite">{message}</p> : null}{dashboard && role === "student" ? <StudentDashboardView dashboard={dashboard as StudentDashboard} api={api} reload={loadDashboard} /> : dashboard && role === "advisor" ? <AdvisorDashboardView dashboard={dashboard as AdvisorDashboard} api={api} reload={loadDashboard} /> : dashboard && role === "administrator" ? <AdminDashboardView dashboard={dashboard as AdminDashboard} api={api} canViewResults={context.capabilities.includes("evaluation.identifiable_results")} reload={loadDashboard} /> : null}</main></div>;
 }

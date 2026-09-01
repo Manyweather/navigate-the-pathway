@@ -25,6 +25,13 @@ test("production client never persists domain records in localStorage", async ()
   assert.match(production, /server-side|saved securely|Supabase/i);
 });
 
+test("invitation handoff recovers the secure session and opens the student view first", async () => {
+  const production = await read("../app/production/production-pilot-app.tsx");
+  assert.match(production, /supabase\.auth\.refreshSession\(\)/);
+  assert.match(production, /Retry secure connection/);
+  assert.match(production, /value\.roles\.includes\("student"\) \? "student"/);
+});
+
 test("worker exposes authenticated survey and evaluation boundaries", async () => {
   const worker = await read("../cloudflare/pilot-api.ts");
   for (const route of [
