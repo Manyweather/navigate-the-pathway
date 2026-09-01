@@ -32,6 +32,19 @@ test("invitation handoff recovers the secure session and opens the student view 
   assert.match(production, /value\.roles\.includes\("student"\) \? "student"/);
 });
 
+test("the production student map stays signed in and saves station work through the pilot API", async () => {
+  const production = await read("../app/production/production-pilot-app.tsx");
+  const map = await read("../app/production/production-pathway-map.tsx");
+  const worker = await read("../cloudflare/pilot-api.ts");
+  assert.doesNotMatch(production, /href="\/"[^>]*>Open the pathway map/);
+  assert.match(production, /<ProductionPathwayMap api=\{api\}/);
+  for (const station of ["Courses", "Experiences", "Compassion & Values", "Cohort", "Your Story", "Application"]) assert.match(map, new RegExp(station));
+  assert.match(map, /api\.request<PathwayArtifact\[]>\("\/api\/artifacts"\)/);
+  assert.match(map, /method: "POST"/);
+  assert.match(worker, /pathwayArtifacts/);
+  assert.match(worker, /private_by_default: true/);
+});
+
 test("worker exposes authenticated survey and evaluation boundaries", async () => {
   const worker = await read("../cloudflare/pilot-api.ts");
   for (const route of [

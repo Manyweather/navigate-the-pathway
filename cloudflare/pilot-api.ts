@@ -20,6 +20,8 @@ type AuthorizationContext = {
   roles: string[];
   capabilities: string[];
   aal: "aal1" | "aal2";
+  activeOrganizationId: string | null;
+  activeProgramId: string | null;
 };
 
 class HttpError extends Error {
@@ -109,6 +111,72 @@ async function readBody(request: Request) {
   catch { throw new HttpError(400, "A valid JSON request is required.", "invalid_json"); }
 }
 
+async function serviceRest<T>(env: Env, path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "content-type": "application/json",
+      ...options.headers,
+    },
+  });
+  if (!response.ok) {
+    const details = await response.json().catch(() => ({})) as { message?: string; code?: string };
+    console.warn(JSON.stringify({ event: "supabase_rest_rejected", path, status: response.status, code: details.code || "unknown" }));
+    throw new HttpError(400, "The saved work request was not accepted.", details.code || "rest_rejected");
+  }
+  return response.json() as Promise<T>;
+}
+
+type StoredArtifact = {
+  id: string;
+  station: string;
+  artifact_type: string;
+  title: string;
+  content: { response?: string; prompt?: string };
+  created_at: string;
+  updated_at: string;
+};
+
+function presentArtifact(artifact: StoredArtifact) {
+  return { id: artifact.id, station: artifact.station, artifactType: artifact.artifact_type, title: artifact.title, content: artifact.content, createdAt: artifact.created_at, updatedAt: artifact.updated_at };
+}
+
+async function pathwayArtifacts(request: Request, env: Env, user: AuthenticatedUser) {
+  const context = await authorization(env, user);
+  requireRole(context, "student");
+  if (request.method === "GET") {
+    const rows = await serviceRest<StoredArtifact[]>(env, `artifacts?student_id=eq.${encodeURIComponent(user.id)}&select=id,station,artifact_type,title,content,created_at,updated_at&order=created_at.desc`);
+    return json(rows.map(presentArtifact));
+  }
+  if (!context.activeOrganizationId || !context.activeProgramId) throw new HttpError(409, "Your account needs an active program before station work can be saved.", "active_program_required");
+  const body = await readBody(request);
+  const stations = ["courses", "evidence", "service", "cohort", "reflection", "application"];
+  const station = typeof body.station === "string" && stations.includes(body.station) ? body.station : "";
+  const artifactType = typeof body.artifactType === "string" ? body.artifactType.trim().slice(0, 80) : "";
+  const title = typeof body.title === "string" ? body.title.trim().slice(0, 160) : "";
+  const prompt = typeof body.prompt === "string" ? body.prompt.trim().slice(0, 1000) : "";
+  const response = typeof body.response === "string" ? body.response.trim().slice(0, 5000) : "";
+  if (!station || !artifactType || !title || !response) throw new HttpError(400, "Choose a station and enter a response before saving.", "invalid_artifact");
+  const rows = await serviceRest<StoredArtifact[]>(env, "artifacts?select=id,station,artifact_type,title,content,created_at,updated_at", {
+    method: "POST",
+    headers: { prefer: "return=representation" },
+    body: JSON.stringify({
+      student_id: user.id,
+      organization_id: context.activeOrganizationId,
+      program_id: context.activeProgramId,
+      station,
+      artifact_type: artifactType,
+      title,
+      content: { prompt, response },
+      private_by_default: true,
+    }),
+  });
+  console.log(JSON.stringify({ event: "pathway_artifact_saved", actor: user.id, station, artifact_id: rows[0]?.id || null }));
+  return json(presentArtifact(rows[0]), 201);
+}
+
 function asCsv(rows: Array<Record<string, unknown>>) {
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
   const cell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
@@ -158,6 +226,7 @@ async function route(request: Request, env: Env) {
     if (role !== "student") requireStaffMfa(user);
     return json(await rpc(env, user.token, "pilot_dashboard", { requested_role: role }));
   }
+  if (url.pathname === "/api/artifacts" && (request.method === "GET" || request.method === "POST")) return pathwayArtifacts(request, env, user);
   if (url.pathname === "/api/surveys/assignments" && request.method === "GET") return json(await rpc(env, user.token, "my_survey_assignments"));
   const assignment = url.pathname.match(/^\/api\/surveys\/assignments\/([0-9a-f-]+)$/i);
   if (assignment && request.method === "GET") return json(await rpc(env, user.token, "get_my_survey_assignment", { assignment_id: assignment[1] }));
@@ -211,4 +280,3 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env>;
-
