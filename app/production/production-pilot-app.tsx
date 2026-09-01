@@ -7,7 +7,7 @@ import { RosieGuide } from "../components/rosie-guide";
 import { PilotApiClient } from "./api-client";
 import { advisorInstrumentCatalog, type PilotRole } from "./catalog";
 import { ProductionPathwayMap } from "./production-pathway-map";
-import { getSupabaseBrowserClient, productionConfiguration } from "./supabase-client";
+import { getSupabaseBrowserClient, loadProductionConfiguration, productionConfiguration } from "./supabase-client";
 import type {
   AdminDashboard,
   AdvisorDashboard,
@@ -17,6 +17,7 @@ import type {
   SurveyAssignmentDetail,
   SurveyAssignmentStatus,
   SurveyAssignmentSummary,
+  UserAccessLog,
 } from "./types";
 
 type AuthState = "loading" | "signed_out" | "signed_in";
@@ -112,12 +113,48 @@ function AdvisorDashboardView({ dashboard, api, reload }: { dashboard: AdvisorDa
   return <div className="production-grid"><section className="production-card production-card--wide"><div className="section-heading"><div><p className="kicker">Assigned students</p><h2>Student support overview</h2></div><label><span>Student</span><select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>{dashboard.assignedStudents.map((student) => <option key={student.id} value={student.id}>{student.displayName} · {student.cohortName}</option>)}</select></label></div>{selected ? <div className="advisor-summary"><article><span>Attendance</span><strong>{selected.attendance.present}/{selected.attendance.expected}</strong></article><article><span>Shared packets</span><strong>{selected.sharedPacketCount}</strong></article>{selected.surveyCompletion.map((item) => <article key={item.instrumentName}><span>{item.instrumentName}</span><strong>{statusLabels[item.status]}</strong></article>)}</div> : <p>No students are assigned.</p>}<p className="privacy-note">Completion is visible. Answers, scores, private reflections, contacts, drafts, and unshared Portfolio items are not.</p></section><section className="production-card production-card--wide"><p className="kicker">My Surveys</p><h2>{advisorInstrumentCatalog[0].name}</h2><SurveyCards assignments={dashboard.mySurveys} onOpen={setSurvey} /></section>{survey ? <SurveyWorkspace assignment={survey} api={api} onClose={() => setSurvey(null)} onSubmitted={() => { setSurvey(null); reload(); }} /> : null}</div>;
 }
 
+function formatDuration(minutes: number) {
+  if (minutes < 1) return "Under 1 min";
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours ? `${hours} hr${hours === 1 ? "" : "s"}${remainder ? ` ${remainder} min` : ""}` : `${minutes} min`;
+}
+
+function AdminUserAccessLog({ api }: { api: PilotApiClient }) {
+  const [log, setLog] = useState<UserAccessLog | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState("all");
+  const [message, setMessage] = useState("Loading student access history...");
+  const load = useCallback(async () => {
+    setMessage("Loading student access history...");
+    try {
+      const value = await api.request<UserAccessLog>("/api/admin/user-access-log");
+      setLog(value);
+      setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Access history could not be loaded.");
+    }
+  }, [api]);
+  useEffect(() => {
+    // The request resolves asynchronously and synchronizes the secured activity log.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  const students = log?.students || [];
+  const sessions = (log?.sessions || []).filter((session) => selectedStudent === "all" || session.userId === selectedStudent);
+  const visibleStudents = selectedStudent === "all" ? students : students.filter((student) => student.userId === selectedStudent);
+  const activeCount = sessions.filter((session) => session.status === "active").length;
+  const totalMinutes = visibleStudents.reduce((sum, student) => sum + student.totalMinutes, 0);
+
+  return <section className="production-card production-card--wide access-log"><div className="section-heading"><div><p className="kicker">Student access log</p><h2>Account activity by student</h2><p>Session time is an approximation based on sign-in, activity, and sign-out events.</p></div><div className="access-log-controls"><label><span>Student</span><select value={selectedStudent} onChange={(event) => setSelectedStudent(event.target.value)}><option value="all">All students</option>{students.map((student) => <option key={student.userId} value={student.userId}>{student.displayName}</option>)}</select></label><button className="secondary-button" onClick={() => void load()}>Refresh log</button></div></div><div className="admin-counts"><article><strong>{visibleStudents.length}</strong><span>Students</span></article><article><strong>{sessions.length}</strong><span>Tracked sessions</span></article><article><strong>{activeCount}</strong><span>Active now</span></article><article><strong>{formatDuration(totalMinutes)}</strong><span>Approximate time</span></article></div>{message ? <p className="form-message" aria-live="polite">{message}</p> : null}{log ? <><div className="access-log-table-wrap"><table className="access-log-table"><caption className="sr-only">Student account directory and access totals</caption><thead><tr><th>Student</th><th>Email</th><th>Last sign-in</th><th>Sessions</th><th>Time logged in</th><th>Account</th></tr></thead><tbody>{visibleStudents.map((student) => <tr key={student.userId}><td>{student.displayName}</td><td>{student.email || "Not available"}</td><td>{student.lastAuthSignInAt ? new Date(student.lastAuthSignInAt).toLocaleString() : "Never"}</td><td>{student.sessionCount}</td><td>{formatDuration(student.totalMinutes)}</td><td><span className="role-chip">{student.accountStatus}</span></td></tr>)}</tbody></table></div><h3>Recent sessions</h3>{sessions.length ? <div className="access-log-table-wrap"><table className="access-log-table"><caption className="sr-only">Recent student sessions</caption><thead><tr><th>Student</th><th>Signed in</th><th>Last activity</th><th>Duration</th><th>Status</th></tr></thead><tbody>{sessions.map((session) => <tr key={session.sessionId}><td><strong>{session.displayName}</strong><br /><small>{session.email}</small></td><td>{new Date(session.signedInAt).toLocaleString()}</td><td>{new Date(session.lastActiveAt).toLocaleString()}</td><td>{formatDuration(session.durationMinutes)}</td><td><span className={`access-status access-status--${session.status}`}>{session.status === "active" ? "Active now" : "Ended"}</span></td></tr>)}</tbody></table></div> : <p className="privacy-note">No application sessions have been recorded for this selection yet. Authentication sign-in dates remain visible above.</p>}</> : null}<p className="privacy-note">This log does not collect IP addresses, precise location, or device fingerprints. Administrator access requires staff MFA.</p></section>;
+}
+
 function AdminDashboardView({ dashboard, api, canViewResults, reload }: { dashboard: AdminDashboard; api: PilotApiClient; canViewResults: boolean; reload: () => void }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<PilotRole>("student");
   const [message, setMessage] = useState("");
   const invite = async (event: React.FormEvent) => { event.preventDefault(); try { await api.request("/api/admin/invitations", { method: "POST", body: { email, roles: [role] } }); setEmail(""); setMessage("Invitation sent and recorded."); reload(); } catch (error) { setMessage(error instanceof Error ? error.message : "Invitation could not be sent."); } };
-  return <div className="production-grid"><section className="production-card production-card--wide"><p className="kicker">Program Administration</p><h2>Accounts, Sessions, and evaluation operations</h2><div className="admin-counts"><article><strong>{dashboard.counts.invitedUsers}</strong><span>Invited</span></article><article><strong>{dashboard.counts.activeUsers}</strong><span>Active</span></article><article><strong>{dashboard.counts.cohorts}</strong><span>Cohorts</span></article><article><strong>{dashboard.counts.sessions}</strong><span>Sessions</span></article></div></section><section className="production-card"><h2>Invite an account</h2><form className="production-form" onSubmit={invite}><label><span>Verified email</span><input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Initial role</span><select value={role} onChange={(event) => setRole(event.target.value as PilotRole)}><option value="student">Student</option><option value="advisor">Advisor</option><option value="administrator">Administrator</option></select></label><button className="primary-button">Send invitation</button><p className="form-message" aria-live="polite">{message}</p></form></section><section className="production-card"><h2>Survey completion</h2>{dashboard.surveyCompletion.map((item) => <p key={item.instrumentName}><strong>{item.instrumentName}</strong><br />{item.submitted}/{item.assigned} submitted</p>)}{canViewResults ? <a className="secondary-button" href={`${productionConfiguration().apiUrl}/api/evaluation/export`}>Authorized evaluation export</a> : <p className="privacy-note">Identifiable answers and calculations require the separate evaluation permission.</p>}</section><section className="production-card"><h2>Sessions and Attendance</h2><p>{dashboard.attendanceCorrections} attendance corrections are preserved in the audit history.</p><button className="secondary-button">Schedule a session</button></section><section className="production-card"><h2>Program configuration</h2><p>{dashboard.pendingCurriculumReviews} curriculum references await review.</p><p>Survey waves, instrument versions, audiences, required status, and dates are configured here. No pre/post schedule is hardcoded.</p></section></div>;
+  return <div className="production-grid"><section className="production-card production-card--wide"><p className="kicker">Program Administration</p><h2>Accounts, Sessions, and evaluation operations</h2><div className="admin-counts"><article><strong>{dashboard.counts.invitedUsers}</strong><span>Invited</span></article><article><strong>{dashboard.counts.activeUsers}</strong><span>Active</span></article><article><strong>{dashboard.counts.cohorts}</strong><span>Cohorts</span></article><article><strong>{dashboard.counts.sessions}</strong><span>Sessions</span></article></div></section><AdminUserAccessLog api={api} /><section className="production-card"><h2>Invite an account</h2><form className="production-form" onSubmit={invite}><label><span>Verified email</span><input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Initial role</span><select value={role} onChange={(event) => setRole(event.target.value as PilotRole)}><option value="student">Student</option><option value="advisor">Advisor</option><option value="administrator">Administrator</option></select></label><button className="primary-button">Send invitation</button><p className="form-message" aria-live="polite">{message}</p></form></section><section className="production-card"><h2>Survey completion</h2>{dashboard.surveyCompletion.map((item) => <p key={item.instrumentName}><strong>{item.instrumentName}</strong><br />{item.submitted}/{item.assigned} submitted</p>)}{canViewResults ? <a className="secondary-button" href={`${productionConfiguration().apiUrl}/api/evaluation/export`}>Authorized evaluation export</a> : <p className="privacy-note">Identifiable answers and calculations require the separate evaluation permission.</p>}</section><section className="production-card"><h2>Sessions and Attendance</h2><p>{dashboard.attendanceCorrections} attendance corrections are preserved in the audit history.</p><button className="secondary-button">Schedule a session</button></section><section className="production-card"><h2>Program configuration</h2><p>{dashboard.pendingCurriculumReviews} curriculum references await review.</p><p>Survey waves, instrument versions, audiences, required status, and dates are configured here. No pre/post schedule is hardcoded.</p></section></div>;
 }
 
 function Dashboard({ session, supabase }: { session: Session; supabase: SupabaseClient }) {
@@ -167,23 +204,42 @@ function Dashboard({ session, supabase }: { session: Session; supabase: Supabase
       void loadDashboard();
     }
   }, [context, loadDashboard, mfaVerified, role]);
+  useEffect(() => {
+    if (!context || !role) return;
+    const heartbeat = () => { void api.request("/api/activity/heartbeat", { method: "POST", body: { role } }).catch(() => undefined); };
+    heartbeat();
+    const interval = window.setInterval(heartbeat, 300_000);
+    return () => window.clearInterval(interval);
+  }, [api, context, role]);
+  const signOut = useCallback(async () => {
+    if (role) await api.request("/api/activity/signout", { method: "POST", body: { role } }).catch(() => undefined);
+    await supabase.auth.signOut();
+  }, [api, role, supabase]);
   if (!context || !role) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose={contextError ? "idle" : "tracks"} eyebrow="Secure pilot" title={contextError ? "Let’s reconnect your dashboard." : "Preparing your dashboard..."} body={message} />{contextError ? <div className="production-recovery" aria-live="polite"><button className="primary-button" onClick={() => void loadContext()} disabled={recovering}>{recovering ? "Reconnecting..." : "Retry secure connection"}</button><button className="text-button" onClick={() => void supabase.auth.signOut()} disabled={recovering}>Sign out</button><p>Your account and pilot roles are already active. Retrying refreshes only this browser session.</p></div> : null}</section></main>;
   if (role !== "student" && context.aal !== "aal2" && !mfaVerified) return <MfaGate supabase={supabase} onVerified={() => { setMfaVerified(true); void loadContext(); }} />;
-  return <div className="production-shell"><AppHeader context={context} role={role} onRole={(next) => { setRole(next); setDashboard(null); }} onSignOut={() => void supabase.auth.signOut()} /><main className="production-main"><div className="production-welcome"><p className="kicker">{role} dashboard</p><h1>{role === "student" ? "Your next step, made clearer." : role === "advisor" ? "Support each assigned student with context." : "Run the pilot with clear boundaries."}</h1></div>{message ? <p className="form-message" aria-live="polite">{message}</p> : null}{dashboard && role === "student" ? <StudentDashboardView dashboard={dashboard as StudentDashboard} api={api} reload={loadDashboard} /> : dashboard && role === "advisor" ? <AdvisorDashboardView dashboard={dashboard as AdvisorDashboard} api={api} reload={loadDashboard} /> : dashboard && role === "administrator" ? <AdminDashboardView dashboard={dashboard as AdminDashboard} api={api} canViewResults={context.capabilities.includes("evaluation.identifiable_results")} reload={loadDashboard} /> : null}</main></div>;
+  return <div className="production-shell"><AppHeader context={context} role={role} onRole={(next) => { setRole(next); setDashboard(null); }} onSignOut={() => void signOut()} /><main className="production-main"><div className="production-welcome"><p className="kicker">{role} dashboard</p><h1>{role === "student" ? "Your next step, made clearer." : role === "advisor" ? "Support each assigned student with context." : "Run the pilot with clear boundaries."}</h1></div>{message ? <p className="form-message" aria-live="polite">{message}</p> : null}{dashboard && role === "student" ? <StudentDashboardView dashboard={dashboard as StudentDashboard} api={api} reload={loadDashboard} /> : dashboard && role === "advisor" ? <AdvisorDashboardView dashboard={dashboard as AdvisorDashboard} api={api} reload={loadDashboard} /> : dashboard && role === "administrator" ? <AdminDashboardView dashboard={dashboard as AdminDashboard} api={api} canViewResults={context.capabilities.includes("evaluation.identifiable_results")} reload={loadDashboard} /> : null}</main></div>;
 }
 
 export function ProductionPilotApp() {
-  const config = productionConfiguration();
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  const [configurationError, setConfigurationError] = useState(false);
   const [authState, setAuthState] = useState<AuthState>("loading");
   const [session, setSession] = useState<Session | null>(null);
+  useEffect(() => {
+    loadProductionConfiguration().then(() => {
+      const configuredClient = getSupabaseBrowserClient();
+      if (!configuredClient) throw new Error("Secure setup is not connected yet.");
+      setSupabase(configuredClient);
+    }).catch(() => setConfigurationError(true));
+  }, []);
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setAuthState(data.session ? "signed_in" : "signed_out"); });
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => { setSession(nextSession); setAuthState(nextSession ? "signed_in" : "signed_out"); });
     return () => data.subscription.unsubscribe();
   }, [supabase]);
-  if (!config.supabaseUrl || !config.supabaseAnonKey || !config.apiUrl || !supabase) return <ConfigurationRequired />;
+  if (configurationError) return <ConfigurationRequired />;
+  if (!supabase) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate The Pathway" title="Connecting your secure pathway..." /></section></main>;
   if (authState === "loading") return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate The Pathway" title="Opening your secure pathway..." /></section></main>;
   if (authState === "signed_out" || !session) return <SignIn supabase={supabase} />;
   return <Dashboard session={session} supabase={supabase} />;

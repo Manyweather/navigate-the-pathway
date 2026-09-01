@@ -14,6 +14,7 @@ type AuthenticatedUser = {
   email: string;
   token: string;
   aal: "aal1" | "aal2";
+  sessionId: string;
 };
 
 type AuthorizationContext = {
@@ -22,6 +23,7 @@ type AuthorizationContext = {
   aal: "aal1" | "aal2";
   activeOrganizationId: string | null;
   activeProgramId: string | null;
+  activeCohortId?: string | null;
 };
 
 class HttpError extends Error {
@@ -56,7 +58,7 @@ function tokenClaims(token: string) {
   try {
     const payload = token.split(".")[1];
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
-    return JSON.parse(atob(normalized)) as { aal?: "aal1" | "aal2" };
+    return JSON.parse(atob(normalized)) as { aal?: "aal1" | "aal2"; session_id?: string };
   } catch {
     return {};
   }
@@ -71,7 +73,8 @@ async function authenticate(request: Request, env: Env): Promise<AuthenticatedUs
   });
   if (!response.ok) throw new HttpError(401, "Your session has ended. Sign in again.", "invalid_session");
   const user = await response.json() as { id: string; email?: string };
-  return { id: user.id, email: user.email || "", token, aal: tokenClaims(token).aal || "aal1" };
+  const claims = tokenClaims(token);
+  return { id: user.id, email: user.email || "", token, aal: claims.aal || "aal1", sessionId: claims.session_id || user.id };
 }
 
 async function rpc<T>(env: Env, token: string, fn: string, body: unknown = {}): Promise<T> {
@@ -127,6 +130,126 @@ async function serviceRest<T>(env: Env, path: string, options: RequestInit = {})
     throw new HttpError(400, "The saved work request was not accepted.", details.code || "rest_rejected");
   }
   return response.json() as Promise<T>;
+}
+
+type AccessEventType = "user_session_opened" | "user_session_heartbeat" | "user_session_signed_out";
+
+type StoredAccessEvent = {
+  actor_id: string;
+  event_type: AccessEventType;
+  subject_id: string;
+  metadata: { email?: string; role?: string };
+  created_at: string;
+};
+
+async function recordAccessEvent(env: Env, user: AuthenticatedUser, context: AuthorizationContext, eventType: AccessEventType, role?: string) {
+  if (!context.activeOrganizationId) return;
+  const prior = await serviceRest<Array<{ id: string; created_at: string }>>(
+    env,
+    `audit_events?actor_id=eq.${encodeURIComponent(user.id)}&subject_id=eq.${encodeURIComponent(user.sessionId)}&event_type=eq.${eventType}&select=id,created_at&order=created_at.desc&limit=1`,
+  );
+  if (eventType === "user_session_opened" && prior.length) return;
+  if (eventType === "user_session_heartbeat" && prior[0] && Date.now() - new Date(prior[0].created_at).getTime() < 240_000) return;
+  await serviceRest<Array<{ id: string }>>(env, "audit_events?select=id", {
+    method: "POST",
+    headers: { prefer: "return=representation" },
+    body: JSON.stringify({
+      organization_id: context.activeOrganizationId,
+      actor_id: user.id,
+      event_type: eventType,
+      subject_type: "user_session",
+      subject_id: user.sessionId,
+      metadata: { email: user.email, role: role || null },
+    }),
+  });
+}
+
+async function supabaseAuthUsers(env: Env) {
+  const response = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`, {
+    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
+  });
+  if (!response.ok) throw new HttpError(400, "The account directory could not be loaded.", "account_directory_failed");
+  const payload = await response.json() as { users?: Array<{ id: string; email?: string; last_sign_in_at?: string | null }> };
+  return payload.users || [];
+}
+
+async function adminUserAccessLog(env: Env, user: AuthenticatedUser, context: AuthorizationContext) {
+  requireStaffMfa(user);
+  requireRole(context, "administrator");
+  if (!context.activeOrganizationId) throw new HttpError(409, "Choose an active organization to view access history.", "active_organization_required");
+
+  const organizationId = encodeURIComponent(context.activeOrganizationId);
+  const [roles, profiles, events, authUsers] = await Promise.all([
+    serviceRest<Array<{ user_id: string }>>(env, `role_assignments?organization_id=eq.${organizationId}&role=eq.student&revoked_at=is.null&select=user_id`),
+    serviceRest<Array<{ user_id: string; display_name: string; preferred_name: string | null; status: string }>>(env, `profiles?active_organization_id=eq.${organizationId}&select=user_id,display_name,preferred_name,status`),
+    serviceRest<StoredAccessEvent[]>(env, `audit_events?organization_id=eq.${organizationId}&subject_type=eq.user_session&event_type=in.(user_session_opened,user_session_heartbeat,user_session_signed_out)&select=actor_id,event_type,subject_id,metadata,created_at&order=created_at.desc&limit=5000`),
+    supabaseAuthUsers(env),
+  ]);
+
+  const studentIds = new Set(roles.map((item) => item.user_id));
+  const profileById = new Map(profiles.map((profile) => [profile.user_id, profile]));
+  const authById = new Map(authUsers.map((entry) => [entry.id, entry]));
+  const sessionMap = new Map<string, { userId: string; sessionId: string; signedInAt: string; lastActiveAt: string; signedOutAt: string | null; role: string | null }>();
+
+  for (const event of events) {
+    if (!studentIds.has(event.actor_id)) continue;
+    const key = `${event.actor_id}:${event.subject_id}`;
+    const current = sessionMap.get(key);
+    const occurredAt = event.created_at;
+    if (!current) {
+      sessionMap.set(key, {
+        userId: event.actor_id,
+        sessionId: event.subject_id,
+        signedInAt: occurredAt,
+        lastActiveAt: occurredAt,
+        signedOutAt: event.event_type === "user_session_signed_out" ? occurredAt : null,
+        role: event.metadata?.role || null,
+      });
+      continue;
+    }
+    if (new Date(occurredAt) < new Date(current.signedInAt)) current.signedInAt = occurredAt;
+    if (new Date(occurredAt) > new Date(current.lastActiveAt)) current.lastActiveAt = occurredAt;
+    if (event.event_type === "user_session_opened") current.signedInAt = occurredAt;
+    if (event.event_type === "user_session_signed_out") current.signedOutAt = occurredAt;
+    if (event.metadata?.role) current.role = event.metadata.role;
+  }
+
+  const now = Date.now();
+  const sessions = [...sessionMap.values()].map((session) => {
+    const profile = profileById.get(session.userId);
+    const auth = authById.get(session.userId);
+    const end = session.signedOutAt || session.lastActiveAt;
+    return {
+      userId: session.userId,
+      sessionId: session.sessionId,
+      displayName: profile?.preferred_name || profile?.display_name || auth?.email?.split("@")[0] || "Student",
+      email: auth?.email || "",
+      signedInAt: session.signedInAt,
+      lastActiveAt: session.lastActiveAt,
+      signedOutAt: session.signedOutAt,
+      durationMinutes: Math.max(0, Math.round((new Date(end).getTime() - new Date(session.signedInAt).getTime()) / 60_000)),
+      status: !session.signedOutAt && now - new Date(session.lastActiveAt).getTime() <= 600_000 ? "active" : "ended",
+      role: session.role || "student",
+    };
+  }).sort((a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime());
+
+  const students = [...studentIds].map((studentId) => {
+    const profile = profileById.get(studentId);
+    const auth = authById.get(studentId);
+    const studentSessions = sessions.filter((session) => session.userId === studentId);
+    return {
+      userId: studentId,
+      displayName: profile?.preferred_name || profile?.display_name || auth?.email?.split("@")[0] || "Student",
+      email: auth?.email || "",
+      accountStatus: profile?.status || "invited",
+      lastAuthSignInAt: auth?.last_sign_in_at || null,
+      sessionCount: studentSessions.length,
+      totalMinutes: studentSessions.reduce((sum, session) => sum + session.durationMinutes, 0),
+    };
+  }).sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  await recordAccessEvent(env, user, context, "user_session_heartbeat", "administrator");
+  return { students, sessions, generatedAt: new Date().toISOString() };
 }
 
 type StoredArtifact = {
@@ -217,7 +340,25 @@ async function route(request: Request, env: Env) {
   if (url.pathname === "/api/health") return json({ ok: true, environment: env.PILOT_ENVIRONMENT });
 
   const user = await authenticate(request, env);
-  if (url.pathname === "/api/me" && request.method === "GET") return json(await rpc(env, user.token, "pilot_authorization_context"));
+  if (url.pathname === "/api/me" && request.method === "GET") {
+    const context = await authorization(env, user);
+    await recordAccessEvent(env, user, context, "user_session_opened");
+    return json(context);
+  }
+  if (url.pathname === "/api/activity/heartbeat" && request.method === "POST") {
+    const context = await authorization(env, user);
+    const body = await readBody(request);
+    const role = typeof body.role === "string" && context.roles.includes(body.role) ? body.role : undefined;
+    await recordAccessEvent(env, user, context, "user_session_heartbeat", role);
+    return json({ ok: true });
+  }
+  if (url.pathname === "/api/activity/signout" && request.method === "POST") {
+    const context = await authorization(env, user);
+    const body = await readBody(request);
+    const role = typeof body.role === "string" && context.roles.includes(body.role) ? body.role : undefined;
+    await recordAccessEvent(env, user, context, "user_session_signed_out", role);
+    return json({ ok: true });
+  }
   if (url.pathname === "/api/dashboard" && request.method === "GET") {
     const role = url.searchParams.get("role") || "";
     if (!["student", "advisor", "administrator"].includes(role)) throw new HttpError(400, "Choose a valid dashboard.", "invalid_role");
@@ -249,6 +390,10 @@ async function route(request: Request, env: Env) {
   if (url.pathname === "/api/admin/survey-waves" && request.method === "POST") {
     requireStaffMfa(user); const context = await authorization(env, user); requireRole(context, "administrator");
     return json(await rpc(env, user.token, "admin_upsert_survey_wave", await readBody(request)));
+  }
+  if (url.pathname === "/api/admin/user-access-log" && request.method === "GET") {
+    const context = await authorization(env, user);
+    return json(await adminUserAccessLog(env, user, context));
   }
   if ((url.pathname === "/api/evaluation/results" || url.pathname === "/api/evaluation/export") && request.method === "GET") {
     requireStaffMfa(user);

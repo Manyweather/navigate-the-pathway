@@ -69,6 +69,35 @@ export type AdminDashboard = {
   attendanceCorrections: number;
 };
 
+export type UserAccessStudent = {
+  userId: string;
+  displayName: string;
+  email: string;
+  accountStatus: string;
+  lastAuthSignInAt: string | null;
+  sessionCount: number;
+  totalMinutes: number;
+};
+
+export type UserAccessSession = {
+  userId: string;
+  sessionId: string;
+  displayName: string;
+  email: string;
+  signedInAt: string;
+  lastActiveAt: string;
+  signedOutAt: string | null;
+  durationMinutes: number;
+  status: "active" | "ended";
+  role: string;
+};
+
+export type UserAccessLog = {
+  students: UserAccessStudent[];
+  sessions: UserAccessSession[];
+  generatedAt: string;
+};
+
 export type PilotDashboard = StudentDashboard | AdvisorDashboard | AdminDashboard;
 
 export type SurveyItem = {
@@ -89,4 +118,3 @@ export type SurveyAssignmentDetail = SurveyAssignmentSummary & {
   draft: Record<string, string>;
   lastSavedAt: string | null;
 };
-

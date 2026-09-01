@@ -59,6 +59,30 @@ test("worker exposes authenticated survey and evaluation boundaries", async () =
   assert.doesNotMatch(worker, /service_role\s*[:=]\s*["'][A-Za-z0-9_-]{20}/);
 });
 
+test("administrator activity log is MFA protected and avoids invasive tracking", async () => {
+  const worker = await read("../cloudflare/pilot-api.ts");
+  const production = await read("../app/production/production-pilot-app.tsx");
+  assert.match(worker, /\/api\/admin\/user-access-log/);
+  assert.match(worker, /requireStaffMfa\(user\)/);
+  assert.match(worker, /user_session_opened/);
+  assert.match(worker, /user_session_heartbeat/);
+  assert.match(worker, /user_session_signed_out/);
+  assert.doesNotMatch(worker, /ip_address|user_agent|device_fingerprint/i);
+  assert.match(production, /Account activity by student/);
+  assert.match(production, /Time logged in/);
+  assert.match(production, /does not collect IP addresses/);
+});
+
+test("production browser configuration can be loaded from the Sites runtime", async () => {
+  const client = await read("../app/production/supabase-client.ts");
+  const route = await read("../app/api/production/config/route.ts");
+  assert.match(client, /fetch\("\/api\/production\/config"/);
+  assert.match(route, /process\.env\.VITE_SUPABASE_URL/);
+  assert.match(route, /process\.env\.VITE_SUPABASE_ANON_KEY/);
+  assert.match(route, /process\.env\.VITE_PILOT_API_URL/);
+  assert.doesNotMatch(route, /SUPABASE_SERVICE_ROLE_KEY/);
+});
+
 test("database migration isolates evaluation data and enforces scoped access", async () => {
   const schema = await read("../supabase/migrations/202608310001_production_pilot.sql");
   for (const clause of [
