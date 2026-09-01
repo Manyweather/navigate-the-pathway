@@ -37,10 +37,10 @@ import { advisorPilotDemoByStudent } from "../pilot-model";
 import { RosieGuide } from "./rosie-guide";
 import { AdminPilotPanel, AdvisorPilotPanel, CoursesPilotWorkspace, PilotStudentWorkspace, PortfolioPilotWorkspace } from "./pilot-workspaces";
 
-export type WorkspaceId = "pilot" | "course" | "experience" | "compassion" | "cohort" | "reflection" | "application";
+export type WorkspaceId = "sessions" | "course" | "experience" | "compassion" | "cohort" | "reflection" | "application";
 
 const workspaceLabels: { id: WorkspaceId; name: string; action: string }[] = [
-  { id: "pilot", name: "Pilot", action: "Participate" },
+  { id: "sessions", name: "Sessions", action: "Participate" },
   { id: "course", name: "Courses", action: "Plan" },
   { id: "experience", name: "Experiences", action: "Track" },
   { id: "compassion", name: "Compassion & Values", action: "Notice" },
@@ -50,7 +50,7 @@ const workspaceLabels: { id: WorkspaceId; name: string; action: string }[] = [
 ];
 
 const routeDestination: Record<WorkspaceId, DestinationId> = {
-  pilot: "course",
+  sessions: "course",
   course: "course",
   experience: "experience",
   compassion: "reflection",
@@ -320,7 +320,7 @@ export function FeatureWorkspaces({ initial = "experience", quick = false, onBac
   const [active, setActive] = useState<WorkspaceId>(initial);
   const [portfolio, setPortfolio] = useState(false);
   const current = workspaceLabels.find((item) => item.id === active) ?? workspaceLabels[1];
-  return <main className="feature-workspace"><WorkspaceHeader id={active} onBack={onBack} /><RosieGuide pose="pointing" compact eyebrow="Recommended station" title={current.name} body="Choose one practical action. Everything saves on this device." /><nav className="workspace-nav" aria-label="Pathway stations">{workspaceLabels.map((item) => <button key={item.id} className={active === item.id && !portfolio ? "active" : ""} onClick={() => { setActive(item.id); setPortfolio(false); }}>{item.name}</button>)}<button className={portfolio ? "active" : ""} onClick={() => setPortfolio(true)}>Portfolio</button></nav>{portfolio ? <PortfolioPilotWorkspace /> : active === "pilot" ? <PilotStudentWorkspace /> : active === "course" ? <CoursesPilotWorkspace /> : active === "experience" ? <ExperienceWorkspace quick={quick} /> : active === "compassion" ? <CompassionWorkspace /> : active === "cohort" ? <CohortWorkspace /> : active === "reflection" ? <ReflectionWorkspace /> : <ApplicationWorkspace />}</main>;
+  return <main className="feature-workspace"><WorkspaceHeader id={active} onBack={onBack} /><RosieGuide pose="pointing" compact eyebrow="Recommended station" title={current.name} body="Choose one practical action. Everything saves on this device." /><nav className="workspace-nav" aria-label="Pathway stations">{workspaceLabels.map((item) => <button key={item.id} className={active === item.id && !portfolio ? "active" : ""} onClick={() => { setActive(item.id); setPortfolio(false); }}>{item.name}</button>)}<button className={portfolio ? "active" : ""} onClick={() => setPortfolio(true)}>Portfolio</button></nav>{portfolio ? <PortfolioPilotWorkspace /> : active === "sessions" ? <PilotStudentWorkspace /> : active === "course" ? <CoursesPilotWorkspace /> : active === "experience" ? <ExperienceWorkspace quick={quick} /> : active === "compassion" ? <CompassionWorkspace /> : active === "cohort" ? <CohortWorkspace /> : active === "reflection" ? <ReflectionWorkspace /> : <ApplicationWorkspace />}</main>;
 }
 
 export function ReviewerWorkspace({
@@ -373,7 +373,7 @@ export function ReviewerWorkspace({
     ];
     return (
       <main className="feature-workspace reviewer-workspace">
-        <header className="workspace-header"><button className="text-button" onClick={onBack}>Back</button><div><p className="kicker">Fictional reviewer view</p><h1>Pilot Administration</h1></div></header>
+        <header className="workspace-header"><button className="text-button" onClick={onBack}>Back</button><div><p className="kicker">Fictional reviewer view</p><h1>Program Administration</h1></div></header>
         <RosieGuide pose="idle" compact title="Nothing here represents a real student." body="Select a route to inspect the student context, recommendation logic, and destination it opens." />
         <section className="workspace-card workspace-card--wide">
           <div className="reviewer-section-heading"><div><p className="kicker">Route testing</p><h2>Eight functional route previews</h2></div><p>Select any fictional profile to open its full explanation below.</p></div>

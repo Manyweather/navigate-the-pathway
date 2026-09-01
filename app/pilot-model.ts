@@ -142,11 +142,14 @@ export function createDefaultPilotState(now = new Date()): PilotState {
     },
     surveys: {
       instruments: [
-        ["demographic", "Demographic survey"], ["grit", "Eight-item GRIT survey"], ["identity", "MacLeod Clark professional identity scale"], ["resilience", "Brief Resilience Scale"], ["self-assessment", "Pre-Health Application Self-Assessment"], ["reflection", "Open-response reflection prompts"],
-      ].map(([id, name]): SurveyInstrument => ({ id, name, version: "Version pending", sourceReference: "Approved source not yet supplied", permissionStatus: "not_approved", responseScale: "Pending confirmation", waveEligibility: ["pre", "post"] })),
+        ["self-assessment", "Your Pre-Health Application Profile: A Self-Assessment"],
+        ["grit", "Short Grit Survey"],
+        ["identity", "MacLeod Clark Professional Identity Scale"],
+        ["resilience", "Brief Resilience Scale"],
+      ].map(([id, name]): SurveyInstrument => ({ id, name, version: "Version pending", sourceReference: "Approved protected source required", permissionStatus: "not_approved", responseScale: "Pending confirmation", waveEligibility: ["pre", "post"] })),
       waves: [
-        { id: "pre", label: "Pre-Survey", opensAt: null, closesAt: null, status: "available", instrumentIds: ["demographic", "grit", "identity", "resilience", "self-assessment", "reflection"], instructions: "Interface demonstration only. Approved survey items are not loaded.", completionRequirements: "Completion rules pending protocol approval." },
-        { id: "post", label: "Post-Survey", opensAt: null, closesAt: null, status: "not_available", instrumentIds: ["grit", "identity", "resilience", "self-assessment", "reflection"], instructions: "Available at the end of the designated semester after dates are configured.", completionRequirements: "Completion rules pending protocol approval." },
+        { id: "pre", label: "Fictional open wave", opensAt: null, closesAt: null, status: "available", instrumentIds: ["self-assessment", "grit", "identity", "resilience"], instructions: "Interface demonstration only. Approved survey items are not loaded.", completionRequirements: "Completion rules pending protocol approval." },
+        { id: "post", label: "Fictional future wave", opensAt: null, closesAt: null, status: "not_available", instrumentIds: ["self-assessment", "grit", "identity", "resilience"], instructions: "The administrator sets every wave and date. No pre or post schedule is hardcoded.", completionRequirements: "Completion rules pending protocol approval." },
       ],
       responseSets: [],
     },
@@ -235,7 +238,7 @@ export type AdvisorPilotDemo = {
 };
 
 export const advisorPilotDemoByStudent: Record<string, AdvisorPilotDemo> = {
-  "student-jordan-lee": { attendance: { attended: 6, expected: 7, percentage: 86 }, surveyStatus: { pre: "Complete", post: "Not available" }, referenceProgram: "Biology, B.S. reference", courseSnapshot: [{ course: "CH 241 Organic Chemistry I and Lab", status: "Reported planned", question: "What timing tradeoffs should I discuss?", source: "student_reported" }], sharedDocuments: [{ title: "Fictional experience summary", type: "Resume" }], packetHistory: ["Limited share opened", "Course question added"] },
+  "student-jordan-lee": { attendance: { attended: 6, expected: 7, percentage: 86 }, surveyStatus: { pre: "Submitted", post: "Not available" }, referenceProgram: "Biology, B.S. reference", courseSnapshot: [{ course: "CH 241 Organic Chemistry I and Lab", status: "Reported planned", question: "What timing tradeoffs should I discuss?", source: "student_reported" }], sharedDocuments: [{ title: "Fictional experience summary", type: "Resume" }], packetHistory: ["Limited share opened", "Course question added"] },
   "student-maya-bennett": { attendance: { attended: 5, expected: 6, percentage: 83 }, surveyStatus: { pre: "In progress", post: "Not available" }, referenceProgram: "Chemistry, B.S. reference", courseSnapshot: [{ course: "CS 215", status: "Needs student confirmation", question: "Which published placement applies?", source: "published_curriculum" }], sharedDocuments: [], packetHistory: ["Limited share opened"] },
   "student-theo-morgan": { attendance: { attended: 0, expected: 0, percentage: 0 }, surveyStatus: { pre: "Hidden", post: "Hidden" }, referenceProgram: "Not visible", courseSnapshot: [], sharedDocuments: [], packetHistory: [] },
   "student-alex-rivera": { attendance: { attended: 0, expected: 0, percentage: 0 }, surveyStatus: { pre: "Hidden", post: "Hidden" }, referenceProgram: "Not visible", courseSnapshot: [], sharedDocuments: [], packetHistory: [] },

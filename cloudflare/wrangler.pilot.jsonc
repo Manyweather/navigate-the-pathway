@@ -1,0 +1,46 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "navigate-pathway-pilot-api",
+  "main": "pilot-api.ts",
+  "compatibility_date": "2026-08-31",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true },
+    "traces": { "enabled": true }
+  },
+  "vars": {
+    "PILOT_ENVIRONMENT": "staging"
+  },
+  "env": {
+    "staging": {
+      "name": "navigate-pathway-pilot-api-staging",
+      "vars": { "PILOT_ENVIRONMENT": "staging" },
+      "secrets": {
+        "required": [
+          "SUPABASE_URL",
+          "SUPABASE_ANON_KEY",
+          "SUPABASE_SERVICE_ROLE_KEY",
+          "ALLOWED_ORIGINS",
+          "INVITE_REDIRECT_URL"
+        ]
+      }
+    },
+    "production": {
+      "name": "navigate-pathway-pilot-api-production",
+      "preview_urls": false,
+      "vars": { "PILOT_ENVIRONMENT": "production" },
+      "secrets": {
+        "required": [
+          "SUPABASE_URL",
+          "SUPABASE_ANON_KEY",
+          "SUPABASE_SERVICE_ROLE_KEY",
+          "ALLOWED_ORIGINS",
+          "INVITE_REDIRECT_URL"
+        ]
+      }
+    }
+  }
+}

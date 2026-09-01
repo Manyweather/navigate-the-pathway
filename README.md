@@ -16,7 +16,7 @@
 
 <p align="center">
   <a href="https://github.com/Manyweather/navigate-the-pathway/actions/workflows/ci.yml"><img src="https://github.com/Manyweather/navigate-the-pathway/actions/workflows/ci.yml/badge.svg?branch=main" alt="Prototype checks" /></a>
-  <img src="https://img.shields.io/badge/status-fictional%20browser--local%20demo-7B1837" alt="Fictional browser-local demonstration" />
+  <img src="https://img.shields.io/badge/status-public%20demo%20%2B%20production%20pilot%20foundation-7B1837" alt="Public demonstration and production pilot foundation" />
   <img src="https://img.shields.io/badge/license-pending%20Roseman%20approval-C69214" alt="License pending Roseman University approval" />
 </p>
 
@@ -49,6 +49,12 @@ Every station stays available. Recommendations identify a useful next destinatio
 - Touch, mouse, and keyboard support across phone, tablet, and desktop layouts
 - Reduced-motion behavior and accessibility text for visual content
 
+## Two deliberately separate releases
+
+The GitHub Pages site remains a fictional, browser-local demonstration. The new invite-only application lives at `/app` in the server build and is backed by a separate Cloudflare Worker API plus Supabase Auth, Postgres, and Storage. The authenticated pilot is not part of the static GitHub Pages bundle.
+
+The production foundation now includes Student, Advisor, and Administrator dashboards; organization, program, cohort, and advisor-assignment scopes; staff MFA enforcement; Sessions and Attendance; private Portfolio records; student-controlled advising packets; administrator-defined survey waves; and an isolated evaluation schema. See [the production runbook](docs/production/README.md).
+
 ## Demonstration boundaries
 
 This is a fictional, browser-local product demonstration. It is not an admissions portal or admissions decision tool.
@@ -56,7 +62,7 @@ This is a fictional, browser-local product demonstration. It is not an admission
 - Student-created entries stay on the current device.
 - Route recommendations never use GPA, MCAT, demographics, personality labels, or message volume.
 - Reviewer views use fictional records and expose only active, student-selected packet items.
-- No student accounts, institutional authentication, Supabase, D1, email, analytics, or external message delivery are active.
+- No real accounts, Supabase records, email, analytics, or external message delivery are active in the GitHub Pages demonstration.
 - No real student, patient, research-participant, admissions, or advising records should be entered.
 
 The GitHub Pages prototype uses a shared playtest access gate backed by a Cloudflare Worker. Access-code comparison and session signing happen at the edge, and secrets are never stored in GitHub or the browser bundle. The static application files remain public, so this is a playtest gate rather than institutional authentication.
@@ -73,7 +79,7 @@ flowchart LR
     E --> C
 ```
 
-The current prototype uses the versioned browser-local state key `navigate.pathway.demo.v2`, with one-time recovery from the earlier unified, donor, and media-first formats. The SQL under [`docs/architecture/`](docs/architecture/) is future architecture reference material only and is not imported by the application.
+The public prototype uses the versioned browser-local state key `navigate.pathway.demo.v2`, with one-time recovery from the earlier unified, donor, and media-first formats. The production pilot never imports those fictional records. Its deployable Supabase migration is under [`supabase/migrations/`](supabase/migrations/).
 
 The earlier Sites deployment remains available as a rollback while GitHub Pages is the primary student-facing address.
 
@@ -103,6 +109,10 @@ pnpm test
 - [`app/curriculum-data.ts`](app/curriculum-data.ts): transcribed 2025-2026 curriculum references and review annotations
 - [`app/prototype-store.tsx`](app/prototype-store.tsx): state, persistence, and legacy migrations
 - [`app/access-session.ts`](app/access-session.ts): constant-time code comparison and signed session cookies
+- [`app/production/`](app/production/): invite-only role dashboards, Supabase session handling, staff MFA, and authenticated survey workspace
+- [`cloudflare/pilot-api.ts`](cloudflare/pilot-api.ts): production pilot API boundary and evaluation access audit logging
+- [`supabase/migrations/`](supabase/migrations/): production schema, RLS, evaluation isolation, and server functions
+- [`docs/production/README.md`](docs/production/README.md): environment, deployment, approval, and launch runbook
 - [`docs/spec/`](docs/spec/): product, playtest, architecture, and v0.2 handoff specifications
 - [`docs/content/AAMC_2027_ORGANIZATION_GUIDANCE.md`](docs/content/AAMC_2027_ORGANIZATION_GUIDANCE.md): coursework and experience organization mapped from the 2027 AMCAS guide
 - [`docs/architecture/supabase-schema.sql`](docs/architecture/supabase-schema.sql): dormant production architecture reference

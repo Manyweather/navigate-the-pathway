@@ -1,0 +1,14 @@
+packages:
+  - .
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
+
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - workerd
+
+virtualStoreDir: node_modules/.pnpm-v2

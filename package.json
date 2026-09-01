@@ -12,19 +12,25 @@
     "start": "vinext start",
     "test": "vinext build && pnpm build:pages && node --import tsx --test tests/*.test.mjs",
     "check": "pnpm lint && pnpm test",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern dist-pages --ignore-pattern .next --ignore-pattern tmp --ignore-pattern cloudflare/worker-configuration.d.ts",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern dist-pages --ignore-pattern .next --ignore-pattern tmp --ignore-pattern cloudflare/worker-configuration.d.ts --ignore-pattern cloudflare/worker-configuration.pilot.d.ts",
     "worker:check": "wrangler deploy --dry-run -c cloudflare/wrangler.jsonc",
     "worker:deploy": "wrangler deploy -c cloudflare/wrangler.jsonc",
     "worker:types": "wrangler types cloudflare/worker-configuration.d.ts -c cloudflare/wrangler.jsonc",
+    "pilot-api:check": "wrangler deploy --dry-run -c cloudflare/wrangler.pilot.jsonc --env staging",
+    "pilot-api:deploy:staging": "wrangler deploy -c cloudflare/wrangler.pilot.jsonc --env staging",
+    "pilot-api:deploy:production": "wrangler deploy -c cloudflare/wrangler.pilot.jsonc --env production",
+    "pilot-api:types": "wrangler types cloudflare/worker-configuration.pilot.d.ts -c cloudflare/wrangler.pilot.jsonc --env staging",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
     "drizzle-orm": "0.45.2",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/vite-plugin": "1.54.2",
+    "@cloudflare/workers-types": "5.20260828.1",
     "@eslint/js": "9.39.4",
     "@next/eslint-plugin-next": "16.2.6",
     "@tailwindcss/postcss": "4.2.1",
@@ -46,7 +52,7 @@
     "typescript-eslint": "8.59.3",
     "vinext": "1.0.0-beta.2",
     "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "wrangler": "4.127.1"
   },
   "type": "module"
 }

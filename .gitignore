@@ -39,6 +39,7 @@ yarn-error.log*
 /dist/
 /dist-pages/
 /cloudflare/worker-configuration.d.ts
+/cloudflare/worker-configuration.pilot.d.ts
 /.wrangler/
 /outputs/
 /work/
@@ -47,3 +48,4 @@ yarn-error.log*
 *.tar.gz
 *.tgz
 /tmp/
+/supabase/.temp/
