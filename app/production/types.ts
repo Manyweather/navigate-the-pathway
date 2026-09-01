@@ -48,6 +48,63 @@ export type StudentDashboard = {
   advisingPackets: Array<{ id: string; title: string; status: string; expiresAt: string | null }>;
 };
 
+export type StationId = "courses" | "evidence" | "service" | "cohort" | "reflection" | "application";
+
+export type PathwayArtifact = {
+  id: string;
+  station: StationId;
+  artifactType: string;
+  title: string;
+  content: {
+    response?: string;
+    prompt?: string;
+    fields?: Record<string, string>;
+  };
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdvisingPacketDetail = {
+  id: string;
+  title: string;
+  status: "active" | "revoked" | "expired" | "closed";
+  advisorName: string;
+  expiresAt: string | null;
+  itemIds: string[];
+  items: PathwayArtifact[];
+  comments: Array<{ id: string; authorName: string; body: string; createdAt: string }>;
+};
+
+export type CohortPost = {
+  id: string;
+  authorName: string;
+  body: string;
+  participationMode: "question" | "resource" | "encouragement" | "reflection";
+  parentId: string | null;
+  createdAt: string;
+};
+
+export type EvaluationSummary = {
+  instruments: Array<{
+    instrumentSlug: string;
+    instrumentName: string;
+    submitted: number;
+    scoreMean: number | null;
+    scoreMin: number | null;
+    scoreMax: number | null;
+  }>;
+  submissions: Array<{
+    userId: string;
+    displayName: string;
+    email: string;
+    instrumentSlug: string;
+    instrumentName: string;
+    submittedAt: string;
+    scores: Record<string, number>;
+  }>;
+  generatedAt: string;
+};
+
 export type AdvisorStudentSummary = {
   id: string;
   displayName: string;
@@ -117,4 +174,5 @@ export type SurveyAssignmentDetail = SurveyAssignmentSummary & {
   items: SurveyItem[];
   draft: Record<string, string>;
   lastSavedAt: string | null;
+  instructions?: string;
 };

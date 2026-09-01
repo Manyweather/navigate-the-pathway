@@ -7,6 +7,12 @@ type Env = {
   ALLOWED_ORIGINS: string;
   PILOT_ENVIRONMENT: PilotEnvironment;
   INVITE_REDIRECT_URL: string;
+  SURVEY_PRE_HEALTH?: string;
+  SURVEY_GRIT?: string;
+  SURVEY_IDENTITY?: string;
+  SURVEY_RESILIENCE?: string;
+  SURVEY_ACCS?: string;
+  SURVEY_ENCRYPTION_KEY?: string;
 };
 
 type AuthenticatedUser = {
@@ -48,7 +54,7 @@ function corsHeaders(request: Request, env: Env) {
   return origin ? {
     "access-control-allow-origin": origin,
     "access-control-allow-headers": "authorization, content-type",
-    "access-control-allow-methods": "GET, POST, PUT, OPTIONS",
+    "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
     "access-control-max-age": "86400",
     vary: "Origin",
   } : {};
@@ -94,6 +100,7 @@ async function rpc<T>(env: Env, token: string, fn: string, body: unknown = {}): 
     const status = response.status === 401 ? 401 : response.status === 403 ? 403 : response.status === 409 ? 409 : 400;
     throw new HttpError(status, details.message || "The requested action was not accepted.", details.code || "rpc_rejected");
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
@@ -281,6 +288,9 @@ async function pathwayArtifacts(request: Request, env: Env, user: AuthenticatedU
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 160) : "";
   const prompt = typeof body.prompt === "string" ? body.prompt.trim().slice(0, 1000) : "";
   const response = typeof body.response === "string" ? body.response.trim().slice(0, 5000) : "";
+  const fields = body.fields && typeof body.fields === "object"
+    ? Object.fromEntries(Object.entries(body.fields as Record<string, unknown>).filter(([, value]) => typeof value === "string").map(([key, value]) => [key.slice(0, 80), String(value).trim().slice(0, 3000)]))
+    : {};
   if (!station || !artifactType || !title || !response) throw new HttpError(400, "Choose a station and enter a response before saving.", "invalid_artifact");
   const rows = await serviceRest<StoredArtifact[]>(env, "artifacts?select=id,station,artifact_type,title,content,created_at,updated_at", {
     method: "POST",
@@ -292,7 +302,7 @@ async function pathwayArtifacts(request: Request, env: Env, user: AuthenticatedU
       station,
       artifact_type: artifactType,
       title,
-      content: { prompt, response },
+      content: { prompt, response, fields },
       private_by_default: true,
     }),
   });
@@ -392,6 +402,333 @@ async function pathwayPrimer(request: Request, env: Env, user: AuthenticatedUser
   return json(presentArtifact(rows[0]), current[0] ? 200 : 201);
 }
 
+type CohortPostContent = {
+  body?: string;
+  participationMode?: string;
+  parentId?: string | null;
+  cohortId?: string;
+};
+
+async function cohortBoard(request: Request, env: Env, user: AuthenticatedUser) {
+  const context = await authorization(env, user);
+  requireRole(context, "student");
+  if (!context.activeOrganizationId || !context.activeProgramId || !context.activeCohortId) throw new HttpError(409, "Your account needs an active cohort before the discussion board can open.", "active_cohort_required");
+  const cohortId = context.activeCohortId;
+  if (request.method === "POST") {
+    const body = await readBody(request);
+    const message = typeof body.body === "string" ? body.body.trim().slice(0, 1800) : "";
+    const modes = ["question", "resource", "encouragement", "reflection"];
+    const participationMode = typeof body.participationMode === "string" && modes.includes(body.participationMode) ? body.participationMode : "question";
+    const parentId = typeof body.parentId === "string" && /^[0-9a-f-]{36}$/i.test(body.parentId) ? body.parentId : null;
+    if (!message) throw new HttpError(400, "Write a message before posting.", "empty_cohort_post");
+    await serviceRest<StoredArtifact[]>(env, "artifacts?select=id", {
+      method: "POST",
+      headers: { prefer: "return=representation" },
+      body: JSON.stringify({ student_id: user.id, organization_id: context.activeOrganizationId, program_id: context.activeProgramId, station: "cohort", artifact_type: "cohort_post", title: "Cohort contribution", content: { body: message, participationMode, parentId, cohortId }, private_by_default: false }),
+    });
+    console.log(JSON.stringify({ event: "cohort_post_created", actor: user.id, cohort_id: cohortId, mode: participationMode }));
+  }
+  const posts = await serviceRest<Array<StoredArtifact & { student_id: string }>>(env, `artifacts?organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&program_id=eq.${encodeURIComponent(context.activeProgramId)}&station=eq.cohort&artifact_type=eq.cohort_post&private_by_default=eq.false&content-%3E%3EcohortId=eq.${encodeURIComponent(cohortId)}&select=id,student_id,content,created_at,updated_at,title,station,artifact_type&order=created_at.asc&limit=200`);
+  const studentIds = [...new Set(posts.map((post) => post.student_id))];
+  const profiles = studentIds.length ? await serviceRest<Array<{ user_id: string; display_name: string; preferred_name: string | null }>>(env, `profiles?user_id=in.(${studentIds.join(",")})&select=user_id,display_name,preferred_name`) : [];
+  const names = new Map(profiles.map((profile) => [profile.user_id, profile.preferred_name || profile.display_name]));
+  return json(posts.map((post) => {
+    const content = post.content as CohortPostContent;
+    return { id: post.id, authorName: names.get(post.student_id) || "Cohort member", body: content.body || "", participationMode: content.participationMode || "question", parentId: content.parentId || null, createdAt: post.created_at };
+  }));
+}
+
+async function assignedAdvisor(env: Env, user: AuthenticatedUser, context: AuthorizationContext) {
+  const rows = await serviceRest<Array<{ advisor_id: string }>>(env, `advisor_assignments?student_id=eq.${encodeURIComponent(user.id)}&program_id=eq.${encodeURIComponent(context.activeProgramId || "")}&starts_at=lte.${encodeURIComponent(new Date().toISOString())}&or=(ends_at.is.null,ends_at.gt.${encodeURIComponent(new Date().toISOString())})&select=advisor_id&limit=1`);
+  if (rows[0]) return rows[0].advisor_id;
+  return env.PILOT_ENVIRONMENT === "staging" && context.roles.includes("advisor") ? user.id : null;
+}
+
+async function presentPacket(env: Env, packet: { id: string; title: string; status: string; advisor_id: string; expires_at: string | null; revoked_at: string | null } | undefined) {
+  if (!packet) return null;
+  const [profile, packetItems, comments] = await Promise.all([
+    serviceRest<Array<{ display_name: string; preferred_name: string | null }>>(env, `profiles?user_id=eq.${encodeURIComponent(packet.advisor_id)}&select=display_name,preferred_name&limit=1`),
+    serviceRest<Array<{ item_id: string }>>(env, `packet_items?packet_id=eq.${encodeURIComponent(packet.id)}&item_type=eq.artifact&item_id=not.is.null&select=item_id&order=created_at.asc`),
+    serviceRest<Array<{ id: string; author_id: string; body: string; created_at: string }>>(env, `comments?packet_id=eq.${encodeURIComponent(packet.id)}&select=id,author_id,body,created_at&order=created_at.asc`),
+  ]);
+  const itemIds = packetItems.map((item) => item.item_id);
+  const items = itemIds.length ? await serviceRest<StoredArtifact[]>(env, `artifacts?id=in.(${itemIds.join(",")})&select=id,station,artifact_type,title,content,created_at,updated_at`) : [];
+  const authorIds = [...new Set(comments.map((comment) => comment.author_id))];
+  const authors = authorIds.length ? await serviceRest<Array<{ user_id: string; display_name: string; preferred_name: string | null }>>(env, `profiles?user_id=in.(${authorIds.join(",")})&select=user_id,display_name,preferred_name`) : [];
+  const authorNames = new Map(authors.map((author) => [author.user_id, author.preferred_name || author.display_name]));
+  const expired = packet.expires_at && new Date(packet.expires_at) < new Date();
+  return {
+    id: packet.id,
+    title: packet.title,
+    status: packet.revoked_at ? "revoked" : expired ? "expired" : packet.status,
+    advisorName: profile[0]?.preferred_name || profile[0]?.display_name || "Assigned advisor",
+    expiresAt: packet.expires_at,
+    itemIds,
+    items: items.map(presentArtifact),
+    comments: comments.map((comment) => ({ id: comment.id, authorName: authorNames.get(comment.author_id) || "Advisor", body: comment.body, createdAt: comment.created_at })),
+  };
+}
+
+async function studentAdvisingShare(request: Request, env: Env, user: AuthenticatedUser) {
+  const context = await authorization(env, user);
+  requireRole(context, "student");
+  if (!context.activeOrganizationId || !context.activeProgramId) throw new HttpError(409, "Your account needs an active program before work can be shared.", "active_program_required");
+  const existing = await serviceRest<Array<{ id: string; title: string; status: string; advisor_id: string; expires_at: string | null; revoked_at: string | null }>>(env, `advising_packets?student_id=eq.${encodeURIComponent(user.id)}&program_id=eq.${encodeURIComponent(context.activeProgramId)}&status=eq.active&revoked_at=is.null&select=id,title,status,advisor_id,expires_at,revoked_at&order=created_at.desc&limit=1`);
+  if (request.method === "GET") return json(await presentPacket(env, existing[0]));
+  if (request.method === "DELETE") {
+    if (existing[0]) await serviceRest(env, `advising_packets?id=eq.${encodeURIComponent(existing[0].id)}`, { method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify({ status: "revoked", revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+    return json({ ok: true });
+  }
+  const body = await readBody(request);
+  const requestedIds = Array.isArray(body.artifactIds) ? [...new Set(body.artifactIds.filter((id): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)))].slice(0, 50) : [];
+  if (!requestedIds.length) throw new HttpError(400, "Select at least one Portfolio item to share.", "packet_items_required");
+  const owned = await serviceRest<Array<{ id: string }>>(env, `artifacts?student_id=eq.${encodeURIComponent(user.id)}&id=in.(${requestedIds.join(",")})&artifact_type=neq.pathway_primer&select=id`);
+  if (owned.length !== requestedIds.length) throw new HttpError(403, "One or more selected items are not available to share.", "packet_item_forbidden");
+  const advisorId = existing[0]?.advisor_id || await assignedAdvisor(env, user, context);
+  if (!advisorId) throw new HttpError(409, "An advisor must be assigned before a packet can be shared.", "advisor_assignment_required");
+  let packet = existing[0];
+  if (!packet) {
+    const created = await serviceRest<typeof existing>(env, "advising_packets?select=id,title,status,advisor_id,expires_at,revoked_at", { method: "POST", headers: { prefer: "return=representation" }, body: JSON.stringify({ student_id: user.id, advisor_id: advisorId, organization_id: context.activeOrganizationId, program_id: context.activeProgramId, title: "Pathway advising packet", status: "active", expires_at: new Date(Date.now() + 90 * 86400000).toISOString() }) });
+    packet = created[0];
+  }
+  await serviceRest(env, `packet_items?packet_id=eq.${encodeURIComponent(packet.id)}&item_type=eq.artifact`, { method: "DELETE", headers: { prefer: "return=minimal" } });
+  await serviceRest(env, "packet_items", { method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify(requestedIds.map((itemId) => ({ packet_id: packet.id, item_type: "artifact", item_id: itemId }))) });
+  await serviceRest(env, `advising_packets?id=eq.${encodeURIComponent(packet.id)}`, { method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify({ updated_at: new Date().toISOString() }) });
+  console.log(JSON.stringify({ event: "advising_packet_shared", actor: user.id, packet_id: packet.id, item_count: requestedIds.length }));
+  return json(await presentPacket(env, packet));
+}
+
+async function advisorStudentPacket(request: Request, env: Env, user: AuthenticatedUser, studentId: string) {
+  requireStaffMfa(user);
+  const context = await authorization(env, user);
+  requireRole(context, "advisor");
+  const assigned = await serviceRest<Array<{ student_id: string }>>(env, `advisor_assignments?advisor_id=eq.${encodeURIComponent(user.id)}&student_id=eq.${encodeURIComponent(studentId)}&select=student_id&limit=1`);
+  const selfStaging = env.PILOT_ENVIRONMENT === "staging" && studentId === user.id && context.roles.includes("student");
+  if (!assigned.length && !selfStaging) throw new HttpError(403, "This student is not assigned to your advising roster.", "student_assignment_required");
+  const packets = await serviceRest<Array<{ id: string; title: string; status: string; advisor_id: string; expires_at: string | null; revoked_at: string | null }>>(env, `advising_packets?student_id=eq.${encodeURIComponent(studentId)}&advisor_id=eq.${encodeURIComponent(user.id)}&status=eq.active&revoked_at=is.null&select=id,title,status,advisor_id,expires_at,revoked_at&order=created_at.desc&limit=1`);
+  if (request.method === "POST") {
+    if (!packets[0]) throw new HttpError(409, "The student has not shared an active packet.", "active_packet_required");
+    const body = await readBody(request);
+    const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 2000) : "";
+    if (!comment) throw new HttpError(400, "Write a comment before saving.", "empty_comment");
+    await serviceRest(env, "comments", { method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify({ packet_id: packets[0].id, author_id: user.id, body: comment }) });
+  }
+  return json(await presentPacket(env, packets[0]));
+}
+
+async function portfolioDocumentMetadata(request: Request, env: Env, user: AuthenticatedUser) {
+  const context = await authorization(env, user);
+  requireRole(context, "student");
+  if (!context.activeOrganizationId || !context.activeProgramId) throw new HttpError(409, "Your account needs an active program before documents can be saved.", "active_program_required");
+  const body = await readBody(request);
+  const storagePath = typeof body.storagePath === "string" ? body.storagePath.trim().slice(0, 500) : "";
+  const title = typeof body.title === "string" ? body.title.trim().slice(0, 160) : "";
+  const documentType = typeof body.documentType === "string" ? body.documentType.trim().slice(0, 80) : "Other";
+  if (!storagePath.startsWith(`${user.id}/`) || !title) throw new HttpError(400, "The uploaded document metadata was not accepted.", "invalid_document_metadata");
+  const rows = await serviceRest<Array<{ id: string }>>(env, "portfolio_documents?select=id", { method: "POST", headers: { prefer: "return=representation" }, body: JSON.stringify({ student_id: user.id, organization_id: context.activeOrganizationId, program_id: context.activeProgramId, storage_path: storagePath, title, document_type: documentType }) });
+  return json({ ok: true, id: rows[0]?.id }, 201);
+}
+
+type SecretSurveyItem = {
+  prompt: string;
+  responseType?: "single_choice" | "text";
+  required?: boolean;
+  options?: Array<{ label: string; value: string }>;
+};
+
+type SecretSurveyDefinition = {
+  instructions: string;
+  items: SecretSurveyItem[];
+  scoreKey: string;
+  scoreLabel: string;
+  reversePositions?: number[];
+};
+
+function secretSurvey(env: Env, slug: string): SecretSurveyDefinition | null {
+  const raw = ({
+    "pre-health-application-profile": env.SURVEY_PRE_HEALTH,
+    "short-grit-survey": env.SURVEY_GRIT,
+    "macleod-clark-professional-identity-scale": env.SURVEY_IDENTITY,
+    "brief-resilience-scale": env.SURVEY_RESILIENCE,
+    "advisor-coaching-competency-scale": env.SURVEY_ACCS,
+  } as Record<string, string | undefined>)[slug];
+  if (!raw || env.PILOT_ENVIRONMENT !== "staging") return null;
+  try {
+    const parsed = JSON.parse(raw) as SecretSurveyDefinition;
+    return Array.isArray(parsed.items) && parsed.items.length ? parsed : null;
+  } catch {
+    console.error(JSON.stringify({ event: "staging_survey_content_invalid", instrument_slug: slug }));
+    return null;
+  }
+}
+
+function base64Bytes(value: string) {
+  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+}
+
+function bytesBase64(value: Uint8Array) {
+  let result = "";
+  value.forEach((byte) => { result += String.fromCharCode(byte); });
+  return btoa(result);
+}
+
+async function surveyKey(env: Env) {
+  if (!env.SURVEY_ENCRYPTION_KEY) throw new HttpError(503, "Protected survey storage is not configured.", "survey_storage_unavailable");
+  return crypto.subtle.importKey("raw", base64Bytes(env.SURVEY_ENCRYPTION_KEY), "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+
+async function encryptSurvey(env: Env, value: unknown) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(JSON.stringify(value));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await surveyKey(env), plaintext);
+  return { iv: bytesBase64(iv), ciphertext: bytesBase64(new Uint8Array(ciphertext)) };
+}
+
+async function decryptSurvey<T>(env: Env, value: unknown): Promise<T> {
+  const encrypted = value && typeof value === "object" ? value as { iv?: string; ciphertext?: string } : {};
+  if (!encrypted.iv || !encrypted.ciphertext) throw new HttpError(400, "The protected survey draft could not be read.", "survey_draft_unreadable");
+  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64Bytes(encrypted.iv) }, await surveyKey(env), base64Bytes(encrypted.ciphertext));
+  return JSON.parse(new TextDecoder().decode(plaintext)) as T;
+}
+
+type SurveyProjection = {
+  assignment_id: string;
+  user_id: string;
+  organization_id: string;
+  program_id: string;
+  instrument_slug: string;
+  instrument_name: string;
+  wave_id: string;
+  wave_label: string;
+  status: string;
+  submitted_at: string | null;
+};
+
+async function surveyProjection(env: Env, userId: string, assignmentId: string) {
+  const rows = await serviceRest<SurveyProjection[]>(env, `survey_completion_projection?assignment_id=eq.${encodeURIComponent(assignmentId)}&user_id=eq.${encodeURIComponent(userId)}&select=assignment_id,user_id,organization_id,program_id,instrument_slug,instrument_name,wave_id,wave_label,status,submitted_at&limit=1`);
+  if (!rows[0]) throw new HttpError(404, "That survey assignment is not available to this account.", "survey_assignment_missing");
+  return rows[0];
+}
+
+async function stagingSurveyArtifact(env: Env, userId: string, assignmentId: string) {
+  const rows = await serviceRest<StoredArtifact[]>(env, `artifacts?student_id=eq.${encodeURIComponent(userId)}&artifact_type=eq.staging_survey&content-%3E%3EassignmentId=eq.${encodeURIComponent(assignmentId)}&select=id,station,artifact_type,title,content,created_at,updated_at&order=updated_at.desc&limit=1`);
+  return rows[0];
+}
+
+function stagingEnabledAssignments(env: Env, value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object") return {};
+  const dashboard = value as Record<string, unknown>;
+  if (env.PILOT_ENVIRONMENT !== "staging") return dashboard;
+  for (const key of ["surveyAssignments", "mySurveys"]) {
+    if (!Array.isArray(dashboard[key])) continue;
+    dashboard[key] = (dashboard[key] as Array<Record<string, unknown>>).map((assignment) => secretSurvey(env, String(assignment.instrumentSlug || "")) && assignment.status === "not_available" ? { ...assignment, status: "not_started" } : assignment);
+  }
+  return dashboard;
+}
+
+async function stagingAdvisorSelf(env: Env, user: AuthenticatedUser, context: AuthorizationContext, dashboard: Record<string, unknown>) {
+  if (env.PILOT_ENVIRONMENT !== "staging" || !context.roles.includes("student") || !Array.isArray(dashboard.assignedStudents) || dashboard.assignedStudents.length) return dashboard;
+  const [profile, attendance, sessions, completion, packets] = await Promise.all([
+    serviceRest<Array<{ display_name: string; preferred_name: string | null }>>(env, `profiles?user_id=eq.${encodeURIComponent(user.id)}&select=display_name,preferred_name&limit=1`),
+    serviceRest<Array<{ status: string }>>(env, `attendance?student_id=eq.${encodeURIComponent(user.id)}&select=status`),
+    context.activeProgramId ? serviceRest<Array<{ id: string }>>(env, `sessions?program_id=eq.${encodeURIComponent(context.activeProgramId)}&starts_at=lt.${encodeURIComponent(new Date().toISOString())}&select=id`) : [],
+    serviceRest<Array<{ instrument_name: string; status: string; submitted_at: string | null }>>(env, `survey_completion_projection?user_id=eq.${encodeURIComponent(user.id)}&audience=eq.student&select=instrument_name,status,submitted_at`) ,
+    serviceRest<Array<{ id: string }>>(env, `advising_packets?student_id=eq.${encodeURIComponent(user.id)}&advisor_id=eq.${encodeURIComponent(user.id)}&status=eq.active&revoked_at=is.null&select=id`),
+  ]);
+  dashboard.assignedStudents = [{ id: user.id, displayName: profile[0]?.preferred_name || profile[0]?.display_name || user.email.split("@")[0], cohortName: "Fictional Staging Cohort", attendance: { present: attendance.filter((item) => item.status === "present").length, expected: sessions.length }, surveyCompletion: completion.map((item) => ({ instrumentName: item.instrument_name, status: item.status, submittedAt: item.submitted_at })), sharedPacketCount: packets.length }];
+  return dashboard;
+}
+
+async function stagingSurveyDetail(env: Env, user: AuthenticatedUser, assignmentId: string) {
+  const official = await rpc<Record<string, unknown>>(env, user.token, "get_my_survey_assignment", { assignment_id: assignmentId });
+  const definition = secretSurvey(env, String(official.instrumentSlug || ""));
+  if (!definition || (Array.isArray(official.items) && official.items.length)) return official;
+  const saved = await stagingSurveyArtifact(env, user.id, assignmentId);
+  const protectedPayload = saved ? await decryptSurvey<{ answers: Record<string, string>; scores?: Record<string, number> }>(env, saved.content.encrypted) : null;
+  const sharedOptions = definition.items.find((item) => item.options?.length)?.options || [];
+  return {
+    ...official,
+    status: saved?.content.status === "submitted" ? "submitted" : saved ? "in_progress" : "not_started",
+    consentTitle: "Navigate the Pathway pilot survey information",
+    consentBody: "Your responses support the approved pilot evaluation. Students and advisors see completion status only. Evaluation-authorized administrators may review identifiable responses and calculated results. Survey results do not affect pathway recommendations or admissions decisions.",
+    items: definition.items.map((item, index) => ({
+      id: `${String(official.instrumentSlug)}:${index + 1}`,
+      position: index + 1,
+      prompt: item.prompt,
+      responseType: item.responseType || "single_choice",
+      required: item.required !== false,
+      options: (item.options?.length ? item.options : sharedOptions).map((option, optionIndex) => ({ id: `${String(official.instrumentSlug)}:${index + 1}:${optionIndex + 1}`, label: option.label, value: option.value, position: optionIndex + 1 })),
+    })),
+    draft: protectedPayload?.answers || {},
+    lastSavedAt: saved?.updated_at || null,
+    instructions: definition.instructions,
+  };
+}
+
+function calculateSurveyScores(definition: SecretSurveyDefinition, answers: Record<string, string>) {
+  const reverse = new Set(definition.reversePositions || []);
+  const values = definition.items.map((item, index) => {
+    if ((item.responseType || "single_choice") === "text") return null;
+    const raw = Number(answers[`${index + 1}`] ?? answers[Object.keys(answers).find((key) => key.endsWith(`:${index + 1}`)) || ""]);
+    if (!Number.isFinite(raw)) return null;
+    return reverse.has(index + 1) ? 6 - raw : raw;
+  }).filter((value): value is number => value !== null);
+  if (!values.length) return {};
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return { [definition.scoreKey]: Number((total / values.length).toFixed(2)), total: Number(total.toFixed(2)), answeredItems: values.length };
+}
+
+async function saveStagingSurvey(request: Request, env: Env, user: AuthenticatedUser, assignmentId: string, submit: boolean) {
+  const projection = await surveyProjection(env, user.id, assignmentId);
+  const definition = secretSurvey(env, projection.instrument_slug);
+  if (!definition) return null;
+  const body = submit ? {} : await readBody(request);
+  const existing = await stagingSurveyArtifact(env, user.id, assignmentId);
+  const prior = existing ? await decryptSurvey<{ answers: Record<string, string> }>(env, existing.content.encrypted) : { answers: {} };
+  const answers = submit ? prior.answers : body.answers && typeof body.answers === "object" ? Object.fromEntries(Object.entries(body.answers as Record<string, unknown>).filter(([, value]) => typeof value === "string").map(([key, value]) => [key.slice(0, 160), String(value).slice(0, 5000)])) : {};
+  if (submit) {
+    const missing = definition.items.some((item, index) => item.required !== false && !String(answers[`${projection.instrument_slug}:${index + 1}`] || "").trim());
+    if (missing) throw new HttpError(400, "Complete each required survey item before submitting.", "survey_incomplete");
+  }
+  const scores = submit ? calculateSurveyScores(definition, Object.fromEntries(Object.entries(answers).map(([key, value]) => [key.split(":").pop() || key, value]))) : {};
+  const encrypted = await encryptSurvey(env, { answers, scores });
+  const status = submit ? "submitted" : "in_progress";
+  const content = { assignmentId, instrumentSlug: projection.instrument_slug, instrumentName: projection.instrument_name, waveId: projection.wave_id, waveLabel: projection.wave_label, status, encrypted };
+  if (existing) await serviceRest(env, `artifacts?id=eq.${encodeURIComponent(existing.id)}`, { method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify({ content, updated_at: new Date().toISOString() }) });
+  else await serviceRest(env, "artifacts", { method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify({ student_id: user.id, organization_id: projection.organization_id, program_id: projection.program_id, station: "sessions", artifact_type: "staging_survey", title: projection.instrument_name, content, private_by_default: true }) });
+  await serviceRest(env, `survey_completion_projection?assignment_id=eq.${encodeURIComponent(assignmentId)}&user_id=eq.${encodeURIComponent(user.id)}`, { method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify({ status, started_at: new Date().toISOString(), submitted_at: submit ? new Date().toISOString() : null, updated_at: new Date().toISOString() }) });
+  console.log(JSON.stringify({ event: submit ? "staging_survey_submitted" : "staging_survey_draft_saved", actor: user.id, assignment_id: assignmentId, instrument_slug: projection.instrument_slug }));
+  return { ok: true, status };
+}
+
+async function evaluationSummary(env: Env, user: AuthenticatedUser, context: AuthorizationContext) {
+  requireStaffMfa(user);
+  requireRole(context, "administrator");
+  if (!context.capabilities.includes("evaluation.identifiable_results")) throw new HttpError(403, "Quantified evaluation results require separate authorization.", "capability_required");
+  const rows = await serviceRest<Array<StoredArtifact & { student_id: string }>>(env, `artifacts?organization_id=eq.${encodeURIComponent(context.activeOrganizationId || "")}&artifact_type=eq.staging_survey&content-%3E%3Estatus=eq.submitted&select=id,student_id,station,artifact_type,title,content,created_at,updated_at&order=updated_at.desc`);
+  const studentIds = [...new Set(rows.map((row) => row.student_id))];
+  const [profiles, authUsers] = await Promise.all([
+    studentIds.length ? serviceRest<Array<{ user_id: string; display_name: string; preferred_name: string | null }>>(env, `profiles?user_id=in.(${studentIds.join(",")})&select=user_id,display_name,preferred_name`) : [],
+    supabaseAuthUsers(env),
+  ]);
+  const names = new Map(profiles.map((profile) => [profile.user_id, profile.preferred_name || profile.display_name]));
+  const emails = new Map(authUsers.map((entry) => [entry.id, entry.email || ""]));
+  const submissions = [] as Array<{ userId: string; displayName: string; email: string; instrumentSlug: string; instrumentName: string; submittedAt: string; scores: Record<string, number> }>;
+  for (const row of rows) {
+    const content = row.content as Record<string, unknown>;
+    const payload = await decryptSurvey<{ scores: Record<string, number> }>(env, content.encrypted);
+    submissions.push({ userId: row.student_id, displayName: names.get(row.student_id) || "Student", email: emails.get(row.student_id) || "", instrumentSlug: String(content.instrumentSlug || ""), instrumentName: String(content.instrumentName || row.title), submittedAt: row.updated_at, scores: payload.scores || {} });
+  }
+  const grouped = new Map<string, typeof submissions>();
+  submissions.forEach((submission) => grouped.set(submission.instrumentSlug, [...(grouped.get(submission.instrumentSlug) || []), submission]));
+  const instruments = [...grouped.entries()].map(([instrumentSlug, group]) => {
+    const values = group.map((submission) => Object.entries(submission.scores).find(([key]) => !["total", "answeredItems"].includes(key))?.[1]).filter((value): value is number => typeof value === "number");
+    return { instrumentSlug, instrumentName: group[0].instrumentName, submitted: group.length, scoreMean: values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)) : null, scoreMin: values.length ? Math.min(...values) : null, scoreMax: values.length ? Math.max(...values) : null };
+  });
+  await serviceRest(env, "audit_events", { method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify({ organization_id: context.activeOrganizationId, actor_id: user.id, event_type: "quantified_evaluation_summary_accessed", subject_type: "evaluation_summary", metadata: { submissionCount: submissions.length } }) });
+  return { instruments, submissions, generatedAt: new Date().toISOString() };
+}
+
 function asCsv(rows: Array<Record<string, unknown>>) {
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
   const cell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
@@ -457,20 +794,32 @@ async function route(request: Request, env: Env) {
     const context = await authorization(env, user);
     requireRole(context, role);
     if (role !== "student") requireStaffMfa(user);
-    return json(await rpc(env, user.token, "pilot_dashboard", { requested_role: role }));
+    const dashboard = stagingEnabledAssignments(env, await rpc(env, user.token, "pilot_dashboard", { requested_role: role }));
+    return json(role === "advisor" ? await stagingAdvisorSelf(env, user, context, dashboard) : dashboard);
   }
   if (url.pathname === "/api/artifacts" && (request.method === "GET" || request.method === "POST")) return pathwayArtifacts(request, env, user);
   if (url.pathname === "/api/pathway/primer" && (request.method === "GET" || request.method === "PUT")) return pathwayPrimer(request, env, user);
-  if (url.pathname === "/api/surveys/assignments" && request.method === "GET") return json(await rpc(env, user.token, "my_survey_assignments"));
+  if (url.pathname === "/api/cohort/posts" && (request.method === "GET" || request.method === "POST")) return cohortBoard(request, env, user);
+  if (url.pathname === "/api/advising/share" && ["GET", "POST", "DELETE"].includes(request.method)) return studentAdvisingShare(request, env, user);
+  const advisorPacket = url.pathname.match(/^\/api\/advisor\/students\/([0-9a-f-]+)\/packet$/i);
+  if (advisorPacket && (request.method === "GET" || request.method === "POST")) return advisorStudentPacket(request, env, user, advisorPacket[1]);
+  if (url.pathname === "/api/portfolio/documents" && request.method === "POST") return portfolioDocumentMetadata(request, env, user);
+  if (url.pathname === "/api/surveys/assignments" && request.method === "GET") return json(stagingEnabledAssignments(env, { surveyAssignments: await rpc(env, user.token, "my_survey_assignments") }).surveyAssignments);
   const assignment = url.pathname.match(/^\/api\/surveys\/assignments\/([0-9a-f-]+)$/i);
-  if (assignment && request.method === "GET") return json(await rpc(env, user.token, "get_my_survey_assignment", { assignment_id: assignment[1] }));
+  if (assignment && request.method === "GET") return json(await stagingSurveyDetail(env, user, assignment[1]));
   const draft = url.pathname.match(/^\/api\/surveys\/response-sets\/([0-9a-f-]+)\/draft$/i);
   if (draft && request.method === "PUT") {
+    const staging = await saveStagingSurvey(request.clone(), env, user, draft[1], false);
+    if (staging) return json(staging);
     const body = await readBody(request);
     return json(await rpc(env, user.token, "save_my_survey_draft", { assignment_id: draft[1], consent_version_id: body.consentVersionId, answers: body.answers || {} }));
   }
   const submit = url.pathname.match(/^\/api\/surveys\/response-sets\/([0-9a-f-]+)\/submit$/i);
-  if (submit && request.method === "POST") return json(await rpc(env, user.token, "submit_my_survey_response", { assignment_id: submit[1] }));
+  if (submit && request.method === "POST") {
+    const staging = await saveStagingSurvey(request, env, user, submit[1], true);
+    if (staging) return json(staging);
+    return json(await rpc(env, user.token, "submit_my_survey_response", { assignment_id: submit[1] }));
+  }
 
   if (url.pathname === "/api/admin/invitations" && request.method === "POST") {
     const context = await authorization(env, user);
@@ -487,6 +836,10 @@ async function route(request: Request, env: Env) {
   if (url.pathname === "/api/admin/user-access-log" && request.method === "GET") {
     const context = await authorization(env, user);
     return json(await adminUserAccessLog(env, user, context));
+  }
+  if (url.pathname === "/api/evaluation/summary" && request.method === "GET") {
+    const context = await authorization(env, user);
+    return json(await evaluationSummary(env, user, context));
   }
   if ((url.pathname === "/api/evaluation/results" || url.pathname === "/api/evaluation/export") && request.method === "GET") {
     requireStaffMfa(user);

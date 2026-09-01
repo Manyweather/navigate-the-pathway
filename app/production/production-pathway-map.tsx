@@ -4,8 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { assetUrl } from "../asset-url";
 import { RosieGuide } from "../components/rosie-guide";
 import type { PilotApiClient } from "./api-client";
+import type { PathwayArtifact, StationId } from "./types";
 
-type StationId = "courses" | "evidence" | "service" | "cohort" | "reflection" | "application";
+type StationField = {
+  id: string;
+  label: string;
+  placeholder: string;
+  type?: "text" | "textarea" | "number" | "date" | "select";
+  options?: string[];
+  required?: boolean;
+};
 
 type Station = {
   id: StationId;
@@ -14,19 +22,12 @@ type Station = {
   icon: string;
   description: string;
   why: string;
-  prompt: string;
+  toolTitle: string;
+  learningPrinciple: string;
+  steps: Array<{ label: string; hint: string }>;
+  fields: StationField[];
   artifactType: string;
   artifactTitle: string;
-};
-
-type PathwayArtifact = {
-  id: string;
-  station: StationId;
-  artifactType: string;
-  title: string;
-  content: { response?: string; prompt?: string };
-  createdAt: string;
-  updatedAt: string;
 };
 
 type PrimerAnswers = {
@@ -57,12 +58,12 @@ type PrimerQuestion = {
 };
 
 const stations: Station[] = [
-  { id: "courses", name: "Courses", short: "Plan", icon: "📚", description: "Track prerequisites, clarify course questions, and plan study strategies.", why: "Clear course plans protect your time and keep more options open.", prompt: "What course question or study strategy do you want to act on next?", artifactType: "course_plan", artifactTitle: "Course question and follow-up" },
-  { id: "evidence", name: "Experiences", short: "Track", icon: "🗂️", description: "Capture meaningful moments from service, clinical work, research, leadership, employment, and campus life.", why: "Specific examples fade. Recording them now makes later reflection and application writing easier.", prompt: "What happened, what did you do, and what mattered?", artifactType: "experience", artifactTitle: "Meaningful experience" },
-  { id: "service", name: "Compassion & Values", short: "Notice", icon: "♡", description: "Notice how people experience care, access, barriers, dignity, and support.", why: "Noticing needs and responses connects your values to action and builds compassionate practice.", prompt: "What need or barrier did you notice, and what compassionate response followed?", artifactType: "reflection", artifactTitle: "Compassion and values reflection" },
-  { id: "cohort", name: "Cohort", short: "Connect", icon: "👥", description: "Identify support, ask questions, encourage classmates, and exchange useful resources.", why: "Small, low-pressure interactions make support easier to give, receive, and request.", prompt: "What small way would you like to participate or ask for support?", artifactType: "action_plan", artifactTitle: "Cohort participation plan" },
-  { id: "reflection", name: "Your Story", short: "Reflect", icon: "✍️", description: "Look across experiences to notice what matters to you, how you learn, and who you are becoming.", why: "Strong personal statements grow from repeated evidence and honest reflection.", prompt: "What pattern or meaning are you noticing across your experiences?", artifactType: "reflection", artifactTitle: "Story reflection" },
-  { id: "application", name: "Application", short: "Prepare", icon: "📄", description: "Turn saved experiences and reflections into application examples and advising questions.", why: "Building from your own records reduces blank-page pressure and reveals what to develop next.", prompt: "What specific example could support an application or advising conversation?", artifactType: "application_example", artifactTitle: "Application-ready example" },
+  { id: "courses", name: "Courses", short: "Plan", icon: "📚", description: "Track prerequisites, clarify course questions, and plan study strategies.", why: "Clear course plans protect your time and keep more options open.", toolTitle: "Turn one uncertainty into a follow-up plan", learningPrinciple: "Chunking reduces planning load.", steps: [{ label: "Course status", hint: "Name what is complete or in progress." }, { label: "Uncertainty", hint: "Turn the fuzzy part into one question." }, { label: "Person to ask", hint: "Choose someone with the right context." }, { label: "Follow-up date", hint: "Give the question a next date." }], fields: [{ id: "course", label: "Course or prerequisite", placeholder: "Example: Organic Chemistry II", required: true }, { id: "status", label: "Current status", placeholder: "Choose one", type: "select", options: ["Planned", "In progress", "Completed", "Needs confirmation"], required: true }, { id: "question", label: "What is uncertain?", placeholder: "Write the question you need answered.", type: "textarea", required: true }, { id: "person", label: "Who can help?", placeholder: "Advisor, professor, registrar, or another person", required: true }, { id: "followUp", label: "Follow-up date", placeholder: "", type: "date", required: true }], artifactType: "course_plan", artifactTitle: "Course question and follow-up" },
+  { id: "evidence", name: "Experiences", short: "Track", icon: "🗂️", description: "Capture hours and meaningful moments from service, clinical work, research, leadership, employment, and campus life.", why: "Specific examples fade. Recording them now makes later reflection and application writing easier.", toolTitle: "Turn an activity into usable evidence", learningPrinciple: "Retrieval preserves useful detail.", steps: [{ label: "Activity", hint: "Name the role and setting." }, { label: "Specific moment", hint: "Zoom in on one scene." }, { label: "Learning", hint: "Name what shifted for you." }, { label: "Future use", hint: "Connect it to what comes next." }], fields: [{ id: "activity", label: "Activity or organization", placeholder: "Example: Community health outreach", required: true }, { id: "category", label: "Experience type", placeholder: "Choose one", type: "select", options: ["Clinical", "Community service", "Research", "Leadership", "Employment", "Campus involvement", "Other"], required: true }, { id: "hours", label: "Approximate hours so far", placeholder: "An estimate is okay", type: "number" }, { id: "role", label: "What did you actually do?", placeholder: "Describe your role in plain language.", type: "textarea", required: true }, { id: "moment", label: "One specific moment", placeholder: "What happened that you want to remember?", type: "textarea", required: true }, { id: "learning", label: "What did you learn or notice?", placeholder: "Name a change in your thinking, skill, or awareness.", type: "textarea", required: true }, { id: "future", label: "How might this matter later?", placeholder: "Advising, future action, or application writing", type: "textarea" }], artifactType: "experience", artifactTitle: "Meaningful experience" },
+  { id: "service", name: "Compassion & Values", short: "Notice", icon: "♡", description: "Notice how people experience care, access, barriers, dignity, and support.", why: "Noticing compassion in action helps you see where listening, dignity, and practical support can change a person’s experience of care.", toolTitle: "Notice compassion in action", learningPrinciple: "Reflection connects compassionate attention to future action.", steps: [{ label: "Person and context", hint: "Center the person, not your role." }, { label: "Need or barrier", hint: "Notice what made access harder." }, { label: "Response", hint: "Describe listening plus action." }, { label: "Reflection", hint: "Name what you will carry forward." }], fields: [{ id: "context", label: "Person and context", placeholder: "Use no names or identifying details.", type: "textarea", required: true }, { id: "barrier", label: "Need or barrier you noticed", placeholder: "What made the situation harder?", type: "textarea", required: true }, { id: "response", label: "Compassionate response", placeholder: "What did someone say, notice, or do?", type: "textarea", required: true }, { id: "reflection", label: "What will you carry forward?", placeholder: "Connect this moment to your values or future practice.", type: "textarea", required: true }], artifactType: "reflection", artifactTitle: "Compassion and values reflection" },
+  { id: "cohort", name: "Cohort", short: "Connect", icon: "👥", description: "Use the cohort board to ask questions, encourage classmates, and exchange useful resources.", why: "A cohort is a group moving through the same process. Small, low-pressure contributions make support easier to give, receive, and request.", toolTitle: "Choose a comfortable way to participate", learningPrinciple: "Belonging grows through useful, low-pressure interactions.", steps: [{ label: "Observe", hint: "Read before you respond." }, { label: "Encourage", hint: "Acknowledge another student." }, { label: "Respond", hint: "Offer a useful idea or question." }, { label: "Connect", hint: "Continue only when it feels useful." }], fields: [{ id: "mode", label: "Participation mode", placeholder: "Choose one", type: "select", options: ["Observe first", "Encourage someone", "Ask a question", "Share a resource", "Invite a follow-up"], required: true }, { id: "action", label: "Your next small action", placeholder: "What will you do on the cohort board?", type: "textarea", required: true }], artifactType: "action_plan", artifactTitle: "Cohort participation plan" },
+  { id: "reflection", name: "Your Story", short: "Reflect", icon: "✍️", description: "Look across experiences to notice what matters to you, how you learn, and who you are becoming.", why: "Strong personal statements grow from repeated evidence and honest reflection.", toolTitle: "Develop one reflection seed", learningPrinciple: "Elaboration connects experience to action.", steps: [{ label: "What happened", hint: "Describe one observable moment." }, { label: "Why it mattered", hint: "Name the meaning or tension." }, { label: "What changes next", hint: "Choose how you will act differently." }], fields: [{ id: "moment", label: "What happened?", placeholder: "Focus on one moment.", type: "textarea", required: true }, { id: "meaning", label: "Why did it matter?", placeholder: "What value, tension, or change became visible?", type: "textarea", required: true }, { id: "change", label: "What changes next?", placeholder: "Name one future action or question.", type: "textarea", required: true }], artifactType: "reflection", artifactTitle: "Story reflection" },
+  { id: "application", name: "Application", short: "Prepare", icon: "📄", description: "Turn saved experiences and reflections into application examples and advising questions.", why: "Building from your own records reduces blank-page pressure and reveals what to develop next.", toolTitle: "Shape one application-ready example", learningPrinciple: "Structured recall lowers drafting effort.", steps: [{ label: "Context", hint: "Give only what the reader needs." }, { label: "Contribution", hint: "Name what you actually did." }, { label: "Learning", hint: "Show how your thinking changed." }, { label: "Future direction", hint: "Connect learning to who you seek to become." }], fields: [{ id: "context", label: "Context", placeholder: "What did the reader need to know?", type: "textarea", required: true }, { id: "contribution", label: "Your contribution", placeholder: "What did you do, decide, or communicate?", type: "textarea", required: true }, { id: "learning", label: "Learning", placeholder: "How did your thinking change?", type: "textarea", required: true }, { id: "future", label: "Future direction", placeholder: "How could this shape your path toward medicine?", type: "textarea", required: true }], artifactType: "application_example", artifactTitle: "Application-ready example" },
 ];
 
 const primerQuestions: PrimerQuestion[] = [
@@ -101,10 +102,10 @@ const primerQuestions: PrimerQuestion[] = [
   },
 ];
 
-export function ProductionPathwayMap({ api }: { api: PilotApiClient }) {
+export function ProductionPathwayMap({ api, onOpenCohort, onArtifactSaved }: { api: PilotApiClient; onOpenCohort?: () => void; onArtifactSaved?: (artifact: PathwayArtifact) => void }) {
   const [activeId, setActiveId] = useState<StationId>("evidence");
   const [artifacts, setArtifacts] = useState<PathwayArtifact[]>([]);
-  const [response, setResponse] = useState("");
+  const [toolValues, setToolValues] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("Loading your saved station work...");
   const [busy, setBusy] = useState(false);
   const [primer, setPrimer] = useState<PathwayPrimer | null | undefined>(undefined);
@@ -160,28 +161,31 @@ export function ProductionPathwayMap({ api }: { api: PilotApiClient }) {
 
   const selectStation = (station: Station) => {
     setActiveId(station.id);
-    setResponse("");
+    setToolValues({});
     setMessage("");
   };
 
   const save = async () => {
-    if (!response.trim()) return;
+    if (active.fields.some((field) => field.required && !toolValues[field.id]?.trim())) return;
     setBusy(true);
     setMessage("");
     try {
+      const response = active.fields.map((field) => toolValues[field.id]?.trim()).filter(Boolean).join(" | ");
       const saved = await api.request<PathwayArtifact>("/api/artifacts", {
         method: "POST",
         body: {
           station: active.id,
           artifactType: active.artifactType,
           title: active.artifactTitle,
-          prompt: active.prompt,
-          response: response.trim(),
+          prompt: active.toolTitle,
+          response,
+          fields: toolValues,
         },
       });
       setArtifacts((current) => [saved, ...current]);
-      setResponse("");
-      setMessage(`${active.name} station saved securely.`);
+      setToolValues({});
+      setMessage(`${active.name} work was added to your Vault and Portfolio.`);
+      onArtifactSaved?.(saved);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "This station could not be saved.");
     } finally {
@@ -202,7 +206,6 @@ export function ProductionPathwayMap({ api }: { api: PilotApiClient }) {
     <div className="section-heading"><div><p className="kicker">Your pathway map</p><h2 id="production-map-title">Start where it feels useful.</h2></div><div className="map-summary"><p>{stamped.size} of {stations.length} stations have saved work.</p><button className="text-button" type="button" onClick={() => { setPrimerStep(0); setPrimerOpen(true); }}>Update my primer</button></div></div>
     <RosieGuide pose="pointing" compact eyebrow="Rosie recommends" title={recommended.name} body={`${primer?.content.reason || recommended.why} Every station remains open.`} />
     <div className="district-map" aria-label="Scrollable pathway station map"><div className="district-map__canvas"><img src={assetUrl("/assets/premed-district-map.png")} alt="Illustrated pathway through six premedical learning stations" />{stations.map((station) => <button key={station.id} type="button" aria-label={`${station.name}: ${station.description}`} className={`station station--${station.id} ${activeId === station.id ? "station--active" : ""} ${recommended.id === station.id ? "station--recommended" : ""} ${stamped.has(station.id) ? "station--stamped" : ""}`} onClick={() => selectStation(station)}><span>{stamped.has(station.id) ? "✓" : station.icon}</span><strong>{station.name}</strong></button>)}</div></div>
-    <article className="station-sheet production-station-sheet"><div className="station-sheet__title"><span>{active.icon}</span><div><small>{active.short}</small><h2>{active.name}</h2></div>{stamped.has(active.id) ? <b className="earned-label">Saved</b> : null}</div><div className="station-overview"><p className="station-description">{active.description}</p><div className="station-why"><span>Why this matters</span><p>{active.why}</p></div><label className="production-station-response"><span>{active.prompt}</span><textarea value={response} maxLength={5000} onChange={(event) => setResponse(event.target.value)} placeholder="Write a brief note. Keep patient names and identifying details out." /></label><div className="production-station-actions"><button className="primary-button" type="button" disabled={busy || !response.trim()} onClick={save}>{busy ? "Saving..." : "Save this station"}</button><span>{response.length} / 5000</span></div><p className="form-message" aria-live="polite">{message}</p></div></article>
-    {artifacts.length ? <div className="production-saved-stations"><h3>Your saved station work</h3>{artifacts.slice(0, 6).map((artifact) => <article key={artifact.id}><div><strong>{artifact.title}</strong><span>{stations.find((station) => station.id === artifact.station)?.name || artifact.station}</span></div><p>{artifact.content.response}</p><time dateTime={artifact.createdAt}>{new Date(artifact.createdAt).toLocaleDateString()}</time></article>)}</div> : null}
+    <article className="station-sheet production-station-sheet"><div className="station-sheet__title"><span>{active.icon}</span><div><small>{active.short}</small><h2>{active.name}</h2></div>{stamped.has(active.id) ? <b className="earned-label">Saved</b> : null}</div><div className="station-overview"><p className="station-description">{active.description}</p><div className="station-why"><span>Why this matters</span><p>{active.why}</p></div><div className="station-tool"><div className="station-tool__heading"><div><span>Station tools</span><h3>{active.toolTitle}</h3></div><small>{active.learningPrinciple}</small></div><div className="station-tool__steps" aria-label={`${active.name} station process`}>{active.steps.map((step, index) => <article key={step.label}><b>{String(index + 1).padStart(2, "0")}</b><strong>{step.label}</strong><span>{step.hint}</span></article>)}</div><div className="station-tool__fields">{active.fields.map((field) => <label key={field.id}><span>{field.label}{field.required ? " *" : ""}</span>{field.type === "textarea" ? <textarea value={toolValues[field.id] || ""} maxLength={3000} onChange={(event) => setToolValues((current) => ({ ...current, [field.id]: event.target.value }))} placeholder={field.placeholder} /> : field.type === "select" ? <select value={toolValues[field.id] || ""} onChange={(event) => setToolValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">{field.placeholder}</option>{field.options?.map((option) => <option key={option}>{option}</option>)}</select> : <input type={field.type || "text"} min={field.type === "number" ? "0" : undefined} value={toolValues[field.id] || ""} onChange={(event) => setToolValues((current) => ({ ...current, [field.id]: event.target.value }))} placeholder={field.placeholder} />}</label>)}</div>{active.id === "cohort" && onOpenCohort ? <button className="secondary-button" type="button" onClick={onOpenCohort}>Open the cohort discussion board</button> : null}<div className="production-station-actions"><button className="primary-button" type="button" disabled={busy || active.fields.some((field) => field.required && !toolValues[field.id]?.trim())} onClick={save}>{busy ? "Saving..." : "Add to Vault and Portfolio"}</button><span>Required fields are marked *</span></div></div><p className="form-message" aria-live="polite">{message}</p></div></article>
   </section>;
 }

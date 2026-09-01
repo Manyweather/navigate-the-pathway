@@ -73,11 +73,59 @@ test("worker exposes authenticated survey and evaluation boundaries", async () =
     "/api/admin/survey-waves",
     "/api/evaluation/results",
     "/api/evaluation/export",
+    "/api/evaluation/summary",
   ]) assert.match(worker, new RegExp(route.replaceAll("/", "\\/")));
   assert.match(worker, /evaluation\.identifiable_results/);
   assert.match(worker, /requireStaffMfa/);
   assert.match(worker, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.doesNotMatch(worker, /service_role\s*[:=]\s*["'][A-Za-z0-9_-]{20}/);
+});
+
+test("each secure role now has a real home and connected workspaces", async () => {
+  const production = await read("../app/production/production-pilot-app.tsx");
+  const studentTools = await read("../app/production/production-student-tools.tsx");
+  for (const destination of ["Home", "Sessions", "Pathway Map", "Vault", "Portfolio", "Cohort", "Advising"]) {
+    assert.match(production, new RegExp(destination));
+  }
+  assert.match(studentTools, /Rosie’s explanation/);
+  assert.match(studentTools, /welcome\.webm/);
+  assert.match(production, /Advisor home/);
+  assert.match(production, /Administrator home/);
+});
+
+test("station work is saved to Vault and Portfolio instead of copied between tools", async () => {
+  const map = await read("../app/production/production-pathway-map.tsx");
+  const studentTools = await read("../app/production/production-student-tools.tsx");
+  assert.match(map, /Station tools/);
+  assert.match(map, /Add to Vault and Portfolio/);
+  assert.match(map, /setToolValues\(\{\}\)/);
+  assert.match(studentTools, /The Vault keeps each item separate/);
+  assert.match(studentTools, /Share selected with advisor/);
+  assert.match(studentTools, /Revoke advisor access/);
+});
+
+test("cohort discussion and advising share are authenticated server features", async () => {
+  const worker = await read("../cloudflare/pilot-api.ts");
+  const studentTools = await read("../app/production/production-student-tools.tsx");
+  for (const route of ["/api/cohort/posts", "/api/advising/share", "/api/portfolio/documents"]) {
+    assert.match(worker, new RegExp(route.replaceAll("/", "\\/")));
+  }
+  assert.match(studentTools, /Post to cohort/);
+  assert.match(studentTools, /StudentAdvising/);
+  assert.match(worker, /private_by_default: false/);
+});
+
+test("protected survey content and scores remain server-only", async () => {
+  const worker = await read("../cloudflare/pilot-api.ts");
+  const production = await read("../app/production/production-pilot-app.tsx");
+  for (const secret of ["SURVEY_PRE_HEALTH", "SURVEY_GRIT", "SURVEY_IDENTITY", "SURVEY_RESILIENCE", "SURVEY_ACCS", "SURVEY_ENCRYPTION_KEY"]) {
+    assert.match(worker, new RegExp(secret));
+  }
+  assert.match(worker, /AES-GCM/);
+  assert.match(worker, /calculateSurveyScores/);
+  assert.match(production, /Quantified survey results/);
+  assert.match(production, /Complete one from the Student Sessions dashboard/);
+  assert.doesNotMatch(worker, /const\s+(student|advisor)SurveyItems\s*=/);
 });
 
 test("administrator activity log is MFA protected and avoids invasive tracking", async () => {
