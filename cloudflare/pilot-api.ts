@@ -160,8 +160,31 @@ async function supabaseAuthUsers(env: Env) {
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
   });
   if (!response.ok) throw new HttpError(400, "The account directory could not be loaded.", "account_directory_failed");
-  const payload = await response.json() as { users?: Array<{ id: string; email?: string; last_sign_in_at?: string | null }> };
+  const payload = await response.json() as { users?: Array<{
+    id: string;
+    email?: string;
+    last_sign_in_at?: string | null;
+    invited_at?: string | null;
+    confirmation_sent_at?: string | null;
+    email_confirmed_at?: string | null;
+    confirmed_at?: string | null;
+  }> };
   return payload.users || [];
+}
+
+async function supabaseAuthUser(env: Env, userId: string) {
+  const response = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
+  });
+  if (!response.ok) throw new HttpError(404, "The invited account could not be found.", "invited_account_not_found");
+  return response.json() as Promise<{
+    id: string;
+    email?: string;
+    invited_at?: string | null;
+    confirmation_sent_at?: string | null;
+    email_confirmed_at?: string | null;
+    confirmed_at?: string | null;
+  }>;
 }
 
 async function adminUserAccessLog(env: Env, user: AuthenticatedUser, context: AuthorizationContext) {
@@ -234,6 +257,8 @@ async function adminUserAccessLog(env: Env, user: AuthenticatedUser, context: Au
       email: auth?.email || "",
       accountStatus: profile?.status || "invited",
       lastAuthSignInAt: auth?.last_sign_in_at || null,
+      emailConfirmedAt: auth?.email_confirmed_at || auth?.confirmed_at || null,
+      lastInvitationSentAt: auth?.confirmation_sent_at || auth?.invited_at || null,
       sessionCount: studentSessions.length,
       totalMinutes: studentSessions.reduce((sum, session) => sum + session.durationMinutes, 0),
     };
@@ -824,6 +849,60 @@ async function inviteAccount(request: Request, env: Env, user: AuthenticatedUser
   return json({ ok: true, userId: invited.id });
 }
 
+async function resendInvitation(request: Request, env: Env, user: AuthenticatedUser, context: AuthorizationContext) {
+  requireStaffMfa(user);
+  requireRole(context, "administrator");
+  if (!context.activeOrganizationId) throw new HttpError(409, "Choose an active organization before resending an invitation.", "active_organization_required");
+
+  const body = await readBody(request);
+  const targetUserId = typeof body.userId === "string" ? body.userId.trim() : "";
+  if (!/^[0-9a-f-]{36}$/i.test(targetUserId)) throw new HttpError(400, "Choose a valid invited account.", "invalid_invited_account");
+
+  const assignments = await serviceRest<Array<{ user_id: string }>>(
+    env,
+    `role_assignments?organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&user_id=eq.${encodeURIComponent(targetUserId)}&revoked_at=is.null&select=user_id&limit=1`,
+  );
+  if (!assignments.length) throw new HttpError(404, "The invited account could not be found.", "invited_account_not_found");
+
+  const invitedUser = await supabaseAuthUser(env, targetUserId);
+  const email = invitedUser.email?.trim().toLowerCase() || "";
+  if (!email) throw new HttpError(409, "This account does not have an email address to resend.", "invited_email_missing");
+  if (invitedUser.email_confirmed_at || invitedUser.confirmed_at) {
+    throw new HttpError(409, "This account is already confirmed and does not need another invitation.", "invitation_already_confirmed");
+  }
+
+  const lastSentAt = invitedUser.confirmation_sent_at || invitedUser.invited_at;
+  if (lastSentAt && Date.now() - new Date(lastSentAt).getTime() < 60_000) {
+    throw new HttpError(429, "Please wait one minute before resending this invitation.", "invitation_resend_too_soon");
+  }
+
+  const invite = await fetch(`${env.SUPABASE_URL}/auth/v1/invite`, {
+    method: "POST",
+    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, "content-type": "application/json" },
+    body: JSON.stringify({ email, redirect_to: env.INVITE_REDIRECT_URL, data: { pilot_environment: env.PILOT_ENVIRONMENT } }),
+  });
+  if (!invite.ok) {
+    const details = await invite.json().catch(() => ({})) as { code?: string };
+    console.warn(JSON.stringify({ event: "pilot_invitation_resend_failed", actor: user.id, invited_user: targetUserId, status: invite.status, code: details.code || "unknown" }));
+    throw new HttpError(invite.status === 429 ? 429 : 400, "The invitation could not be resent. Wait a moment and try again.", "invitation_resend_failed");
+  }
+
+  await serviceRest(env, "audit_events", {
+    method: "POST",
+    headers: { prefer: "return=minimal" },
+    body: JSON.stringify({
+      organization_id: context.activeOrganizationId,
+      actor_id: user.id,
+      event_type: "account_invitation_resent",
+      subject_type: "profile",
+      subject_id: targetUserId,
+      metadata: { email },
+    }),
+  });
+  console.log(JSON.stringify({ event: "pilot_invitation_resent", actor: user.id, invited_user: targetUserId }));
+  return json({ ok: true, userId: targetUserId, sentAt: new Date().toISOString() });
+}
+
 async function route(request: Request, env: Env) {
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request, env) });
@@ -892,6 +971,10 @@ async function route(request: Request, env: Env) {
   if (url.pathname === "/api/admin/invitations" && request.method === "POST") {
     const context = await authorization(env, user);
     return inviteAccount(request, env, user, context);
+  }
+  if (url.pathname === "/api/admin/invitations/resend" && request.method === "POST") {
+    const context = await authorization(env, user);
+    return resendInvitation(request, env, user, context);
   }
   if (url.pathname === "/api/admin/survey-waves" && request.method === "GET") {
     requireStaffMfa(user); const context = await authorization(env, user); requireRole(context, "administrator");

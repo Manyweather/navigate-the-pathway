@@ -162,6 +162,19 @@ test("administrator activity log is MFA protected and avoids invasive tracking",
   assert.match(production, /does not collect IP addresses/);
 });
 
+test("administrators can resend an invitation without duplicating the pilot profile", async () => {
+  const worker = await read("../cloudflare/pilot-api.ts");
+  const production = await read("../app/production/production-pilot-app.tsx");
+  assert.match(worker, /\/api\/admin\/invitations\/resend/);
+  assert.match(worker, /invitation_already_confirmed/);
+  assert.match(worker, /invitation_resend_too_soon/);
+  assert.match(worker, /account_invitation_resent/);
+  assert.match(worker, /requireStaffMfa\(user\)/);
+  assert.match(production, /Resend invitation/);
+  assert.match(production, /Awaiting confirmation/);
+  assert.match(production, /Delivery can still depend on the recipient's email system/);
+});
+
 test("production browser configuration can be loaded from the Sites runtime", async () => {
   const client = await read("../app/production/supabase-client.ts");
   const route = await read("../app/api/production/config/route.ts");

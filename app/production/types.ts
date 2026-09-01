@@ -132,6 +132,8 @@ export type UserAccessStudent = {
   email: string;
   accountStatus: string;
   lastAuthSignInAt: string | null;
+  emailConfirmedAt: string | null;
+  lastInvitationSentAt: string | null;
   sessionCount: number;
   totalMinutes: number;
 };
