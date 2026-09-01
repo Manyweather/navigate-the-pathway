@@ -118,13 +118,14 @@ test("cohort discussion and advising share are authenticated server features", a
 test("protected survey content and scores remain server-only", async () => {
   const worker = await read("../cloudflare/pilot-api.ts");
   const production = await read("../app/production/production-pilot-app.tsx");
+  const analytics = await read("../app/production/survey-analytics-center.tsx");
   for (const secret of ["SURVEY_PRE_HEALTH", "SURVEY_GRIT", "SURVEY_IDENTITY", "SURVEY_RESILIENCE", "SURVEY_ACCS", "SURVEY_ENCRYPTION_KEY"]) {
     assert.match(worker, new RegExp(secret));
   }
   assert.match(worker, /AES-GCM/);
   assert.match(worker, /calculateSurveyScores/);
-  assert.match(production, /Quantified survey results/);
-  assert.match(production, /Complete one from the Student Sessions dashboard/);
+  assert.match(production, /quantified survey results/);
+  assert.match(analytics, /Scores stay hidden from participants/);
   assert.doesNotMatch(worker, /const\s+(student|advisor)SurveyItems\s*=/);
 });
 
@@ -139,11 +140,14 @@ test("staging accounts receive integrated survey assignments for their active ro
 
 test("administrator home includes completion and quantified result graphs", async () => {
   const production = await read("../app/production/production-pilot-app.tsx");
+  const analytics = await read("../app/production/survey-analytics-center.tsx");
   const styles = await read("../app/globals.css");
   assert.match(production, /AdminSurveyCompletionChart completion=\{dashboard\.surveyCompletion\}/);
-  assert.match(production, /canViewResults \? <AdminEvaluationResults api=\{api\}/);
-  assert.match(production, /Survey completion graph/);
-  assert.match(production, /Mean survey score by instrument/);
+  assert.match(production, /AdminEvaluationResults api=\{api\} audience="student"/);
+  assert.match(production, /AdminEvaluationResults api=\{api\} audience="advisor"/);
+  assert.match(production, /AdminSurveyCompletionChart completion=\{dashboard\.surveyCompletion\} audience="student"/);
+  assert.match(analytics, /Student Surveys/);
+  assert.match(analytics, /Advisor Surveys/);
   assert.match(styles, /\.completion-chart__track/);
   assert.match(styles, /\.evaluation-summary/);
 });

@@ -27,5 +27,22 @@ export class PilotApiClient {
     if (!response.ok) throw new Error(payload.error || "The request could not be completed.");
     return payload as T;
   }
-}
 
+  async download(path: string, options: RequestOptions = {}) {
+    const { data } = await this.supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error("Your session has ended. Sign in again.");
+    const response = await fetch(`${productionConfiguration().apiUrl.replace(/\/$/, "")}${path}`, {
+      ...options,
+      headers: { authorization: `Bearer ${token}`, ...options.headers },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ error: "The download could not be prepared." }));
+      throw new Error(payload.error || "The download could not be prepared.");
+    }
+    const disposition = response.headers.get("content-disposition") || "";
+    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || "navigate-evaluation-export";
+    return { blob: await response.blob(), filename };
+  }
+}
