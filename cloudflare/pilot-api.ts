@@ -257,7 +257,7 @@ type StoredArtifact = {
   station: string;
   artifact_type: string;
   title: string;
-  content: { response?: string; prompt?: string };
+  content: Record<string, unknown> & { response?: string; prompt?: string };
   created_at: string;
   updated_at: string;
 };
@@ -270,7 +270,7 @@ async function pathwayArtifacts(request: Request, env: Env, user: AuthenticatedU
   const context = await authorization(env, user);
   requireRole(context, "student");
   if (request.method === "GET") {
-    const rows = await serviceRest<StoredArtifact[]>(env, `artifacts?student_id=eq.${encodeURIComponent(user.id)}&select=id,station,artifact_type,title,content,created_at,updated_at&order=created_at.desc`);
+    const rows = await serviceRest<StoredArtifact[]>(env, `artifacts?student_id=eq.${encodeURIComponent(user.id)}&artifact_type=neq.pathway_primer&select=id,station,artifact_type,title,content,created_at,updated_at&order=created_at.desc`);
     return json(rows.map(presentArtifact));
   }
   if (!context.activeOrganizationId || !context.activeProgramId) throw new HttpError(409, "Your account needs an active program before station work can be saved.", "active_program_required");
@@ -298,6 +298,98 @@ async function pathwayArtifacts(request: Request, env: Env, user: AuthenticatedU
   });
   console.log(JSON.stringify({ event: "pathway_artifact_saved", actor: user.id, station, artifact_id: rows[0]?.id || null }));
   return json(presentArtifact(rows[0]), 201);
+}
+
+type PrimerAnswers = {
+  stage: "junior" | "senior" | "gap" | "exploring";
+  applicationTiming: "within_12_months" | "later" | "unsure";
+  coursework: "clear" | "questions" | "starting";
+  experienceTracking: "detailed" | "some" | "none";
+  reflectionHabit: "regular" | "sometimes" | "not_yet";
+  participation: "observe" | "structured" | "open";
+  focus: "courses" | "evidence" | "service" | "cohort" | "reflection" | "application";
+};
+
+const primerChoices = {
+  stage: ["junior", "senior", "gap", "exploring"],
+  applicationTiming: ["within_12_months", "later", "unsure"],
+  coursework: ["clear", "questions", "starting"],
+  experienceTracking: ["detailed", "some", "none"],
+  reflectionHabit: ["regular", "sometimes", "not_yet"],
+  participation: ["observe", "structured", "open"],
+  focus: ["courses", "evidence", "service", "cohort", "reflection", "application"],
+} as const;
+
+function parsePrimerAnswers(value: unknown): PrimerAnswers {
+  const answers = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  for (const [key, values] of Object.entries(primerChoices)) {
+    if (typeof answers[key] !== "string" || !(values as readonly string[]).includes(answers[key] as string)) {
+      throw new HttpError(400, "Complete each primer question before building your map.", "primer_incomplete");
+    }
+  }
+  return answers as PrimerAnswers;
+}
+
+function recommendPrimerStation(answers: PrimerAnswers) {
+  const stations = ["evidence", "reflection", "cohort", "courses", "service", "application"] as const;
+  const scores = Object.fromEntries(stations.map((station) => [station, 0])) as Record<typeof stations[number], number>;
+  scores[answers.focus] += 6;
+  if (answers.applicationTiming === "within_12_months") scores.application += 4;
+  if (answers.stage === "gap") scores.application += 2;
+  if (answers.coursework !== "clear") scores.courses += 3;
+  if (answers.experienceTracking !== "detailed") scores.evidence += 4;
+  if (answers.reflectionHabit !== "regular") scores.reflection += 3;
+  if (answers.participation !== "open") scores.cohort += 3;
+  const recommendedStation = [...stations].sort((a, b) => scores[b] - scores[a] || stations.indexOf(a) - stations.indexOf(b))[0];
+  const reasons: Record<typeof recommendedStation, string> = {
+    courses: "You identified a course-planning need that can become one clear next question.",
+    evidence: "Capturing one experience now will protect useful details for later reflection and application writing.",
+    service: "You chose to begin by noticing how compassion and values show up in action.",
+    cohort: "A low-pressure connection step can help you build support in a way that fits you.",
+    reflection: "A short reflection can help you notice meaning and patterns across what you have already done.",
+    application: "Your timing and focus suggest organizing existing evidence for your application pathway.",
+  };
+  return { recommendedStation, reason: reasons[recommendedStation] };
+}
+
+async function pathwayPrimer(request: Request, env: Env, user: AuthenticatedUser) {
+  const context = await authorization(env, user);
+  requireRole(context, "student");
+  const query = `artifacts?student_id=eq.${encodeURIComponent(user.id)}&artifact_type=eq.pathway_primer&select=id,station,artifact_type,title,content,created_at,updated_at&order=updated_at.desc&limit=1`;
+  const current = await serviceRest<StoredArtifact[]>(env, query);
+  if (request.method === "GET") return json(current[0] ? presentArtifact(current[0]) : null);
+  if (!context.activeOrganizationId || !context.activeProgramId) throw new HttpError(409, "Your account needs an active program before the primer can be saved.", "active_program_required");
+  const body = await readBody(request);
+  const answers = parsePrimerAnswers(body.answers);
+  const recommendation = recommendPrimerStation(answers);
+  const completedAt = new Date().toISOString();
+  const content = { answers, ...recommendation, completedAt };
+  const payload = {
+    station: recommendation.recommendedStation,
+    title: "Pathway primer",
+    content,
+    updated_at: completedAt,
+  };
+  const rows = current[0]
+    ? await serviceRest<StoredArtifact[]>(env, `artifacts?id=eq.${encodeURIComponent(current[0].id)}&select=id,station,artifact_type,title,content,created_at,updated_at`, { method: "PATCH", headers: { prefer: "return=representation" }, body: JSON.stringify(payload) })
+    : await serviceRest<StoredArtifact[]>(env, "artifacts?select=id,station,artifact_type,title,content,created_at,updated_at", {
+      method: "POST",
+      headers: { prefer: "return=representation" },
+      body: JSON.stringify({
+        student_id: user.id,
+        organization_id: context.activeOrganizationId,
+        program_id: context.activeProgramId,
+        artifact_type: "pathway_primer",
+        private_by_default: true,
+        ...payload,
+      }),
+    });
+  await serviceRest<Array<{ id: string }>>(env, "audit_events?select=id", {
+    method: "POST",
+    headers: { prefer: "return=representation" },
+    body: JSON.stringify({ organization_id: context.activeOrganizationId, actor_id: user.id, event_type: "pathway_primer_saved", subject_type: "artifact", subject_id: rows[0].id, metadata: { recommendedStation: recommendation.recommendedStation } }),
+  });
+  return json(presentArtifact(rows[0]), current[0] ? 200 : 201);
 }
 
 function asCsv(rows: Array<Record<string, unknown>>) {
@@ -368,6 +460,7 @@ async function route(request: Request, env: Env) {
     return json(await rpc(env, user.token, "pilot_dashboard", { requested_role: role }));
   }
   if (url.pathname === "/api/artifacts" && (request.method === "GET" || request.method === "POST")) return pathwayArtifacts(request, env, user);
+  if (url.pathname === "/api/pathway/primer" && (request.method === "GET" || request.method === "PUT")) return pathwayPrimer(request, env, user);
   if (url.pathname === "/api/surveys/assignments" && request.method === "GET") return json(await rpc(env, user.token, "my_survey_assignments"));
   const assignment = url.pathname.match(/^\/api\/surveys\/assignments\/([0-9a-f-]+)$/i);
   if (assignment && request.method === "GET") return json(await rpc(env, user.token, "get_my_survey_assignment", { assignment_id: assignment[1] }));

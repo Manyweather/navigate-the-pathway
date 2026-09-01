@@ -45,6 +45,27 @@ test("the production student map stays signed in and saves station work through 
   assert.match(worker, /private_by_default: true/);
 });
 
+test("the production pathway restores a server-backed primer before the first station", async () => {
+  const map = await read("../app/production/production-pathway-map.tsx");
+  const worker = await read("../cloudflare/pilot-api.ts");
+  for (const copy of [
+    "Where are you in your premedical journey?",
+    "When might you apply?",
+    "How clear is your course plan?",
+    "How much have you recorded?",
+    "How often do you reflect",
+    "How do you prefer to enter a new group?",
+    "What would you like to focus on first?",
+    "Build My Map",
+  ]) assert.match(map, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(map, /api\.request<PathwayPrimer \| null>\("\/api\/pathway\/primer"\)/);
+  assert.match(worker, /\/api\/pathway\/primer/);
+  assert.match(worker, /artifact_type=eq\.pathway_primer/);
+  assert.match(worker, /artifact_type=neq\.pathway_primer/);
+  assert.match(map, /Every station remains open/);
+  assert.doesNotMatch(map, /localStorage|sessionStorage/);
+});
+
 test("worker exposes authenticated survey and evaluation boundaries", async () => {
   const worker = await read("../cloudflare/pilot-api.ts");
   for (const route of [
