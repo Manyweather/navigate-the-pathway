@@ -33,7 +33,7 @@ export function AccessGate({
         body: JSON.stringify({ code }),
       });
       if (!response.ok) throw new Error("Access rejected");
-      window.location.assign("/");
+      window.location.assign("/demo");
     } catch {
       setMessage("That code did not open the playtest. Check it and try again.");
       setSubmitting(false);
