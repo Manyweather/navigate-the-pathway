@@ -173,7 +173,7 @@ export function recordStudentCheckIn(state: PilotState, sessionId: string, now =
   return { state: { ...state, attendance: { ...state.attendance, records: [...state.attendance.records, record] } }, outcome: "recorded" as const };
 }
 
-export function correctAttendance(state: PilotState, recordId: string, newStatus: AttendanceStatus, changedBy: string, reason: string, now = new Date()) {
+export function correctAttendance(state: PilotState, recordId: string, newStatus: AttendanceStatus, changedBy: string, reason: string, now = new Date()): PilotState {
   const existing = state.attendance.records.find((item) => item.id === recordId);
   if (!existing) return state;
   const change: AttendanceChange = { id: `attendance-change-${now.getTime()}`, attendanceRecordId: recordId, changedBy, previousStatus: existing.status, newStatus, changedAt: now.toISOString(), reason };

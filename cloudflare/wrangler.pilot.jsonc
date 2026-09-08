@@ -14,10 +14,12 @@
   "vars": {
     "PILOT_ENVIRONMENT": "staging"
   },
+  "triggers": { "crons": ["*/15 * * * *"] },
   "env": {
     "staging": {
       "name": "navigate-pathway-pilot-api-staging",
       "vars": { "PILOT_ENVIRONMENT": "staging" },
+      "triggers": { "crons": ["*/15 * * * *"] },
       "secrets": {
         "required": [
           "SUPABASE_URL",
@@ -39,6 +41,7 @@
       "name": "navigate-pathway-pilot-api-production",
       "preview_urls": false,
       "vars": { "PILOT_ENVIRONMENT": "production" },
+      "triggers": { "crons": ["*/15 * * * *"] },
       "secrets": {
         "required": [
           "SUPABASE_URL",

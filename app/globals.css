@@ -793,6 +793,14 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 .principal-list dt { color: var(--muted); }
 .principal-list dd { display: grid; margin: 0; font-weight: 800; }
 .principal-list small { color: var(--muted); font-weight: 400; }
+.identity-invitations { display: grid; gap: .45rem; min-width: 12rem; }
+.identity-invitations .invitation-action { padding-bottom: .45rem; border-bottom: 1px solid var(--line); }
+.identity-invitations .invitation-action:last-child { padding-bottom: 0; border-bottom: 0; }
+.identity-manager-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.identity-manager-grid > div { display: grid; align-content: start; gap: .7rem; padding: 1rem; border: 1px solid var(--line); border-radius: 1rem; background: #fffdfa; }
+.identity-manager-grid h3, .identity-manager-grid p { margin: 0; }
+.identity-manager-grid label { display: grid; gap: .35rem; color: var(--muted); font-size: .78rem; font-weight: 800; }
+.identity-manager-grid input, .identity-manager-grid select { width: 100%; padding: .75rem; border: 1px solid var(--line); border-radius: .75rem; background: white; color: var(--ink); font: inherit; }
 .reset-manifest { display: flex; flex-wrap: wrap; gap: .4rem; margin: .8rem 0 1rem; }
 .reset-manifest span, .manifest-line { padding: .3rem .55rem; border-radius: 999px; background: var(--cream); color: var(--muted); font-size: .72rem; }
 .danger-button { display: inline-flex; justify-content: center; align-items: center; min-height: 2.6rem; padding: .65rem 1rem; border: 1px solid #8a2733; border-radius: 999px; background: #fff3f1; color: #7a1626; font: inherit; font-weight: 900; cursor: pointer; }
@@ -816,7 +824,7 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
   .station-tool__heading, .discussion-list header { flex-direction: column; }
   .completion-chart__rows article { grid-template-columns: 1fr 3rem; }
   .completion-chart__rows article > div:first-child { grid-column: 1 / -1; }
-  .analytics-controls, .analytics-grid, .qualitative-grid, .privilege-grid, .codebook-toolbar { grid-template-columns: 1fr; }
+  .analytics-controls, .analytics-grid, .qualitative-grid, .privilege-grid, .codebook-toolbar, .identity-manager-grid { grid-template-columns: 1fr; }
   .governance-dimensions { grid-template-columns: 1fr; }
   .creator-controls__hero { flex-direction: column; }
 }
@@ -831,3 +839,36 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+/* Authenticated advising workspaces extend the existing Pathway palette. */
+.workspace-tabs { display:flex; gap:.5rem; overflow-x:auto; padding:.75rem 0 1.25rem; margin-bottom:1rem; border-bottom:1px solid #d6cbc5; }
+.workspace-tabs button { flex:0 0 auto; border:1px solid #c6b9b2; background:#fff; color:#482835; padding:.65rem .9rem; border-radius:999px; font-size:.95rem; min-height:44px; }
+.workspace-tabs button.active { background:#7b1837; border-color:#7b1837; color:#fff; }
+.workspace-back { min-height:44px; margin-bottom:.6rem; }
+.workspace-panel { max-width:100%; min-width:0; }
+.workspace-panel p { line-height:1.6; overflow-wrap:anywhere; }
+.workspace-panel h3 { margin:1.2rem 0 .6rem; }
+.workspace-panel textarea,.workspace-panel input:not([type=checkbox]),.workspace-panel select { display:block; width:100%; min-height:44px; border:1px solid #b9aaa4; border-radius:.5rem; padding:.7rem; margin:.35rem 0 .7rem; background:#fff; color:#2e2430; font:inherit; }
+.workspace-panel textarea { min-height:110px; resize:vertical; }
+.workspace-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem 1.25rem; margin:1.4rem 0; padding:1.25rem; border:1px solid #ded4cf; border-radius:.8rem; background:#fbf9f7; align-items:end; }
+.workspace-form h3,.workspace-form .workspace-check { grid-column:1/-1; }
+.workspace-form label { font-size:1rem; font-weight:600; min-width:0; }
+.workspace-actions { display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; }
+.workspace-actions button,.workspace-form button { min-height:44px; }
+.workspace-list { display:grid; gap:1rem; margin-top:1.5rem; }
+.workspace-list>article { border:1px solid #d8cdc6; border-radius:.8rem; padding:1rem 1.25rem; background:#fff; }
+.workspace-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.6rem; }
+.workspace-row h3 { margin:0; }
+.workspace-check { display:flex; gap:.65rem; align-items:center; margin:.8rem 0; line-height:1.5; }
+.workspace-check input { width:1.25rem; height:1.25rem; accent-color:#7b1837; flex-shrink:0; }
+.workspace-upload { display:block; max-width:24rem; font-weight:600; }
+.messaging-layout { display:grid; grid-template-columns:minmax(180px,260px) minmax(0,1fr); gap:1.25rem; margin-top:1.5rem; }
+.messaging-layout aside { border-right:1px solid #d8cdc6; padding-right:1rem; }
+.messaging-layout aside button { display:block; width:100%; text-align:left; padding:.8rem; margin:.4rem 0; border:1px solid #d8cdc6; border-radius:.5rem; background:white; color:#482835; min-height:44px; }
+.messaging-layout aside button.active { background:#f4e8ed; border-color:#7b1837; }
+.message-log { min-height:180px; max-height:440px; overflow:auto; padding:.5rem; display:flex; flex-direction:column; gap:.7rem; }
+.message-log article { padding:.9rem; background:#f1efec; border-radius:.6rem; max-width:90%; align-self:flex-start; }
+.message-log article.message-own { background:#f4e8ed; align-self:flex-end; }
+.message-log p { white-space:pre-wrap; margin:.45rem 0; }
+.message-log small { display:block; }
+.workspace-panel button:focus-visible,.workspace-panel input:focus-visible,.workspace-panel select:focus-visible,.workspace-panel textarea:focus-visible,.workspace-tabs button:focus-visible { outline:3px solid #b58916; outline-offset:3px; }
+@media(max-width:680px) { .workspace-form,.messaging-layout { grid-template-columns:1fr; } .workspace-form { padding:1rem; } .messaging-layout aside { border-right:0; border-bottom:1px solid #d8cdc6; padding:0 0 1rem; } .message-log article { max-width:100%; } }

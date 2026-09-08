@@ -4,8 +4,11 @@ export type SurveyAssignmentStatus = "not_available" | "not_started" | "in_progr
 
 export type AuthorizationContext = {
   userId: string;
+  authUserId?: string;
   displayName: string;
   email: string;
+  signInEmail?: string;
+  secondaryEmails?: string[];
   roles: PilotRole[];
   activeOrganizationId: string | null;
   activeProgramId: string | null;
@@ -198,6 +201,8 @@ export type UserAccessPerson = {
   userId: string;
   displayName: string;
   email: string;
+  secondaryEmails?: string[];
+  signInEmails?: Array<{ email: string; isPrimary: boolean; confirmedAt: string | null }>;
   accountStatus: string;
   lastAuthSignInAt: string | null;
   emailConfirmedAt: string | null;

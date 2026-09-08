@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathwayView, useSessionDraft } from "./workspace-navigation";
 import { assetUrl } from "../asset-url";
 import { RosieGuide } from "../components/rosie-guide";
 import type { PilotApiClient } from "./api-client";
@@ -103,15 +104,15 @@ const primerQuestions: PrimerQuestion[] = [
 ];
 
 export function ProductionPathwayMap({ api, onOpenCohort, onArtifactSaved }: { api: PilotApiClient; onOpenCohort?: () => void; onArtifactSaved?: (artifact: PathwayArtifact) => void }) {
-  const [activeId, setActiveId] = useState<StationId>("evidence");
+  const [activeId, setActiveId] = usePathwayView<StationId>("map-station", "evidence");
   const [artifacts, setArtifacts] = useState<PathwayArtifact[]>([]);
-  const [toolValues, setToolValues] = useState<Record<string, string>>({});
+  const [toolValues, setToolValues] = useSessionDraft<Record<string, string>>("map-fields:"+activeId, {});
   const [message, setMessage] = useState("Loading your saved station work...");
   const [busy, setBusy] = useState(false);
   const [primer, setPrimer] = useState<PathwayPrimer | null | undefined>(undefined);
-  const [primerOpen, setPrimerOpen] = useState<boolean | null>(null);
-  const [primerStep, setPrimerStep] = useState(0);
-  const [primerAnswers, setPrimerAnswers] = useState<Partial<PrimerAnswers>>({});
+  const [primerOpen, setPrimerOpen] = usePathwayView<boolean | null>("map-primer", null);
+  const [primerStep, setPrimerStep] = useSessionDraft("primer-step", 0);
+  const [primerAnswers, setPrimerAnswers] = useSessionDraft<Partial<PrimerAnswers>>("map-primer-answers", {});
   const active = stations.find((station) => station.id === activeId) ?? stations[1];
   const stamped = new Set(artifacts.map((artifact) => artifact.station));
 
@@ -123,15 +124,14 @@ export function ProductionPathwayMap({ api, onOpenCohort, onArtifactSaved }: { a
       ]);
       setArtifacts(saved);
       setPrimer(savedPrimer);
-      setPrimerOpen(!savedPrimer);
+
       if (savedPrimer) {
-        setPrimerAnswers(savedPrimer.content.answers);
-        setActiveId(savedPrimer.content.recommendedStation);
+        setPrimerAnswers(current => Object.keys(current).length ? current : savedPrimer.content.answers);
       }
       setMessage("");
     } catch (error) {
       setPrimer(null);
-      setPrimerOpen(true);
+
       setMessage(error instanceof Error ? error.message : "Your station work could not be loaded.");
     }
   }, [api]);
@@ -161,7 +161,6 @@ export function ProductionPathwayMap({ api, onOpenCohort, onArtifactSaved }: { a
 
   const selectStation = (station: Station) => {
     setActiveId(station.id);
-    setToolValues({});
     setMessage("");
   };
 
@@ -193,9 +192,9 @@ export function ProductionPathwayMap({ api, onOpenCohort, onArtifactSaved }: { a
     }
   };
 
-  if (primerOpen === null) return <section className="production-card production-card--wide"><RosieGuide pose="tracks" eyebrow="Your pathway primer" title="Preparing a few quick questions..." /></section>;
+  if (primer === undefined) return <section className="production-card production-card--wide"><RosieGuide pose="tracks" eyebrow="Your pathway primer" title="Preparing a few quick questions..." /></section>;
 
-  if (primerOpen) {
+  if (primerOpen ?? !primer) {
     const question = primerQuestions[primerStep];
     const selected = primerAnswers[question.key];
     return <section className="production-card production-card--wide pathway-primer" aria-labelledby="primer-question"><div className="primer-progress"><span>Step {primerStep + 1} of {primerQuestions.length}</span><div aria-hidden="true"><i style={{ width: `${((primerStep + 1) / primerQuestions.length) * 100}%` }} /></div></div><RosieGuide pose={primerStep === primerQuestions.length - 1 ? "pointing" : "gesture"} compact eyebrow="Rosie, your pathway guide" title={primerStep === 0 ? "Let’s find a useful place to begin." : "Your map is taking shape."} body="These answers personalize your starting point. They do not rank you or close any station." /><div className="primer-question"><p className="kicker">{question.eyebrow}</p><h2 id="primer-question">{question.question}</h2><p>{question.instruction}</p></div><div className="primer-options">{question.options.map((option) => <button key={option.value} type="button" className={selected === option.value ? "selected" : ""} aria-pressed={selected === option.value} onClick={() => setPrimerAnswers((current) => ({ ...current, [question.key]: option.value }))}><span>{option.icon}</span><strong>{option.label}</strong><small>{option.detail}</small></button>)}</div><div className="primer-actions">{primerStep > 0 ? <button className="text-button" type="button" onClick={() => setPrimerStep((current) => current - 1)}>Back</button> : <span />}{primerStep < primerQuestions.length - 1 ? <button className="primary-button" type="button" disabled={!selected} onClick={() => setPrimerStep((current) => current + 1)}>Next question</button> : <button className="primary-button" type="button" disabled={busy || !selected} onClick={() => void savePrimer()}>{busy ? "Building..." : "Build My Map"}</button>}</div>{message ? <p className="form-message" aria-live="polite">{message}</p> : null}</section>;

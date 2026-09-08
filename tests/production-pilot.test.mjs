@@ -14,6 +14,7 @@ test("grant instrument assignment is represented by names and counts only", () =
   ]);
   assert.deepEqual(advisorInstrumentCatalog.map(({ name, itemCount }) => ({ name, itemCount })), [
     { name: "Advisor Coaching Competency Scale (ACCS)", itemCount: 20 },
+    { name: "MacLeod Clark Professional Identity Scale", itemCount: 9 },
   ]);
 });
 
@@ -163,7 +164,7 @@ test("administrator activity log is MFA protected and avoids invasive tracking",
   assert.doesNotMatch(worker, /ip_address|user_agent|device_fingerprint/i);
   assert.match(production, /Account activity by student/);
   assert.match(production, /Time logged in/);
-  assert.match(production, /does not collect IP addresses/);
+  assert.match(production, /IP addresses retained for 30 days/);
 });
 
 test("administrators can resend an invitation without duplicating the pilot profile", async () => {
@@ -177,6 +178,25 @@ test("administrators can resend an invitation without duplicating the pilot prof
   assert.match(production, /Resend invitation/);
   assert.match(production, /Awaiting confirmation/);
   assert.match(production, /Delivery can still depend on the recipient's email system/);
+});
+
+test("one Navigate profile can use primary and secondary sign-in emails", async () => {
+  const worker = await read("../cloudflare/pilot-api.ts");
+  const production = await read("../app/production/production-pilot-app.tsx");
+  const controls = await read("../app/production/creator-controls.tsx");
+  const migration = await read("../supabase/migrations/202609010003_account_identities_and_invites.sql");
+  assert.match(migration, /account_auth_identities/);
+  assert.match(migration, /current_profile_user_id/);
+  assert.match(migration, /merge_pilot_auth_identities/);
+  assert.match(migration, /Both identities contain responses for the same survey wave/);
+  assert.match(worker, /primary_email/);
+  assert.match(worker, /account_role/);
+  assert.match(worker, /secondaryEmail/);
+  assert.match(worker, /canonicalizeAuthenticatedUser/);
+  assert.match(production, /Primary sign-in email/);
+  assert.match(production, /Secondary sign-in email/);
+  assert.match(controls, /One person, more than one email/);
+  assert.match(controls, /Merge existing accounts/);
 });
 
 test("production browser configuration can be loaded from the Sites runtime", async () => {

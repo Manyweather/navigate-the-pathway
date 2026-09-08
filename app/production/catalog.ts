@@ -52,8 +52,15 @@ export const instrumentCatalog: InstrumentCatalogEntry[] = [
     openResponseCount: 0,
     releaseState: "content_required",
   },
+  {
+    slug: "macleod-clark-professional-identity-scale-advisor",
+    name: "MacLeod Clark Professional Identity Scale",
+    audience: "advisor",
+    itemCount: 9,
+    openResponseCount: 0,
+    releaseState: "pi_confirmation_required",
+  },
 ];
 
 export const studentInstrumentCatalog = instrumentCatalog.filter((item) => item.audience === "student");
 export const advisorInstrumentCatalog = instrumentCatalog.filter((item) => item.audience === "advisor");
-

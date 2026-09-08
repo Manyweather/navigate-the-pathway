@@ -24,7 +24,7 @@ export class PilotApiClient {
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
     const payload = await response.json().catch(() => ({ error: "The server returned an unreadable response." }));
-    if (!response.ok) throw new Error(payload.error || "The request could not be completed.");
+    if (!response.ok) throw new Error((payload as {error?:string}|null)?.error || "The request could not be completed.");
     return payload as T;
   }
 
@@ -32,14 +32,16 @@ export class PilotApiClient {
     const { data } = await this.supabase.auth.getSession();
     const token = data.session?.access_token;
     if (!token) throw new Error("Your session has ended. Sign in again.");
-    const response = await fetch(`${productionConfiguration().apiUrl.replace(/\/$/, "")}${path}`, {
+    const apiUrl=productionConfiguration().apiUrl;
+    if(!apiUrl)throw new Error("The pilot API has not been configured.");
+    const response = await fetch(`${apiUrl.replace(/\/$/, "")}${path}`, {
       ...options,
       headers: { authorization: `Bearer ${token}`, ...options.headers },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({ error: "The download could not be prepared." }));
-      throw new Error(payload.error || "The download could not be prepared.");
+      throw new Error((payload as {error?:string}|null)?.error || "The download could not be prepared.");
     }
     const disposition = response.headers.get("content-disposition") || "";
     const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || "navigate-evaluation-export";
