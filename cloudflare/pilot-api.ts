@@ -1,3 +1,4 @@
+import { modeAllowsPath, principalMode, surveysForAudience, type DashboardMode } from "../app/production/dashboard-mode";
 import { workspaceRoute, workspaceScheduled, WorkspaceError, type WorkspaceServices } from "./workspace-api";
 import { calendarPublicRoute, type CalendarServices } from "./workspace-calendars";
 
@@ -8,6 +9,7 @@ type AuthenticatedUser = {
   token: string;
   aal: "aal1" | "aal2";
   sessionId: string;
+  mode?: DashboardMode;
 };
 
 type AuthorizationContext = {
@@ -49,7 +51,7 @@ function corsHeaders(request: Request, env: Env): Record<string,string> {
   const origin = allowedOrigin(request, env);
   return origin ? {
     "access-control-allow-origin": origin,
-    "access-control-allow-headers": "authorization, content-type",
+    "access-control-allow-headers": "authorization, content-type, x-navigate-mode",
     "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
     "access-control-max-age": "86400",
     vary: "Origin",
@@ -79,7 +81,7 @@ async function authenticate(request: Request, env: Env): Promise<AuthenticatedUs
   return { id: user.id, authUserId: user.id, email: user.email || "", token, aal: claims.aal || "aal1", sessionId: claims.session_id || user.id };
 }
 
-async function rpc<T>(env: Env, token: string, fn: string, body: unknown = {}): Promise<T> {
+async function rpc<T>(env: Env, token: string, fn: string, body: unknown = {}, mode?: string): Promise<T> {
   const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: "POST",
     headers: {
@@ -87,6 +89,7 @@ async function rpc<T>(env: Env, token: string, fn: string, body: unknown = {}): 
       authorization: `Bearer ${token}`,
       "content-type": "application/json",
       accept: "application/json",
+      ...(mode ? {"x-navigate-mode":mode} : {}),
     },
     body: JSON.stringify(body),
   });
@@ -215,7 +218,8 @@ async function serviceRest<T>(env: Env, path: string, options: RequestInit = {})
   if (!response.ok) {
     const details = await response.json().catch(() => ({})) as { message?: string; code?: string };
     console.warn(JSON.stringify({ event: "supabase_rest_rejected", path, status: response.status, code: details.code || "unknown" }));
-    throw new HttpError(400, "The saved work request was not accepted.", details.code || "rest_rejected");
+    const message = details.code === "23505" ? "This email or record is already in use. Refresh the account list; use Preview merge for two existing accounts." : details.code === "42501" ? "Your current role, scope, or MFA verification does not permit this action." : details.code === "P0001" ? details.message || "The requested change conflicts with an existing record." : "The change could not be saved. Refresh the page and try again; if it continues, provide the request reference to the Creator.";
+    throw new HttpError(details.code === "23505" ? 409 : details.code === "42501" ? 403 : 400, message, details.code || "rest_rejected");
   }
   const body = await response.text();
   return (body ? JSON.parse(body) : undefined) as T;
@@ -312,9 +316,11 @@ async function adminUserAccessLog(env: Env, user: AuthenticatedUser, context: Au
     optionalServiceRest<Array<{ auth_user_id: string; canonical_user_id: string; email: string; is_primary: boolean; verified_at: string | null }>>(env, "account_auth_identities?select=auth_user_id,canonical_user_id,email,is_primary,verified_at", []),
   ]);
 
-  const peopleIds = new Set(roles.map((item) => item.user_id));
+  const canonicalIds = new Map(identities.map(i=>[i.auth_user_id,i.canonical_user_id]));
+  const canonical = (id:string)=>canonicalIds.get(id)||id;
+  const peopleIds = new Set(roles.map(item=>canonical(item.user_id)).filter(id=>profiles.some(p=>p.user_id===id && p.status!=="archived")));
   const rolesById = new Map<string, string[]>();
-  roles.forEach((item) => rolesById.set(item.user_id, [...new Set([...(rolesById.get(item.user_id) || []), item.role])]));
+  roles.forEach((item) => { const id=canonical(item.user_id); rolesById.set(id,[...new Set([...(rolesById.get(id)||[]),item.role])]); });
   const principalById = new Map(principals.map((item) => [item.user_id, item.permission_key === "platform.creator" ? "creator" : "principal_investigator"] as const));
   const lifecycleById = new Map(lifecycle.map((item) => [item.user_id, item]));
   const profileById = new Map(profiles.map((profile) => [profile.user_id, profile]));
@@ -323,7 +329,8 @@ async function adminUserAccessLog(env: Env, user: AuthenticatedUser, context: Au
   identities.forEach((identity) => identitiesByPerson.set(identity.canonical_user_id, [...(identitiesByPerson.get(identity.canonical_user_id) || []), identity]));
   const sessionMap = new Map<string, { userId: string; sessionId: string; signedInAt: string; lastActiveAt: string; signedOutAt: string | null; role: string | null }>();
 
-  for (const event of events) {
+  for (const original of events) {
+    const event={...original,actor_id:canonical(original.actor_id)};
     if (!peopleIds.has(event.actor_id)) continue;
     const key = `${event.actor_id}:${event.subject_id}`;
     const current = sessionMap.get(key);
@@ -380,7 +387,7 @@ async function adminUserAccessLog(env: Env, user: AuthenticatedUser, context: Au
       secondaryEmails: secondaryIdentities.map((identity) => identity.email),
       signInEmails: personIdentities.map((identity) => ({ email: identity.email, isPrimary: identity.is_primary, confirmedAt: authById.get(identity.auth_user_id)?.email_confirmed_at || identity.verified_at || null })),
       accountStatus: profile?.status || "invited",
-      lastAuthSignInAt: auth?.last_sign_in_at || null,
+      lastAuthSignInAt: personIdentities.map(i=>authById.get(i.auth_user_id)?.last_sign_in_at).filter((v):v is string=>!!v).sort().at(-1) || auth?.last_sign_in_at || null,
       emailConfirmedAt: auth?.email_confirmed_at || auth?.confirmed_at || null,
       lastInvitationSentAt: auth?.confirmation_sent_at || auth?.invited_at || null,
       sessionCount: personSessions.length,
@@ -864,7 +871,7 @@ async function stagingSurveyDetail(env: Env, user: AuthenticatedUser, assignment
       items: [],
     };
   } else {
-    official = await rpc<Record<string, unknown>>(env, user.token, "get_my_survey_assignment", { assignment_id: assignmentId });
+    official = await rpc<Record<string, unknown>>(env, user.token, "get_my_survey_assignment", { assignment_id: assignmentId }, user.mode);
   }
   const definition = secretSurvey(env, String(official.instrumentSlug || projection.instrument_slug));
   if (!definition || (Array.isArray(official.items) && official.items.length)) return official;
@@ -1504,14 +1511,19 @@ async function inviteAccount(request: Request, env: Env, user: AuthenticatedUser
   const roles = Array.isArray(body.roles) ? body.roles.filter((item): item is string => ["student", "advisor", "administrator"].includes(String(item))) : [];
   if (!email || !email.includes("@") || !roles.length) throw new HttpError(400, "Provide an email and at least one valid role.", "invalid_invitation");
   if (secondaryEmail && (!secondaryEmail.includes("@") || secondaryEmail === email)) throw new HttpError(400, "Use a different valid secondary email.", "invalid_secondary_email");
+  requireCapability(context,"accounts.manage");
+  await rpc(env,user.token,"pathway_action",{action:"roster_context"});
+  const organizationId=context.activeOrganizationId, programId=context.activeProgramId, cohortId=context.activeCohortId || null;
+  const existingIdentities=await serviceRest<Array<{email:string}>>(env,`account_auth_identities?email=in.(${encodeURIComponent(email)}${secondaryEmail?","+encodeURIComponent(secondaryEmail):""})&select=email`);
+  if(existingIdentities.length)throw new HttpError(409,"An email already belongs to an account. Use its invitation resend action or the explicit merge preview.","existing_account");
   const invited = await sendPilotInvitation(env, email, roles, email);
   await rpc(env, user.token, "admin_assign_invited_user", {
     target_user_id: invited.id,
     target_email: email,
     target_roles: roles,
-    target_organization_id: body.organizationId || null,
-    target_program_id: body.programId || null,
-    target_cohort_id: body.cohortId || null,
+    target_organization_id: organizationId,
+    target_program_id: programId,
+    target_cohort_id: cohortId,
   });
   await serviceRest(env, "account_auth_identities?on_conflict=auth_user_id", {
     method: "POST", headers: { prefer: "resolution=merge-duplicates,return=minimal" },
@@ -1592,19 +1604,14 @@ async function addSecondaryIdentity(request: Request, env: Env, user: Authentica
   const canonicalUserId = typeof body.userId === "string" ? body.userId.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!/^[0-9a-f-]{36}$/i.test(canonicalUserId) || !email.includes("@")) throw new HttpError(400, "Choose an account and enter a valid secondary email.", "invalid_identity");
+  const profile = await serviceRest<Array<{status:string}>>(env,`profiles?user_id=eq.${encodeURIComponent(canonicalUserId)}&select=status`);
+  if(!profile[0] || profile[0].status==="archived")throw new HttpError(409,"This is an archived merged profile. Select the active primary account; its linked emails already share that profile.","archived_account");
   const roles = await serviceRest<Array<{ role: string }>>(env, `role_assignments?organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&user_id=eq.${encodeURIComponent(canonicalUserId)}&revoked_at=is.null&select=role`);
   if (!roles.length) throw new HttpError(404, "The account could not be found in this organization.", "account_not_found");
   const currentIdentities = await optionalServiceRest<Array<{ auth_user_id: string; email: string; is_primary: boolean }>>(env, `account_auth_identities?canonical_user_id=eq.${encodeURIComponent(canonicalUserId)}&select=auth_user_id,email,is_primary`, []);
   if (currentIdentities.some((identity) => identity.email.toLowerCase() === email)) return { ok: true, userId: canonicalUserId, email, alreadyLinked: true };
   const existing = (await supabaseAuthUsers(env)).find((account) => account.email?.trim().toLowerCase() === email);
-  if (existing) {
-    requireCapability(context, "platform.creator");
-    return serviceRest<Record<string, unknown>>(env, "rpc/merge_pilot_auth_identities", {
-      method: "POST",
-      headers: { prefer: "return=representation" },
-      body: JSON.stringify({ primary_user_id: canonicalUserId, secondary_user_id: existing.id, actor_user_id: user.id }),
-    });
-  }
+  if (existing) throw new HttpError(409,"This address already has a sign-in account. Use Merge existing accounts and review its preview; adding a secondary email cannot merge existing records.","existing_identity_requires_merge");
   const primaryEmail = currentIdentities.find((identity) => identity.is_primary)?.email || (await supabaseAuthUser(env, canonicalUserId)).email || email;
   const invited = await sendPilotInvitation(env, email, roles.map((assignment) => assignment.role), primaryEmail);
   await serviceRest(env, "account_auth_identities?on_conflict=auth_user_id", {
@@ -1642,6 +1649,15 @@ async function route(request: Request, env: Env) {
   if (calendarPublic) return calendarPublic;
 
   const user = await canonicalizeAuthenticatedUser(env, await authenticate(request, env));
+  const requestedMode = request.headers.get("x-navigate-mode");
+  if (requestedMode) {
+    const context=await enrichPrincipalContext(env,user,await authorization(env,user));
+    const assigned=[...context.roles,...(context.principalType?[context.principalType]:[])];
+    if(!assigned.includes(requestedMode))throw new HttpError(403,"That dashboard role is not assigned to your account.","mode_unassigned");
+    user.mode=requestedMode as DashboardMode;
+    if(user.mode!=="student")requireStaffMfa(user);
+    if(!modeAllowsPath(user.mode,url.pathname,request.method))throw new HttpError(403,"This feature is not available in your current dashboard. Switch to an assigned role that includes it.","dashboard_mode_required");
+  }
   if (url.pathname.startsWith("/api/workspace/") || url.pathname.startsWith("/api/calendar/") || url.pathname === "/api/activity/page") {
     await authorization(env,user);
     const response = await workspaceRoute(request,workspaceServices(env,user));
@@ -1676,10 +1692,13 @@ async function route(request: Request, env: Env) {
     const role = url.searchParams.get("role") || "";
     if (!["student", "advisor", "administrator"].includes(role)) throw new HttpError(400, "Choose a valid dashboard.", "invalid_role");
     const context = await authorization(env, user);
+    if(user.mode && role !== (principalMode(user.mode)?"administrator":user.mode))throw new HttpError(403,"Choose the matching dashboard mode.","dashboard_mode_required");
     requireRole(context, role);
     if (role !== "student") requireStaffMfa(user);
     if (role === "student" || role === "advisor") await ensureStagingSurveyAssignments(env, user, context, [role]);
-    const dashboard = stagingEnabledAssignments(env, await rpc(env, user.token, "pilot_dashboard", { requested_role: role }));
+    const dashboard = stagingEnabledAssignments(env, await rpc(env, user.token, "pilot_dashboard", { requested_role: role }, user.mode || role));
+    if(role==="student" && Array.isArray(dashboard.surveyAssignments)) dashboard.surveyAssignments=surveysForAudience(dashboard.surveyAssignments as Parameters<typeof surveysForAudience>[0],"student");
+    if(role==="advisor" && Array.isArray(dashboard.mySurveys)) dashboard.mySurveys=surveysForAudience(dashboard.mySurveys as Parameters<typeof surveysForAudience>[0],"advisor");
     if (role === "administrator") dashboard.surveyCompletion = await adminSurveyCompletion(env, context);
     return json(role === "advisor" ? await stagingAdvisorSelf(env, user, context, dashboard) : dashboard);
   }
@@ -1692,9 +1711,20 @@ async function route(request: Request, env: Env) {
   if (url.pathname === "/api/portfolio/documents" && request.method === "POST") return portfolioDocumentMetadata(request, env, user);
   if (url.pathname === "/api/surveys/assignments" && request.method === "GET") {
     const context = await authorization(env, user);
-    const audiences = [context.roles.includes("student") ? "student" : null, context.roles.includes("advisor") ? "advisor" : null].filter((audience): audience is "student" | "advisor" => audience !== null);
+    const audience = user.mode === "advisor" ? "advisor" : context.roles.includes("student") ? "student" : "advisor";
+    requireRole(context,audience); if(audience==="advisor")requireStaffMfa(user);
+    const audiences: Array<"student"|"advisor"> = [audience];
     await ensureStagingSurveyAssignments(env, user, context, audiences);
-    return json(stagingEnabledAssignments(env, { surveyAssignments: await rpc(env, user.token, "my_survey_assignments") }).surveyAssignments);
+    return json(surveysForAudience(stagingEnabledAssignments(env, { surveyAssignments: await rpc(env, user.token, "my_survey_assignments",{},user.mode || audience) }).surveyAssignments as Parameters<typeof surveysForAudience>[0],audience));
+  }
+  const surveyTarget = url.pathname.match(/^\/api\/surveys\/(?:assignments|response-sets)\/([0-9a-f-]+)/i);
+  if(surveyTarget) {
+    const projection=await surveyProjection(env,user.id,surveyTarget[1]);
+    const context=await authorization(env,user);
+    const audience=user.mode || (context.roles.includes("student")?"student":"advisor");
+    const surveyAudience = projection.instrument_slug === "advisor-coaching-competency-scale" || projection.instrument_slug === "macleod-clark-professional-identity-scale-advisor" ? "advisor" : projection.audience;
+    if(surveyAudience!==audience || !context.roles.includes(surveyAudience))throw new HttpError(403,"This survey belongs to the "+surveyAudience+" role. Open it from that assigned dashboard.","survey_audience_required");
+    if(surveyAudience==="advisor")requireStaffMfa(user);
   }
   const assignment = url.pathname.match(/^\/api\/surveys\/assignments\/([0-9a-f-]+)$/i);
   if (assignment && request.method === "GET") return json(await stagingSurveyDetail(env, user, assignment[1]));
@@ -1703,15 +1733,16 @@ async function route(request: Request, env: Env) {
     const staging = await saveStagingSurvey(new Request(request.url, {method:request.method,headers:request.headers,body:await request.clone().text()}), env, user, draft[1], false);
     if (staging) return json(staging);
     const body = await readBody(request);
-    return json(await rpc(env, user.token, "save_my_survey_draft", { assignment_id: draft[1], consent_version_id: body.consentVersionId, answers: body.answers || {} }));
+    return json(await rpc(env, user.token, "save_my_survey_draft", { assignment_id: draft[1], consent_version_id: body.consentVersionId, answers: body.answers || {} }, user.mode));
   }
   const submit = url.pathname.match(/^\/api\/surveys\/response-sets\/([0-9a-f-]+)\/submit$/i);
   if (submit && request.method === "POST") {
     const staging = await saveStagingSurvey(request, env, user, submit[1], true);
     if (staging) return json(staging);
-    return json(await rpc(env, user.token, "submit_my_survey_response", { assignment_id: submit[1] }));
+    return json(await rpc(env, user.token, "submit_my_survey_response", { assignment_id: submit[1] }, user.mode));
   }
 
+  if(url.pathname==="/api/admin/accounts" && request.method==="POST") return json(await manuallyCreateAccount(request,env,user,await enrichPrincipalContext(env,user,await authorization(env,user))));
   if (url.pathname === "/api/admin/invitations" && request.method === "POST") {
     const context = await authorization(env, user);
     return inviteAccount(request, env, user, context);
@@ -1837,7 +1868,7 @@ function calendarServices(env: Env): CalendarServices {
 }
 
 function workspaceServices(env:Env,user:AuthenticatedUser):WorkspaceServices {
-  return {...calendarServices(env),user,rpc:<T>(name:string,body?:unknown)=>rpc<T>(env,user.token,name,body),
+  return {...calendarServices(env),user,rpc:<T>(name:string,body?:unknown)=>rpc<T>(env,user.token,name,body,user.mode),
     createAuthUser:async(email:string,name:string)=>{
       const response=await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users`,{method:"POST",headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,"content-type":"application/json"},body:JSON.stringify({email,email_confirm:false,user_metadata:{display_name:name}})});
       if(!response.ok) {
@@ -1850,3 +1881,31 @@ function workspaceServices(env:Env,user:AuthenticatedUser):WorkspaceServices {
     },
   };
 }
+
+async function manuallyCreateAccount(request:Request,env:Env,user:AuthenticatedUser,context:AuthorizationContext) {
+ requireStaffMfa(user);requireRole(context,"administrator");requireCapability(context,"accounts.manage");
+ if(!context.principalType || (user.mode && !principalMode(user.mode)))throw new HttpError(403,"Open Creator or PI mode to create an account.","principal_required");
+ const body=await readBody(request), email=String(body.email||"").trim().toLowerCase(), name=String(body.name||"").trim(), role=String(body.role||""), key=String(body.requestKey||"");
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!name||name.length>160||!["student","advisor","administrator"].includes(role)||!/^[0-9a-f-]{36}$/i.test(key))throw new HttpError(400,"Enter a name, valid email, and initial role.","invalid_account");
+ const scope=await rpc<{cohorts:Array<{id:string}>}>(env,user.token,"pathway_action",{action:"roster_context"},user.mode);
+ const cohortId=body.cohortId?String(body.cohortId):context.activeCohortId||null;
+ if(cohortId && !scope.cohorts.some(c=>c.id===cohortId))throw new HttpError(403,"Choose a cohort within your assigned program.","scope_required");
+ const roles=await serviceRest<Array<{cohort_id:string|null}>>(env,  `role_assignments?user_id=eq.${user.id}&role=eq.administrator&organization_id=eq.${context.activeOrganizationId}&revoked_at=is.null&select=cohort_id`);
+ if(!cohortId && !roles.some(r=>r.cohort_id===null))throw new HttpError(403,"Your access requires a specific cohort.","scope_required");
+ const identities=await serviceRest<Array<{auth_user_id:string;canonical_user_id:string}>>(env,`account_auth_identities?email=eq.${encodeURIComponent(email)}&select=auth_user_id,canonical_user_id`);
+ let id:string;
+ if(identities[0]) {
+   const info=await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${identities[0].auth_user_id}`,{headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`}});
+   const record=await info.json() as {app_metadata?:Record<string,string>};
+   if(!info.ok || record.app_metadata?.navigate_manual_request!==key || record.app_metadata?.navigate_created_by!==user.id || identities[0].canonical_user_id!==identities[0].auth_user_id)throw new HttpError(409,"That email already belongs to an account. Select it in Account Lifecycle or use the merge preview; this form never merges accounts.","existing_account");
+   id=identities[0].auth_user_id;
+ } else {
+   const response=await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users`,{method:"POST",headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,"content-type":"application/json"},body:JSON.stringify({email,email_confirm:false,user_metadata:{display_name:name},app_metadata:{navigate_manual_request:key,navigate_created_by:user.id}})});
+   if(!response.ok)throw new HttpError(409,"The email is already registered or could not be created. Refresh Account Lifecycle before retrying.","account_create_failed");
+   id=((await response.json()) as {id:string}).id;
+ }
+ await rpc(env,user.token,"pathway_create_account_profile",{target_id:id,target_email:email,target_name:name,target_role:role,target_cohort:cohortId,request_key:key},user.mode);
+ return {ok:true,userId:id,email,invitationSent:false};
+}
+
+export const pilotAccountTestHelpers = {adminUserAccessLog};

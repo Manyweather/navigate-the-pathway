@@ -6,7 +6,7 @@ import { productionConfiguration } from "./supabase-client";
 type RequestOptions = Omit<RequestInit, "body"> & { body?: unknown };
 
 export class PilotApiClient {
-  constructor(private readonly supabase: SupabaseClient) {}
+  constructor(private readonly supabase: SupabaseClient, private readonly mode?: string) {}
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const { data } = await this.supabase.auth.getSession();
@@ -17,7 +17,7 @@ export class PilotApiClient {
     const response = await fetch(`${apiUrl.replace(/\/$/, "")}${path}`, {
       ...options,
       headers: {
-        authorization: `Bearer ${token}`,
+        authorization: `Bearer ${token}`, ...(this.mode ? {"x-navigate-mode": this.mode} : {}),
         "content-type": "application/json",
         ...options.headers,
       },
@@ -36,7 +36,7 @@ export class PilotApiClient {
     if(!apiUrl)throw new Error("The pilot API has not been configured.");
     const response = await fetch(`${apiUrl.replace(/\/$/, "")}${path}`, {
       ...options,
-      headers: { authorization: `Bearer ${token}`, ...options.headers },
+      headers: { authorization: `Bearer ${token}`, ...(this.mode ? {"x-navigate-mode": this.mode} : {}), ...options.headers },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
     if (!response.ok) {

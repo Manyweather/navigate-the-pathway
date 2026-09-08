@@ -34,6 +34,7 @@ export type SessionSummary = {
 export type SurveyAssignmentSummary = {
   id: string;
   instrumentSlug: string;
+  waveId?: string;
   instrumentName: string;
   itemCount: number;
   openResponseCount: number;

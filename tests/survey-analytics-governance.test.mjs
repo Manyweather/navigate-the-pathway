@@ -58,8 +58,10 @@ test("Creator and PI governance stays server-authorized and dual approved", asyn
   assert.match(worker, /CREATOR_BOOTSTRAP_EMAIL/);
   assert.match(worker, /A principal cannot approve their own request/);
   assert.match(worker, /platform\.principal_investigator/);
-  assert.match(controls, /Platform Creator Access/);
-  assert.match(controls, /Principal Investigator Access/);
+  const privileges = await read("../app/production/role-privileges.tsx");
+  assert.match(controls, /Creator and PI/);
+  assert.match(privileges, /creator:/);
+  assert.match(privileges, /principal_investigator:/);
   assert.match(migration, /on delete set null/);
   assert.match(migration, /reset_evaluation_pilot_records/);
 });

@@ -872,3 +872,30 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 .message-log small { display:block; }
 .workspace-panel button:focus-visible,.workspace-panel input:focus-visible,.workspace-panel select:focus-visible,.workspace-panel textarea:focus-visible,.workspace-tabs button:focus-visible { outline:3px solid #b58916; outline-offset:3px; }
 @media(max-width:680px) { .workspace-form,.messaging-layout { grid-template-columns:1fr; } .workspace-form { padding:1rem; } .messaging-layout aside { border-right:0; border-bottom:1px solid #d8cdc6; padding:0 0 1rem; } .message-log article { max-width:100%; } }
+
+/* Role-specific workspaces and compact shared tools. */
+.production-header { gap: 1rem; flex-wrap: wrap; }
+button.production-brand { border: 0; padding: 0; background: transparent; cursor: pointer; text-align: left; }
+.workspace-top-tools { display:flex; align-items:center; justify-content:center; gap:.35rem; flex:1; flex-wrap:wrap; }
+.workspace-top-tools > button { min-width:44px; min-height:44px; border:1px solid transparent; border-radius:10px; padding:.45rem; color:var(--burgundy, #7b163a); background:transparent; cursor:pointer; }
+.workspace-top-tools > button svg { display:block; width:23px; height:23px; margin:auto; }
+.workspace-top-tools > button span { display:block; font-size:.75rem; margin-top:.2rem; }
+.workspace-top-tools > button:hover, .workspace-top-tools > button.active { background:#f4e6eb; border-color:#cfa6b3; }
+.workspace-menu select { max-width:185px; font-size:.875rem; }
+.production-account { gap:.65rem; }
+.production-account > span { max-width:130px; overflow-wrap:anywhere; }
+.production-welcome h1 { font-size:clamp(2rem,4vw,3.4rem); max-width:none; margin-bottom:1.25rem; }
+.role-privileges { border:1px solid #d9c2c9; border-radius:22px; max-width:850px; width:calc(100% - 2rem); max-height:85dvh; padding:1.75rem; color:#2d2628; background:#fffdfa; }
+.role-privileges::backdrop { background:rgba(30,18,23,.55); }
+.role-privileges h2 { font-size:2rem; margin:.25rem 0 1rem; }
+.privilege-definitions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin:1rem 0; }
+.privilege-definitions article { background:#f6f0e9; border-radius:12px; padding:1rem; }
+.privilege-definitions h3 { margin:0 0 .45rem; font-size:1rem; }
+.privilege-definitions p { margin:0; font-size:.95rem; line-height:1.5; }
+.role-privileges footer { position:sticky; bottom:-1.75rem; padding:1rem 0; background:#fffdfa; }
+.access-log-table td small { display:block; margin-top:.25rem; }
+.submission-time { font-size:.875rem; color:#635057; }
+.manual-account-form { border:1px solid #dcc8cf; padding:1rem; border-radius:14px; margin:1rem 0 1.5rem; }
+.merge-steps { padding-left:1.4rem; line-height:1.7; }
+@media(max-width:1100px) { .workspace-top-tools{ order:3; flex-basis:100%; justify-content:flex-start; } .production-account{margin-left:auto;} }
+@media(max-width:600px) { .privilege-definitions{grid-template-columns:1fr;} .production-brand span{font-size:1rem;} .production-account{flex-wrap:wrap;} .workspace-top-tools{gap:.2rem;} .workspace-top-tools > button{padding:.3rem;} .workspace-menu{width:100%;} .workspace-menu select{max-width:none;width:100%;} }

@@ -447,3 +447,39 @@ test("roster import has preview, repeat safety and no implicit invitations", asy
     1,
   );
 });
+
+test("selected student and advisor modes cannot reuse principal workspace privileges", async () => {
+  try {
+    await db.query("select set_config('request.headers',$1,false)",[JSON.stringify({'x-navigate-mode':'student'})]);
+    await assert.rejects(()=>act(db,ids.creator,'analytics'),/Creator or PI mode/);
+    await assert.rejects(()=>act(db,ids.creator,'access_update',{userId:ids.student}),/Creator or PI mode/);
+    await db.query("select set_config('request.headers',$1,false)",[JSON.stringify({'x-navigate-mode':'advisor'})]);
+    await assert.rejects(()=>act(db,ids.advisor,'roster_context'),/administrative dashboard/);
+    await assert.rejects(()=>act(db,ids.student,'directory'),/not assigned/);
+  } finally { await db.exec("select set_config('request.headers','{}',false)"); }
+});
+test("Creator and PI manually create scoped accounts without sending invitations", async () => {
+ const account=randomUUID(); const requestKey=randomUUID();
+ await db.query("insert into auth.users(id,email) values($1,'manual@example.test')",[account]);
+ await act(db,ids.pi,'directory');
+ await db.exec('set role authenticated');
+ try {
+  const call=()=>db.query("select public.pathway_create_account_profile($1,'manual@example.test','Manual Person','student',$2,$3) as result",[account,ids.cohort,requestKey]);
+  assert.equal((await call()).rows[0].result.invitationSent,false); await call();
+ } finally {await db.exec('reset role');}
+ assert.equal((await db.query("select count(*)::int n from public.role_assignments where user_id=$1",[account])).rows[0].n,1);
+ assert.equal((await db.query("select count(*)::int n from public.enrollments where student_id=$1",[account])).rows[0].n,1);
+ assert.equal((await db.query("select count(*)::int n from public.audit_events where event_type='account_created_manually' and subject_id=$1",[account])).rows[0].n,1);
+ await act(db,ids.student,'directory'); await db.exec('set role authenticated');
+ try {await assert.rejects(()=>db.query("select public.pathway_create_account_profile($1,'manual@example.test','Other','administrator',$2,$3)",[account,ids.cohort,randomUUID()]),/Creator or PI/);}finally{await db.exec('reset role');}
+});
+test("survey reads and writes enforce audience and advisor MFA for multi-role accounts", async () => {
+ const id=randomUUID();
+ await db.query("insert into public.survey_completion_projection(assignment_id,user_id,organization_id,program_id,cohort_id,instrument_slug,instrument_name,wave_id,wave_label,audience,status) values($1,$2,$3,$4,$5,'advisor-coaching-competency-scale','ACCS',$6,'Baseline','advisor','not_started')",[id,ids.creator,ids.org,ids.program,ids.cohort,randomUUID()]);
+ try {
+  await act(db,ids.creator,'directory');
+  await db.exec("select set_config('request.headers','{\"x-navigate-mode\":\"student\"}',false); set role authenticated");
+  assert.deepEqual((await db.query('select public.my_survey_assignments() result')).rows[0].result,[]);
+  for(const [fn,args] of [['get_my_survey_assignment','$1'],['save_my_survey_draft',"$1,null,'{}'"],['submit_my_survey_response','$1']])await assert.rejects(()=>db.query(`select public.${fn}(${args})`,[id]),/assigned dashboard/);
+ } finally {await db.exec("reset role; select set_config('request.headers','{}',false)");}
+});

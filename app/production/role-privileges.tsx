@@ -1,0 +1,23 @@
+"use client";
+import { useEffect, useRef } from "react";
+import { modeLabels, type DashboardMode } from "./dashboard-mode";
+import type { AuthorizationContext } from "./types";
+
+const shared = [
+  ["Notifications", "Updates inside Navigate about appointment requests, decisions, and changes. Automated appointment emails are off."],
+  ["Calendar", "Choose connected calendar availability and export confirmed meetings. Provider connections require configuration."],
+  ["Appointments", "Request meetings with eligible people. The recipient must accept; changes require renewed acceptance."],
+  ["Messages", "Private appointment chats and separate direct messages. Only participants can read them; student-to-student DMs are blocked."],
+];
+const features: Record<DashboardMode, string[][]> = {
+ student: [["Journey and Portfolio", "Record goals, experiences, and preparation. Choose which materials to share with your assigned advisor."],["Student surveys", "Complete only your assigned student surveys and view submission dates. ACCS and advisor surveys belong in Advisor mode."],["Support", "Share goals, barriers, and deadlines. See only support actions staff have reviewed and shared with you."]],
+ advisor: [["Assigned students", "Review attendance, survey completion, and materials your assigned students explicitly share. Research answers and scores are excluded."],["Advisor surveys", "Complete ACCS and the advisor MacLeod Clark scale. These are separate from student assignments."],["Support", "Review shared evidence, propose actions, and record follow-up for assigned students. AI suggestions are not configured."]],
+ administrator: [["People and roster", "Manage invitations and import student/advisor rosters within your assigned scope when account management is granted."],["Program sessions", "Publish and manage sessions when program configuration is granted. Students retain control of private advising materials."],["Program operations", "View completion and attendance. Principal governance and identifiable research results require Creator or PI mode."]],
+ creator: [["Account lifecycle", "Create accounts manually, manage sign-in identities, deactivate or restore eligible accounts, and preview validated merges."],["Access controls", "Assign scoped roles and permissions. You cannot change your own access or remove the last Creator."],["Page views", "Review student page totals and visits. IP addresses expire after 30 days."],["Evaluation and governance", "Use granted evaluation tools for approved purposes. Survey publication and destructive actions retain separate review and approval."],["Ownership", "Initiate eligible reset or purge requests. Ownership does not expose private messages or bypass PI review; you cannot approve your own request."],["Support", "Review shared advising evidence and manage manual support actions. AI is not configured."]],
+ principal_investigator: [["Account lifecycle", "Create accounts manually and manage eligible account access within scope. Account merging and permanent purge execution remain Creator responsibilities."],["Access controls and page views", "Manage granted roles and permissions, and review student page activity. IP addresses expire after 30 days."],["Evaluation and review", "Review research configuration, releases, exports, and governance requests within your granted permissions. You cannot approve your own request."],["Support", "Review shared evidence and proposed actions. Private messages remain participant-only, and AI is not configured."]],
+};
+export function RolePrivileges({mode,context,onDone}:{mode:DashboardMode;context:AuthorizationContext;onDone:()=>void}) {
+ const dialog = useRef<HTMLDialogElement>(null);
+ useEffect(()=>{const node=dialog.current; node?.showModal();return ()=>node?.close();},[]);
+ return <dialog ref={dialog} className="role-privileges" aria-labelledby="role-privileges-title" onCancel={e=>e.preventDefault()}><p className="kicker">Your active role</p><h2 id="role-privileges-title">{modeLabels[mode]} privileges</h2><p>These tools apply to your current dashboard. Switching roles changes the available tools. All access remains limited to your assigned program, cohort, permissions, and current sharing.</p><div className="privilege-definitions">{[...features[mode],...shared].map(([name,description])=><article key={name}><h3>{name}</h3><p>{description}</p></article>)}</div>{context.capabilities.length ? <details><summary>Your granted permissions</summary><p>{context.capabilities.join(", ")}</p></details>:null}<footer><button className="primary-button" onClick={onDone}>I understand my {modeLabels[mode].toLowerCase()} privileges</button></footer></dialog>;
+}

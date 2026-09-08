@@ -16,6 +16,7 @@ type Navigation = {
   values: Record<string, unknown>;
   set: (key: string, value: unknown) => void;
   back: () => void;
+  reset: () => void;
   drafts: Map<string, unknown>;
 };
 const Context = createContext<Navigation | null>(null);
@@ -62,9 +63,13 @@ export function WorkspaceNavigation({ children }: { children: ReactNode }) {
       );
     }
   }, []);
+  const reset = useCallback(() => {
+    current.current = {}; snapshots.current.clear(); snapshots.current.set(0, {}); sequence.current = 0; setValues({});
+    window.history.replaceState({...window.history.state,pathwayNavigation:0}, "");
+  }, []);
   const value = useMemo(
-    () => ({ values, set, back, drafts }),
-    [values, set, back, drafts],
+    () => ({ values, set, back, reset, drafts }),
+    [values, set, back, reset, drafts],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
@@ -137,3 +142,5 @@ export function WorkspaceBack() {
     </button>
   );
 }
+
+export function useResetPathway() { return useContext(Context)?.reset || (() => undefined); }

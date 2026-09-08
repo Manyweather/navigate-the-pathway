@@ -650,7 +650,7 @@ export function SupportWorkspace({
     15000,
   );
   const materials = useLoad(
-    () => get<Array<{ id: string; title: string }>>(api, "support_materials"),
+    () => context.roles.includes("student") ? get<Array<{ id: string; title: string }>>(api, "support_materials") : Promise.resolve([]),
     [api],
   );
   const [message, setMessage] = useState("");
@@ -1995,22 +1995,6 @@ export function WorkspaceHub({
 }) {
   const [view, setView] = usePathwayView("workspace", "home");
   const [chat, setChat] = usePathwayView<string | null>("workspace-chat", null);
-  const tabs = [
-    ["home", "Dashboard"],
-    ["appointments", "Appointments"],
-    ["messages", "Messages"],
-    ["support", "Support"],
-    ["sessions", "Program sessions"],
-    ["calendars", "Calendars"],
-    ["notifications", "Notifications"],
-  ];
-  if (
-    context.roles.includes("administrator") &&
-    context.capabilities.includes("accounts.manage")
-  )
-    tabs.push(["roster", "Roster import"]);
-  if (context.principalType)
-    tabs.push(["analytics", "Page views"], ["access", "Access controls"]);
   const location = usePathwayLocation();
   const studentScreen = location["student-screen"] || "home";
   const rawPage =
@@ -2041,17 +2025,6 @@ export function WorkspaceHub({
   }, [api, context.userId, activeRole, context.roles, page]);
   return (
     <>
-      <nav className="workspace-tabs" aria-label="Portal workspaces">
-        {tabs.map(([id, label]) => (
-          <button
-            key={id}
-            className={view === id ? "active" : ""}
-            onClick={() => setView(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
       {view === "home" ? (
         children
       ) : view === "appointments" ? (
@@ -2080,7 +2053,7 @@ export function WorkspaceHub({
             context.capabilities.includes("program.configure")
           }
         />
-      ) : view === "roster" ? (
+      ) : view === "roster" && context.roles.includes("administrator") && context.capabilities.includes("accounts.manage") ? (
         <RosterWorkspace api={api} />
       ) : view === "analytics" && context.principalType ? (
         <PageAnalyticsWorkspace api={api} />
@@ -2091,4 +2064,19 @@ export function WorkspaceHub({
       )}
     </>
   );
+}
+
+const toolIcons: Record<string,string> = {
+ notifications: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4",
+ calendars: "M7 2v4M17 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2M7 14h3M14 14h3M7 17h3",
+ appointments: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7v5l3 2",
+ messages: "M3 4h18v13H9l-6 4V4M7 8h10M7 12h7",
+ support: "M12 21S2 15 2 8a5 5 0 0 1 10-1A5 5 0 0 1 22 8c0 7-10 13-10 13",
+};
+export function WorkspaceTopTools({context}: {context:AuthorizationContext;api:PilotApiClient}) {
+ const [view,setView] = usePathwayView("workspace","home");
+ const [adminView,setAdminView] = usePathwayView("admin-screen","home");
+ const admin = context.roles.includes("administrator");
+ const select = (value:string)=>{ if(value.startsWith("admin:")){setAdminView(value.slice(6));setView("home");}else{setAdminView("home");setView(value);} };
+ return <nav className="workspace-top-tools" aria-label="Portal tools">{[["notifications","Notifications"],["calendars","Calendar"],["appointments","Appointments"],["messages","Messages"],["support","Support"]].map(([id,label])=><button key={id} title={label} aria-label={label} aria-pressed={view===id} className={view===id?"active":""} onClick={()=>setView(id)}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={toolIcons[id]}/></svg><span>{label}</span></button>)}{admin ? <label className="workspace-menu"><span className="sr-only">Program tools</span><select aria-label="Program tools" value={view==="home"?"admin:"+adminView:["sessions","roster","analytics","access"].includes(view)?view:""} onChange={e=>select(e.target.value)}><option value="" disabled>Program tools</option><option value="admin:home">{context.principalType?"Governance dashboard":"Dashboard"}</option><option value="admin:people">People and access log</option><option value="sessions">Program sessions</option>{context.capabilities.includes("accounts.manage")?<option value="roster">Roster import</option>:null}{context.principalType?<><option value="admin:surveys">Survey analytics</option><option value="analytics">Page views</option><option value="access">Access controls</option></>:null}<option value="admin:configuration">Configuration</option></select></label>:<button className="workspace-home" title="Dashboard" onClick={()=>setView("home")}>Home</button>}</nav>;
 }

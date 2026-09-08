@@ -26,11 +26,11 @@ test("production client never persists domain records in localStorage", async ()
   assert.match(production, /server-side|saved securely|Supabase/i);
 });
 
-test("invitation handoff recovers the secure session and opens the student view first", async () => {
+test("invitation handoff recovers the secure session and chooses an assigned dashboard", async () => {
   const production = await read("../app/production/production-pilot-app.tsx");
   assert.match(production, /supabase\.auth\.refreshSession\(\)/);
   assert.match(production, /Retry secure connection/);
-  assert.match(production, /value\.roles\.includes\("student"\) \? "student"/);
+  assert.match(production, /assignedModes\(value\)\[0\]/);
 });
 
 test("the production student map stays signed in and saves station work through the pilot API", async () => {

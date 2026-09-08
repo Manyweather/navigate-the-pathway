@@ -48,3 +48,13 @@ The build, public-demo build, lint, TypeScript check, and Worker dry run passed.
 The live fictional staging smoke test exercised booking, acceptance, participant chat, Creator chat denial, support sharing/revocation, page deduplication, and suppressed email. Its entire transaction was rolled back. Browser checks verified appointment draft preservation through Back and the disabled service states. Existing lint warnings concern image guidance and hook dependency analysis; there are no lint errors.
 
 Use `supabase/tests/pathway_workspace_smoke.sql` for the rollback-only database smoke test. Keep backup snapshots, identity details, credentials, and restore manifests outside source control. Check scheduled job failures and `last_synced_at` during provider rollout. Do not expose page analytics or research data to AI inputs.
+
+## Dashboard refinement (September 8, 2026)
+
+Creator and PI now have explicit dashboard modes. The active mode narrows visible controls and the API's route access; workspace and survey database functions also enforce the selected mode. Shared Notifications, Calendar, Appointments, Messages, and Support tools are in the header. Administrative tools use a dropdown. The role explanation appears on login and role changes, with a manual review button.
+
+Student survey lists exclude advisor instruments, including ACCS and the advisor MacLeod Clark assignment. Distinct survey waves remain separate. Submission timestamps are shown wherever available. The pathway action is labeled “Update my journey.”
+
+Account Lifecycle supports manual profile creation by Creator/PI with MFA and account-management permission. Creation is retry-safe and creates student enrollment when applicable. It does not send email; invitation delivery remains an explicit subsequent action. Existing emails never merge through account creation or the add-email form. Merge preview retains conflict and backup checks. Error messages explain duplicate emails, archived profiles, missing scope/MFA, and merge conflicts.
+
+Operational directories count canonical profiles and aggregate their linked sign-in identities and historical activity. Merged archived profiles do not count as separate students. Migration `202609080007` was applied after checking the deployed ledger. The complete suite passed 91 tests, including database audience/role restrictions, manual creation and repeat safety, and canonical student counts.
