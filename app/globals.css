@@ -22,12 +22,13 @@
 .auth-experience-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; margin: 0 0 1.5rem; padding: 0; list-style: none; }
 .auth-experience-card { display: grid; grid-template-rows: auto 1fr; align-content: start; gap: .9rem; min-height: 13.5rem; padding: 1.15rem; overflow: hidden; border: 1px solid #d7cbd0; border-radius: 1.2rem; background: linear-gradient(155deg, #fff 0%, #f6f8fb 100%); box-shadow: 0 .8rem 1.8rem rgba(42, 35, 38, .08); }
 .auth-experience-card--pathway { border-color: #ddc4cd; background: linear-gradient(155deg, #fff 0%, #fbf1f4 100%); }
-.auth-experience-card--genesis { border-color: #d8cce6; background: linear-gradient(155deg, #fff 0%, #f5f0fb 100%); }
+.auth-experience-card--impact { border-color: #d8cce6; background: linear-gradient(155deg, #fff 0%, #f5f0fb 100%); }
 .auth-experience-graphic { width: 5.5rem; height: 5.5rem; display: grid; place-items: center; border-radius: 1.25rem; color: #365f8c; background: #e5eef7; }
 .auth-experience-card--pathway .auth-experience-graphic { color: #791034; background: #f3dfe5; }
-.auth-experience-card--genesis .auth-experience-graphic { color: #6e4f98; background: #e9e0f4; }
+.auth-experience-card--impact .auth-experience-graphic { color: #6e4f98; background: #e9e0f4; }
 .auth-experience-graphic svg { width: 4.4rem; height: 4.4rem; overflow: visible; }
 .auth-experience-graphic circle, .auth-experience-graphic path { fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.auth-experience-graphic .experience-graphic-solid { fill: currentColor; stroke: none; }
 .auth-experience-graphic .experience-graphic-detail { stroke-width: 3; opacity: .72; }
 .auth-experience-list li > div:last-child { display: grid; align-content: start; gap: .45rem; }
 .auth-experience-list strong { color: #381f29; font-family: Georgia, serif; font-size: 1.18rem; line-height: 1.12; }

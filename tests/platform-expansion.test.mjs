@@ -143,8 +143,9 @@ test("phone-first pilot screens include the required privacy and approval guardr
   ]);
   const signIn = signInSource.slice(signInSource.indexOf("export function SignIn"), signInSource.indexOf("export function MfaGate"));
   assert.doesNotMatch(signIn, /One Roseman account|Three experiences\. One sign-in\.|Your roles determine which separate workspaces appear/);
-  for (const experience of ["OACA Compass", "Navigate the Pathway", "GENESIS Impact Studio"]) assert.match(signIn, new RegExp(experience));
-  for (const graphic of ["compass", "pathway", "genesis"]) assert.match(signIn, new RegExp(`ExperienceGraphic experience="${graphic}"`));
+  for (const experience of ["OACA Compass", "Navigate the Pathway", "Impact Studio"]) assert.match(signIn, new RegExp(experience));
+  assert.doesNotMatch(signIn, /GENESIS/);
+  for (const graphic of ["compass", "pathway", "impact"]) assert.match(signIn, new RegExp(`ExperienceGraphic experience="${graphic}"`));
   assert.match(signIn, /Roseman Microsoft SSO is coming soon/);
   assert.match(signIn, /Sign-in is taking too long/);
   assert.doesNotMatch(signIn, /navigate-pathway-mark/);
