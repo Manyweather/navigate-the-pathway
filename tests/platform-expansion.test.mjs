@@ -132,14 +132,21 @@ test("Worker API requires matching experience context and keeps endpoint familie
 });
 
 test("phone-first pilot screens include the required privacy and approval guardrails", async () => {
-  const [hub, oaca, genesis, worksheet, eventWorkspace, styles] = await Promise.all([
+  const [hub, oaca, genesis, worksheet, eventWorkspace, signInSource, styles] = await Promise.all([
     readFile(new URL("../app/production/navigate-hub-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-compass-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/genesis-impact-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-worksheet.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-event-workspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/production-pilot-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
+  const signIn = signInSource.slice(signInSource.indexOf("export function SignIn"), signInSource.indexOf("export function MfaGate"));
+  assert.match(signIn, /Three experiences\. One sign-in\./);
+  for (const experience of ["OACA Compass", "Navigate the Pathway", "GENESIS Impact Studio"]) assert.match(signIn, new RegExp(experience));
+  assert.match(signIn, /Roseman Microsoft SSO is coming soon/);
+  assert.match(signIn, /Sign-in is taking too long/);
+  assert.doesNotMatch(signIn, /navigate-pathway-mark/);
   assert.match(hub, /only|active/);
   assert.match(hub, /Student Council/);
   assert.match(hub, /same Roseman directory used in GENESIS/);

@@ -60,8 +60,15 @@ export function SignIn({ supabase }: { supabase: SupabaseClient }) {
   const [busy, setBusy] = useState(false);
   const signIn = async (event: React.FormEvent) => {
     event.preventDefault(); setBusy(true); setMessage("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false); setMessage(error ? "We could not sign you in. Check your invitation email or password." : "Signed in.");
+    try {
+      const { error } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("timeout")), 15000)),
+      ]);
+      setMessage(error ? "We could not sign you in. If this email has not been activated, choose Set or reset password." : "Signed in.");
+    } catch {
+      setMessage("Sign-in is taking too long. Check your connection, then try again or choose Set or reset password.");
+    } finally { setBusy(false); }
   };
   const reset = async () => {
     if (!email.trim()) { setMessage("Enter your invited email address first."); return; }
@@ -69,12 +76,7 @@ export function SignIn({ supabase }: { supabase: SupabaseClient }) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/app` });
     setBusy(false); setMessage(error ? "The reset message could not be sent." : "Check your email for a secure password link.");
   };
-  const microsoftSignIn = async () => {
-    setBusy(true); setMessage("");
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "azure", options: { scopes: "openid email profile", redirectTo: `${window.location.origin}${window.location.pathname}`, queryParams: { prompt: "select_account" } } });
-    if (error) { setBusy(false); setMessage("Roseman Microsoft sign-in is not available yet. Use an invited email or contact support."); }
-  };
-  return <main className="production-auth"><section className="production-auth-card"><div className="production-auth-identity"><img src={assetUrl("/assets/navigate-pathway-mark.svg")} alt="Navigate" /><div><p className="kicker">One Roseman account hub</p><h1>Welcome back.</h1></div></div><RosieGuide pose="idle" compact eyebrow="Navigate" title="Use Roseman Microsoft sign-in or an approved invitation." body="Calendar access is requested separately. Staff roles also verify a second factor before protected records open." /><button type="button" className="primary-button" onClick={microsoftSignIn} disabled={busy}>Continue with Roseman Microsoft</button><div className="auth-divider" aria-hidden="true"><span>or invited email</span></div><form className="production-form" onSubmit={signIn}><label><span>Email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="secondary-button" disabled={busy}>{busy ? "Checking..." : "Sign in with email"}</button><button type="button" className="text-button" onClick={reset} disabled={busy}>Set or reset password</button><p className="form-message" aria-live="polite">{message}</p></form><p className="privacy-note">Sign-in consent never grants calendar access. Access is limited to active memberships and approved invitations.</p></section></main>;
+  return <main className="production-auth"><section className="production-auth-card"><div className="production-auth-identity"><p className="kicker">One Roseman account</p><h1>Three experiences. One sign-in.</h1><p className="auth-intro">Your roles determine which separate workspaces appear after you sign in.</p></div><ul className="auth-experience-list" aria-label="Available Roseman experiences"><li><strong>OACA Compass</strong><span>Advising, tutoring, events, and student support.</span></li><li><strong>Navigate the Pathway</strong><span>Premed reflection, preparation, and portfolio.</span></li><li><strong>GENESIS Impact Studio</strong><span>Community initiative design, coaching, and handoff.</span></li></ul><RosieGuide pose="idle" compact eyebrow="Account hub" title="Use your approved email invitation today." body="Roseman Microsoft SSO is coming soon. Calendar access remains a separate choice, and staff verify a second factor before protected records open." /><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Coming soon</span></div><div className="auth-divider" aria-hidden="true"><span>sign in with invited email</span></div><form className="production-form" onSubmit={signIn}><label><span>Email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="primary-button" disabled={busy}>{busy ? "Checking..." : "Sign in with email"}</button><button type="button" className="text-button" onClick={reset} disabled={busy}>Set or reset password</button><p className="form-message" aria-live="polite">{message}</p></form><p className="privacy-note">Sign-in consent never grants calendar access. Access is limited to active memberships and approved invitations.</p></section></main>;
 }
 
 export function MfaGate({ supabase, onVerified }: { supabase: SupabaseClient; onVerified: () => void }) {
