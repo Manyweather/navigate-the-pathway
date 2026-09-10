@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import { ProductionPilotApp } from "../production/production-pilot-app";
+import { NavigateHubApp } from "../production/navigate-hub-app";
 
 export const metadata: Metadata = {
-  title: "Production Pilot",
-  description: "Invite-only Navigate the Pathway pilot for students, advisors, and program administrators.",
+  title: "Navigate",
+  description: "One secure account hub for Navigate the Pathway, OACA Compass, and GENESIS Impact Studio.",
 };
 
 export default function PilotApplicationPage() {
-  return <ProductionPilotApp />;
+  return <NavigateHubApp />;
 }
-

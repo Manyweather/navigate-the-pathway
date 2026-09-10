@@ -1,0 +1,12 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+export function OacaWorksheet() {
+  const [sessionCode, setSessionCode] = useState("");
+  useEffect(() => {
+    const task = window.setTimeout(() => setSessionCode(crypto.randomUUID()), 0);
+    return () => window.clearTimeout(task);
+  }, []);
+  return <main className="worksheet-page"><header><div><p className="kicker">OACA Compass</p><h1>Advising & Tutoring Visit Worksheet</h1><p>Use this page to prepare, take notes, and plan next actions. Do not write patient information.</p></div><a className="text-button print-hidden" href="/app/oaca">Return to OACA</a></header><section className="worksheet-code" aria-label="Opaque worksheet session identifier"><strong>Session code</strong><code>{sessionCode || "Preparing an opaque code…"}</code><p>This code contains no name, email, or student identifier.</p></section><section><h2>Before the visit</h2><label><span>What would make this conversation useful?</span><textarea rows={4} /></label><label><span>Questions or context I want to remember</span><textarea rows={5} /></label></section><section><h2>During the visit</h2><label><span>Key ideas, resources, or referrals</span><textarea rows={7} /></label></section><section><h2>Action plan</h2><div className="worksheet-actions"><label><span>My next action</span><textarea rows={3} /></label><label><span>Who can help?</span><textarea rows={3} /></label><label><span>Target date</span><input type="date" /></label><label><span>How I will know it is complete</span><textarea rows={3} /></label></div></section><footer><p>To attach a handwritten copy, photograph or scan every page and give the session code to authorized OACA staff. Staff must verify OCR before it updates any record.</p><button className="primary-button print-hidden" onClick={() => window.print()}>Print or save as PDF</button><a className="secondary-button print-hidden" href="/resources/oaca-compass-visit-worksheet.pdf" download>Download blank PDF</a></footer></main>;
+}

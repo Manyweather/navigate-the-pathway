@@ -1,6 +1,8 @@
 import { modeAllowsPath, principalMode, surveysForAudience, type DashboardMode } from "../app/production/dashboard-mode";
 import { workspaceRoute, workspaceScheduled, WorkspaceError, type WorkspaceServices } from "./workspace-api";
 import { calendarPublicRoute, type CalendarServices } from "./workspace-calendars";
+import { experienceRoute } from "./experience-api";
+import { normalizePenjiEventExports } from "../app/production/oaca-event-model";
 
 type AuthenticatedUser = {
   id: string;
@@ -51,7 +53,7 @@ function corsHeaders(request: Request, env: Env): Record<string,string> {
   const origin = allowedOrigin(request, env);
   return origin ? {
     "access-control-allow-origin": origin,
-    "access-control-allow-headers": "authorization, content-type, x-navigate-mode",
+    "access-control-allow-headers": "authorization, content-type, x-navigate-mode, x-navigate-experience",
     "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
     "access-control-max-age": "86400",
     vary: "Origin",
@@ -205,6 +207,37 @@ async function readBody(request: Request) {
   catch { throw new HttpError(400, "A valid JSON request is required.", "invalid_json"); }
 }
 
+function hexadecimalBytes(value: string) {
+  const normalized = value.replace(/^sha256=/i, "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(normalized)) return null;
+  return Uint8Array.from(normalized.match(/.{2}/g) || [], (pair) => Number.parseInt(pair, 16));
+}
+
+async function receiveOacaSmsWebhook(request: Request, env: Env) {
+  const secret = (env as unknown as Record<string,string>).EVENT_SMS_WEBHOOK_SECRET || "";
+  const signature = hexadecimalBytes(request.headers.get("x-navigate-signature") || "");
+  const raw = await request.text();
+  if (!secret || !signature || raw.length > 100_000) throw new HttpError(401, "Webhook signature is not valid.", "invalid_webhook_signature");
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  const valid = await crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(raw));
+  if (!valid) throw new HttpError(401, "Webhook signature is not valid.", "invalid_webhook_signature");
+  let payload: Record<string,unknown>;
+  try { payload = JSON.parse(raw) as Record<string,unknown>; } catch { throw new HttpError(400, "A valid JSON webhook is required.", "invalid_webhook_json"); }
+  const allowed = { from: payload.from, providerMessageId: payload.providerMessageId, body: payload.body, eventId: payload.eventId };
+  return serviceRest<Record<string,unknown>>(env, "rpc/oaca_receive_event_sms", { method: "POST", body: JSON.stringify({ payload: allowed }) });
+}
+
+async function receiveNotificationDeliveryWebhook(request: Request, env: Env) {
+  const secret=(env as unknown as Record<string,string>).EVENT_SMS_WEBHOOK_SECRET||"";
+  const signature=hexadecimalBytes(request.headers.get("x-navigate-signature")||""); const raw=await request.text();
+  if(!secret||!signature||raw.length>100_000)throw new HttpError(401,"Webhook signature is not valid.","invalid_webhook_signature");
+  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["verify"]);
+  if(!await crypto.subtle.verify("HMAC",key,signature,new TextEncoder().encode(raw)))throw new HttpError(401,"Webhook signature is not valid.","invalid_webhook_signature");
+  let payload:Record<string,unknown>;try{payload=JSON.parse(raw) as Record<string,unknown>;}catch{throw new HttpError(400,"A valid JSON webhook is required.","invalid_webhook_json");}
+  const allowed={providerEventId:payload.providerEventId,providerMessageId:payload.providerMessageId,status:payload.status,occurredAt:payload.occurredAt,provider:payload.provider,errorCode:payload.errorCode};
+  return serviceRest<Record<string,unknown>>(env,"rpc/platform_record_notification_delivery_event",{method:"POST",body:JSON.stringify({payload:allowed})});
+}
+
 async function serviceRest<T>(env: Env, path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
     ...options,
@@ -223,6 +256,36 @@ async function serviceRest<T>(env: Env, path: string, options: RequestInit = {})
   }
   const body = await response.text();
   return (body ? JSON.parse(body) : undefined) as T;
+}
+
+async function privatePlatformFile(env: Env, storagePath: string) {
+  const safePath=storagePath.split("/").map(encodeURIComponent).join("/");
+  const response=await fetch(`${env.SUPABASE_URL}/storage/v1/object/authenticated/platform-files/${safePath}`,{headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`}});
+  if(!response.ok)throw new Error("private_file_unavailable");
+  return response.text();
+}
+
+async function processOacaEventImports(env: Env) {
+  const jobs=await serviceRest<Array<{id:string;package_id:string}>>(env,`oaca_event_import_jobs?status=eq.pending&run_after=lte.${encodeURIComponent(new Date().toISOString())}&select=id,package_id&order=run_after&limit=2`);
+  for(const job of jobs){
+    const claimed=await serviceRest<Array<{id:string}>>(env,`oaca_event_import_jobs?id=eq.${job.id}&status=eq.pending`,{method:"PATCH",headers:{prefer:"return=representation"},body:JSON.stringify({status:"running",locked_until:new Date(Date.now()+5*60_000).toISOString()})});
+    if(!claimed.length)continue;
+    try{
+      const packages=await serviceRest<Array<{id:string;status:string;events_file_id:string;attendance_file_id:string}>>(env,`oaca_event_import_packages?id=eq.${job.package_id}&select=id,status,events_file_id,attendance_file_id`);
+      const packageRecord=packages[0]; if(!packageRecord||packageRecord.status!=="approved")throw new Error("package_not_approved");
+      const files=await serviceRest<Array<{id:string;storage_path:string;scan_status:string}>>(env,`platform_files?id=in.(${packageRecord.events_file_id},${packageRecord.attendance_file_id})&select=id,storage_path,scan_status`);
+      const eventsFile=files.find((file)=>file.id===packageRecord.events_file_id); const attendanceFile=files.find((file)=>file.id===packageRecord.attendance_file_id);
+      if(!eventsFile||!attendanceFile||eventsFile.scan_status!=="clean"||attendanceFile.scan_status!=="clean")throw new Error("security_scan_incomplete");
+      const [eventsSource,attendanceSource]=await Promise.all([privatePlatformFile(env,eventsFile.storage_path),privatePlatformFile(env,attendanceFile.storage_path)]);
+      const normalized=normalizePenjiEventExports(eventsSource,attendanceSource);
+      if(normalized.summary.missingRequiredEventHeaders.length||normalized.summary.missingRequiredAttendanceHeaders.length)throw new Error("penji_schema_mismatch");
+      await serviceRest(env,"rpc/oaca_process_event_import_package",{method:"POST",body:JSON.stringify({package_id:packageRecord.id,event_rows:normalized.events,attendance_rows:normalized.attendance,processor_version:"compass-penji-events-v1"})});
+    }catch(error){
+      const code=error instanceof Error?error.message:"event_import_failed";
+      await serviceRest(env,`oaca_event_import_jobs?id=eq.${job.id}`,{method:"PATCH",body:JSON.stringify({status:"failed",last_error_code:code.slice(0,120),locked_until:null})});
+      await serviceRest(env,`oaca_event_import_packages?id=eq.${job.package_id}`,{method:"PATCH",body:JSON.stringify({status:"failed",updated_at:new Date().toISOString(),quality_summary:{errorCode:code.slice(0,120)}})});
+    }
+  }
 }
 
 async function optionalServiceMutation(env: Env, path: string, options: RequestInit) {
@@ -1644,6 +1707,8 @@ async function route(request: Request, env: Env) {
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request, env) });
   if (url.pathname === "/api/health") return json({ ok: true, environment: env.PILOT_ENVIRONMENT });
+  if (url.pathname === "/api/webhooks/oaca/sms" && request.method === "POST") return json(await receiveOacaSmsWebhook(request, env));
+  if (url.pathname === "/api/webhooks/oaca/delivery" && request.method === "POST") return json(await receiveNotificationDeliveryWebhook(request, env));
 
   const calendarPublic = await calendarPublicRoute(request, calendarServices(env));
   if (calendarPublic) return calendarPublic;
@@ -1657,6 +1722,10 @@ async function route(request: Request, env: Env) {
     user.mode=requestedMode as DashboardMode;
     if(user.mode!=="student")requireStaffMfa(user);
     if(!modeAllowsPath(user.mode,url.pathname,request.method))throw new HttpError(403,"This feature is not available in your current dashboard. Switch to an assigned role that includes it.","dashboard_mode_required");
+  }
+  if (url.pathname.startsWith("/api/platform/") || url.pathname.startsWith("/api/oaca/") || url.pathname.startsWith("/api/genesis/")) {
+    const response = await experienceRoute(request, experienceServices(env, user));
+    if (response) return response;
   }
   if (url.pathname.startsWith("/api/workspace/") || url.pathname.startsWith("/api/calendar/") || url.pathname === "/api/activity/page") {
     await authorization(env,user);
@@ -1837,7 +1906,11 @@ async function route(request: Request, env: Env) {
 
 export default {
   async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(workspaceScheduled(calendarServices(env)));
+    ctx.waitUntil(Promise.all([
+      workspaceScheduled(calendarServices(env)),
+      serviceRest(env,"rpc/oaca_enqueue_due_event_notifications",{method:"POST",body:"{}"}),
+      processOacaEventImports(env),
+    ]).then(()=>undefined));
   },
   async fetch(request: Request, env: Env) {
     const requestId = crypto.randomUUID();
@@ -1879,6 +1952,13 @@ function workspaceServices(env:Env,user:AuthenticatedUser):WorkspaceServices {
       }
       return response.json() as Promise<{id:string}>;
     },
+  };
+}
+
+function experienceServices(env: Env, user: AuthenticatedUser) {
+  return {
+    ...workspaceServices(env, user),
+    context: async () => enrichPrincipalContext(env, user, await authorization(env, user)) as AuthorizationContext,
   };
 }
 

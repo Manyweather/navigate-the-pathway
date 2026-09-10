@@ -246,7 +246,7 @@ test("survey data is absent from recommendation and routine student routing code
   assert.doesNotMatch(catalog, /prompt\s*:/i);
 });
 
-test("legacy Pilot navigation is renamed while redirect remains", async () => {
+test("legacy Pilot navigation now opens the expanded Navigate home", async () => {
   const workspaces = await read("../app/components/feature-workspaces.tsx");
   const journey = await read("../app/journey-experience.tsx");
   const redirect = await read("../app/pilot/page.tsx");

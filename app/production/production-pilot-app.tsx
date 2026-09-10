@@ -46,14 +46,14 @@ const statusLabels: Record<SurveyAssignmentStatus, string> = {
 export function AppHeader({ context, role, onRole, onSignOut, onReview, api }: { context: AuthorizationContext; role: DashboardMode; onRole: (role: DashboardMode) => void; onSignOut: () => void; onReview:()=>void; api:PilotApiClient }) {
   const modes = assignedModes(context);
   const [,setView] = usePathwayView("workspace","home");
-  return <header className="production-header"><button className="production-brand" onClick={()=>setView("home")}><img src={assetUrl("/assets/navigate-pathway-mark.svg")} alt="" /><span>Navigate The Pathway</span></button><WorkspaceTopTools context={modeContext(context,role)} api={api} /><div className="production-account"><span>{context.displayName}</span><button className="principal-badge" onClick={onReview}><span>{modeLabels[role]}</span><small>My privileges</small></button>{modes.length > 1 ? <label><span className="sr-only">Dashboard mode</span><select value={role} onChange={(event) => onRole(event.target.value as DashboardMode)}>{modes.map(item=><option key={item} value={item}>{modeLabels[item]}</option>)}</select></label> : null}<button className="text-button" onClick={onSignOut}>Sign out</button></div></header>;
+  return <header className="production-header"><a className="hub-return" href="/app">All experiences</a><button className="production-brand" onClick={()=>setView("home")}><img src={assetUrl("/assets/navigate-pathway-mark.svg")} alt="" /><span>Navigate The Pathway</span></button><WorkspaceTopTools context={modeContext(context,role)} api={api} /><div className="production-account"><span>{context.displayName}</span><button className="principal-badge" onClick={onReview}><span>{modeLabels[role]}</span><small>My privileges</small></button>{modes.length > 1 ? <label><span className="sr-only">Dashboard mode</span><select value={role} onChange={(event) => onRole(event.target.value as DashboardMode)}>{modes.map(item=><option key={item} value={item}>{modeLabels[item]}</option>)}</select></label> : null}<button className="text-button" onClick={onSignOut}>Sign out</button></div></header>;
 }
 
-function ConfigurationRequired() {
+export function ConfigurationRequired() {
   return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Production pilot" title="Secure setup is not connected yet." body="The application shell is ready. Supabase and the pilot API must be configured before invitations can be sent." priority /><div className="production-checklist"><p><strong>Public demonstration:</strong> remains separate and fictional.</p><p><strong>Production records:</strong> will be stored only in Supabase.</p><p><strong>Survey wording:</strong> stays protected until permissions and PI approval are documented.</p></div></section></main>;
 }
 
-function SignIn({ supabase }: { supabase: SupabaseClient }) {
+export function SignIn({ supabase }: { supabase: SupabaseClient }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -69,10 +69,15 @@ function SignIn({ supabase }: { supabase: SupabaseClient }) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/app` });
     setBusy(false); setMessage(error ? "The reset message could not be sent." : "Check your email for a secure password link.");
   };
-  return <main className="production-auth"><section className="production-auth-card"><div className="production-auth-identity"><img src={assetUrl("/assets/navigate-pathway-mark.svg")} alt="Navigate The Pathway" /><div><p className="kicker">Invite-only pilot</p><h1>Welcome back.</h1></div></div><RosieGuide pose="idle" compact eyebrow="Rosie" title="Use the email address from your invitation." body="Advisor and administrator accounts will also verify a second factor." /><form className="production-form" onSubmit={signIn}><label><span>Email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="primary-button" disabled={busy}>{busy ? "Checking..." : "Sign in"}</button><button type="button" className="text-button" onClick={reset} disabled={busy}>Set or reset password</button><p className="form-message" aria-live="polite">{message}</p></form><p className="privacy-note">This is an educational pilot, not an admissions portal. Access is limited to invited participants.</p></section></main>;
+  const microsoftSignIn = async () => {
+    setBusy(true); setMessage("");
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "azure", options: { scopes: "openid email profile", redirectTo: `${window.location.origin}${window.location.pathname}`, queryParams: { prompt: "select_account" } } });
+    if (error) { setBusy(false); setMessage("Roseman Microsoft sign-in is not available yet. Use an invited email or contact support."); }
+  };
+  return <main className="production-auth"><section className="production-auth-card"><div className="production-auth-identity"><img src={assetUrl("/assets/navigate-pathway-mark.svg")} alt="Navigate" /><div><p className="kicker">One Roseman account hub</p><h1>Welcome back.</h1></div></div><RosieGuide pose="idle" compact eyebrow="Navigate" title="Use Roseman Microsoft sign-in or an approved invitation." body="Calendar access is requested separately. Staff roles also verify a second factor before protected records open." /><button type="button" className="primary-button" onClick={microsoftSignIn} disabled={busy}>Continue with Roseman Microsoft</button><div className="auth-divider" aria-hidden="true"><span>or invited email</span></div><form className="production-form" onSubmit={signIn}><label><span>Email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="secondary-button" disabled={busy}>{busy ? "Checking..." : "Sign in with email"}</button><button type="button" className="text-button" onClick={reset} disabled={busy}>Set or reset password</button><p className="form-message" aria-live="polite">{message}</p></form><p className="privacy-note">Sign-in consent never grants calendar access. Access is limited to active memberships and approved invitations.</p></section></main>;
 }
 
-function MfaGate({ supabase, onVerified }: { supabase: SupabaseClient; onVerified: () => void }) {
+export function MfaGate({ supabase, onVerified }: { supabase: SupabaseClient; onVerified: () => void }) {
   const [enrollment, setEnrollment] = useState<AuthMFAEnrollResponse["data"] | null>(null);
   const [code, setCode] = useState("");
   const [message, setMessage] = useState("");
@@ -82,7 +87,7 @@ function MfaGate({ supabase, onVerified }: { supabase: SupabaseClient; onVerifie
     const factors = await supabase.auth.mfa.listFactors();
     const verified = factors.data?.totp.find((factor) => factor.status === "verified");
     if (verified) { setEnrollment({ id: verified.id, type: "totp", totp: { qr_code: "", secret: "", uri: "" }, friendly_name: verified.friendly_name }); setBusy(false); return; }
-    const result = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "Navigate the Pathway" });
+    const result = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "Navigate" });
     setBusy(false);
     if (result.error) setMessage("A second factor could not be prepared. Contact the pilot administrator."); else setEnrollment(result.data);
   };

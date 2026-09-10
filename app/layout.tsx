@@ -4,10 +4,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://navigate-pathways.roseman-coll-6465.chatgpt.site"),
   title: {
-    default: "Navigate the Pathway",
-    template: "%s | Navigate the Pathway",
+    default: "Navigate",
+    template: "%s | Navigate",
   },
   description: "A phone-first visual pathway for premedical students to capture evidence, reflect, connect, and prepare.",
+  manifest: "/manifest.webmanifest",
   openGraph: {
     title: "Navigate the Pathway",
     description: "Explore a visual premed district and complete one useful next move.",

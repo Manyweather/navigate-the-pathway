@@ -14,7 +14,7 @@ async function fetchBuilt(request) {
 }
 
 async function render() {
-  return fetchBuilt(new Request("http://localhost/", { headers: { accept: "text/html" } }));
+  return fetchBuilt(new Request("http://localhost/demo", { headers: { accept: "text/html" } }));
 }
 
 test("server renders the Rosie access gate before protected views", async () => {
@@ -42,7 +42,7 @@ test("built access routes reject, unlock, authorize, and sign out", async () => 
   assert.match(setCookie, /SameSite=Lax/i);
   assert.match(setCookie, /Max-Age=43200/i);
   const cookie = setCookie.split(";")[0];
-  const authorized = await fetchBuilt(new Request("http://localhost/", { headers: { accept: "text/html", cookie } }));
+  const authorized = await fetchBuilt(new Request("http://localhost/demo", { headers: { accept: "text/html", cookie } }));
   const authorizedHtml = await authorized.text();
   assert.match(authorizedHtml, /Navigate The Pathway/);
   assert.match(authorizedHtml, /Start Rosie&#x27;s explanation/);

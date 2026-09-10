@@ -2,7 +2,7 @@
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "navigate-pathway-pilot-api",
   "main": "pilot-api.ts",
-  "compatibility_date": "2026-09-01",
+  "compatibility_date": "2026-09-10",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": true,
@@ -33,6 +33,7 @@
           "SURVEY_RESILIENCE",
           "SURVEY_ACCS",
           "SURVEY_ENCRYPTION_KEY",
+          "EVENT_SMS_WEBHOOK_SECRET",
           "CREATOR_BOOTSTRAP_EMAIL"
         ]
       }
@@ -47,6 +48,7 @@
           "SUPABASE_URL",
           "SUPABASE_ANON_KEY",
           "SUPABASE_SERVICE_ROLE_KEY",
+          "EVENT_SMS_WEBHOOK_SECRET",
           "ALLOWED_ORIGINS",
           "INVITE_REDIRECT_URL",
           "CREATOR_BOOTSTRAP_EMAIL"

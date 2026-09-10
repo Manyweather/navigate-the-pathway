@@ -1,4 +1,5 @@
 import type { PilotRole } from "./catalog";
+import type { ExperienceMembership } from "./platform-model";
 
 export type SurveyAssignmentStatus = "not_available" | "not_started" | "in_progress" | "submitted" | "closed";
 
@@ -18,6 +19,7 @@ export type AuthorizationContext = {
   environment: "staging" | "production";
   principalType?: "creator" | "principal_investigator" | null;
   principalAcknowledged?: boolean;
+  experienceMemberships?: ExperienceMembership[];
 };
 
 export type SessionSummary = {
