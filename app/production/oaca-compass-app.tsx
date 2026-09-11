@@ -47,6 +47,66 @@ type Bootstrap = {
 };
 type OacaView = "home" | "schedule" | "appointments" | "requirements" | "policies" | "portfolio" | "records" | "analytics" | "imports" | "settings" | "schedule_student" | "tutor" | "events" | "notifications" | "checkin" | "outreach";
 
+type CreatorActivity = { totalMs: number; locations: Record<string, number>; firstSeenAt: string; lastSeenAt: string };
+const creatorActivityKey = "navigate.creator.compass-time.v1";
+const oacaRoleLabels: Record<string, string> = { creator: "Creator", administrator: "Administrator", staff: "Staff", faculty: "Faculty", student: "Student" };
+const oacaViewLabels: Record<OacaView, string> = { home: "Home", schedule: "Request appointment", appointments: "My visits", requirements: "Requirements", policies: "Policies", portfolio: "Portfolio", records: "Visit records", analytics: "Analytics", imports: "Data imports", settings: "Service configuration", schedule_student: "Schedule for student", tutor: "Tutor desk", events: "Events", notifications: "Notifications", checkin: "Check-in", outreach: "Events and outreach" };
+
+function readCreatorActivity(): CreatorActivity {
+  const empty = { totalMs: 0, locations: {}, firstSeenAt: new Date().toISOString(), lastSeenAt: new Date().toISOString() };
+  if (typeof window === "undefined") return empty;
+  try { return { ...empty, ...JSON.parse(window.localStorage.getItem(creatorActivityKey) || "{}") } as CreatorActivity; }
+  catch { return empty; }
+}
+
+function formatTrackedTime(milliseconds: number) {
+  const seconds = Math.floor(milliseconds / 1000);
+  if (seconds < 60) return `${seconds} sec`;
+  const hours = Math.floor(seconds / 3600); const minutes = Math.floor((seconds % 3600) / 60);
+  return hours ? `${hours} hr ${minutes} min` : `${minutes} min`;
+}
+
+function useCreatorTimeTracking(enabled: boolean, location: string) {
+  useEffect(() => {
+    if (!enabled) return;
+    let lastTick = Date.now();
+    const record = () => {
+      const now = Date.now();
+      const elapsed = document.visibilityState === "visible" ? Math.min(now - lastTick, 15_000) : 0;
+      lastTick = now;
+      if (elapsed < 500) return;
+      const current = readCreatorActivity();
+      const next = { ...current, totalMs: current.totalMs + elapsed, locations: { ...current.locations, [location]: (current.locations[location] || 0) + elapsed }, lastSeenAt: new Date(now).toISOString() };
+      window.localStorage.setItem(creatorActivityKey, JSON.stringify(next));
+      window.dispatchEvent(new Event("navigate-creator-time"));
+    };
+    const interval = window.setInterval(record, 5_000);
+    const visibility = () => { record(); lastTick = Date.now(); };
+    document.addEventListener("visibilitychange", visibility);
+    window.addEventListener("pagehide", record);
+    return () => { record(); window.clearInterval(interval); document.removeEventListener("visibilitychange", visibility); window.removeEventListener("pagehide", record); };
+  }, [enabled, location]);
+}
+
+function CreatorTimePanel() {
+  const [activity, setActivity] = useState<CreatorActivity>(() => readCreatorActivity());
+  useEffect(() => {
+    const refresh = () => setActivity(readCreatorActivity());
+    const interval = window.setInterval(refresh, 5_000);
+    window.addEventListener("navigate-creator-time", refresh);
+    window.addEventListener("storage", refresh);
+    return () => { window.clearInterval(interval); window.removeEventListener("navigate-creator-time", refresh); window.removeEventListener("storage", refresh); };
+  }, []);
+  const locations = Object.entries(activity.locations).sort((left, right) => right[1] - left[1]).slice(0, 6);
+  const maximum = locations[0]?.[1] || 1;
+  return <section className="creator-time-panel" aria-labelledby="creator-time-title">
+    <div><p className="kicker">Creator pilot activity</p><h2 id="creator-time-title">Your time in Compass</h2><p>Counts active, visible time in this browser and separates it by the role and area you were exploring.</p></div>
+    <div className="creator-time-total"><strong>{formatTrackedTime(activity.totalMs)}</strong><span>Total exploration time</span></div>
+    <div className="creator-time-breakdown">{locations.map(([label, milliseconds]) => <div key={label}><span><strong>{label}</strong><small>{formatTrackedTime(milliseconds)}</small></span><i style={{ "--creator-time-width": `${Math.max(6, Math.round(milliseconds / maximum * 100))}%` } as React.CSSProperties} /></div>)}{!locations.length ? <p>Your activity breakdown will appear after a few seconds of exploration.</p> : null}</div>
+    <small>Stored only on this device for the synthetic Creator pilot.</small>
+  </section>;
+}
+
 const fallbackServices: Service[] = oacaServiceLines.map((service) => ({ id: "", key: service.key, name: service.name, providerRule: service.providerRule, policyStatus: "sandbox_approved", modalities: ["in_person", "phone", "teams"], durationMinutes: service.key === "peer_tutoring" ? 60 : 30 }));
 const emptyBootstrap: Bootstrap = { services: [], providers: [], appointments: [], assignedAdvisor: null, assignedStudents: [], currentProvider: null, policyDocuments: [], policyRules: [], acknowledgments: [], obligations: [], restrictions: [], tutorCompliance: null, liveScheduling: false, calendarConnected: false, canManageImports: false, canViewAnalytics: false, importBatches: [], analytics: null, canManageOutreach: false, canViewOutreachInsights: false, events: [], campaigns: [], nudges: [], communications: [], forms: [], audienceOptions: { cohorts: [], phases: [], years: [], campuses: [] }, eventNotificationUnreadCount: 0 };
 
@@ -127,6 +187,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
   const [preparationNote, setPreparationNote] = useState("");
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [dismissedRebooks, setDismissedRebooks] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const services = data.services.length ? data.services : fallbackServices;
   const selectedService = services.find((service) => service.key === serviceKey) || fallbackServices[0];
@@ -135,6 +196,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
   const studentAgreement = data.policyDocuments.find((item) => item.key === "peer_tutoring_student_agreement_2026_2027");
   const tutoringAcknowledged = Boolean(studentAgreement && data.acknowledgments.some((item) => item.policyDocumentId === studentAgreement.id && item.kind === "student_tutoring"));
   const openObligations = data.obligations.filter((item) => item.serviceKey === serviceKey && item.status !== "completed");
+  const obligationReasonLabel = (item: Obligation) => serviceKey === "academic_advising" && /foundations?/i.test(item.title) ? "General advising" : item.title;
   const standardReasons = serviceKey === "academic_advising"
     ? [["academic_planning", "Academic planning"], ["learning_strategy", "Learning or study strategy"], ["required_follow_up", "Required follow-up"], ["drop_in_question", "Quick drop-in question"]]
     : serviceKey === "career_advising"
@@ -154,7 +216,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
       : reasonForVisit === "recommended"
         ? "Advisor recommendation"
         : reasonForVisit.startsWith("requirement:")
-          ? data.obligations.find((item) => item.id === reasonForVisit.slice(12))?.title || "Required advising milestone"
+          ? (() => { const obligation = data.obligations.find((item) => item.id === reasonForVisit.slice(12)); return obligation ? obligationReasonLabel(obligation) : "General advising"; })()
           : standardReasons.find(([key]) => key === reasonForVisit)?.[1] || reasonForVisit.replaceAll("_", " ");
     const policyContext = serviceKey === "peer_tutoring"
       ? { examBlockKey, reasonForVisit: reason }
@@ -172,6 +234,10 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
     finally { setBusy(false); }
   };
   const cancel = async (id: string) => { setBusy(true); setMessage(""); try { await api.request("/api/oaca/appointments/cancel", { method: "POST", body: { appointmentId: id } }); setMessage("Appointment cancelled."); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : "The appointment could not be cancelled."); } finally { setBusy(false); } };
+  const rebook = (appointment: Appointment) => {
+    const nextService = appointment.serviceName.toLowerCase().includes("tutor") ? "peer_tutoring" : appointment.serviceName.toLowerCase().includes("career") ? "career_advising" : "academic_advising";
+    setServiceKey(nextService); setReasonForVisit("other"); setCustomReason("Rebook a cancelled appointment"); setTopic(appointment.subject || "Follow-up visit"); setStartsAt(""); setProviderId(""); setMessage(""); setView("schedule");
+  };
   const upload = async (file?: File) => {
     if (!file) return; const invalid = validateUpload(file); if (invalid) { setMessage(invalid); return; }
     setBusy(true); setMessage("Scanning and storing your private document…");
@@ -188,8 +254,6 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
   if (view === "tutor") return <TutorDesk api={api} context={context} data={data} reload={reload} setView={setView} />;
   if (view === "events" || view === "notifications" || view === "checkin") return <OacaStudentEvents focus={view} api={api} events={data.events} communications={data.communications} nudges={data.nudges} forms={data.forms} onSchedule={scheduleFromNudge} onBack={() => setView("home")} reload={reload} />;
   if (view === "schedule") {
-    const visitDetailsComplete = Boolean(reasonForVisit && (reasonForVisit !== "other" || customReason.trim()) && topic.trim());
-    const timeComplete = Boolean(startsAt && modality);
     return <section className="experience-panel">
       <button className="workspace-back text-button" onClick={() => setView("home")}>← Compass home</button>
       <div className="section-heading">
@@ -197,11 +261,10 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
         <span className={"status-chip status-chip--" + (data.liveScheduling ? "confirmed" : "pending")}>{data.liveScheduling ? "Live scheduling" : "Policy mapped · sandbox validation"}</span>
       </div>
       <p className="policy-intro">Required milestones are reminders, not limits. You can request academic advising, career advising, or peer tutoring whenever you need it.</p>
-      <ol className="booking-progress" aria-label="Booking process">
-        <li className="complete"><span>1</span><strong>Service</strong></li>
-        <li className={visitDetailsComplete ? "complete" : "active"}><span>2</span><strong>Visit details</strong></li>
-        <li className={timeComplete ? "complete" : visitDetailsComplete ? "active" : ""}><span>3</span><strong>Time &amp; format</strong></li>
-        <li className={timeComplete ? "active" : ""}><span>4</span><strong>Submit</strong></li>
+      <ol className="booking-progress booking-progress--lifecycle" aria-label="Appointment process">
+        <li className="active"><span>1</span><strong>Request</strong><small>Choose what works for you</small></li>
+        <li><span>2</span><strong>Confirm</strong><small>Your advisor confirms the time</small></li>
+        <li><span>3</span><strong>Meet</strong><small>Connect in person, by phone, or Teams</small></li>
       </ol>
       <form className="experience-form" onSubmit={schedule}>
         <fieldset>
@@ -220,7 +283,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
             setObligationId(value.startsWith("requirement:") ? value.slice(12) : "");
           }}>
             <option value="">Choose a reason</option>
-            {openObligations.map((item) => <option key={item.id} value={"requirement:" + item.id}>{item.title}</option>)}
+            {openObligations.map((item) => <option key={item.id} value={"requirement:" + item.id}>{obligationReasonLabel(item)}</option>)}
             {standardReasons.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             <option value="recommended">Advisor recommendation</option>
             <option value="other">Other — type my own</option>
@@ -263,18 +326,32 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
       </form>
     </section>;
   }
-  if (view === "appointments") return <section className="experience-panel"><button className="workspace-back text-button" onClick={() => setView("home")}>← OACA home</button><p className="kicker">My visits</p><h1>Appointments and action plans</h1><p className="form-message" aria-live="polite">{message}</p><div className="record-list">{data.appointments.map((appointment) => <article key={appointment.id}><div><span className={`status-chip status-chip--${appointment.status}`}>{appointment.status.replaceAll("_", " ")}</span><h2>{appointment.serviceName}</h2><p>{appointment.providerName || "Provider assignment pending"} · {appointment.requestOrigin === "advisor" ? "Scheduled by advisor" : "Requested by you"}</p></div><dl><div><dt>When</dt><dd>{appointment.startsAt ? new Date(appointment.startsAt).toLocaleString() : "Not selected"}</dd></div><div><dt>Modality</dt><dd>{appointment.modality.replaceAll("_", " ")}</dd></div></dl>{["pending_approval", "counterproposed", "confirmed"].includes(appointment.status) ? <button className="text-button" disabled={busy} onClick={() => void cancel(appointment.id)}>Cancel appointment</button> : null}{appointment.studentRecap ? <div className="student-recap"><strong>Your action plan</strong><p>{appointment.studentRecap}</p></div> : null}</article>)}{!data.appointments.length ? <div className="empty-state"><h2>No appointment history yet</h2><p>Your visits and staff-published action plans will appear here.</p></div> : null}</div></section>;
+  if (view === "appointments") return <section className="experience-panel">
+    <button className="workspace-back text-button" onClick={() => setView("home")}>← Compass home</button>
+    <p className="kicker">My visits</p><h1>Appointments and action plans</h1>
+    <p className="form-message" aria-live="polite">{message}</p>
+    <div className="record-list appointment-list">{data.appointments.map((appointment) => <article key={appointment.id}>
+      <div><span className={"status-chip status-chip--" + appointment.status}>{appointment.status.replaceAll("_", " ")}</span><h2>{appointment.serviceName}</h2><p>{appointment.providerName || "Provider assignment pending"} · {appointment.requestOrigin === "advisor" ? "Scheduled by advisor" : "Requested by you"}</p></div>
+      <dl><div><dt>When</dt><dd>{appointment.startsAt ? new Date(appointment.startsAt).toLocaleString() : "Not selected"}</dd></div><div><dt>Modality</dt><dd>{appointment.modality.replaceAll("_", " ")}</dd></div></dl>
+      {["pending_approval", "counterproposed", "confirmed"].includes(appointment.status) ? <button className="text-button" disabled={busy} onClick={() => void cancel(appointment.id)}>Cancel appointment</button> : null}
+      {appointment.status === "cancelled" && !dismissedRebooks.has(appointment.id) ? <div className="rebook-prompt"><div><strong>Would you like to choose another time?</strong><p>You can rebook now or come back to it later.</p></div><div className="workspace-actions"><button className="primary-button" onClick={() => rebook(appointment)}>Rebook</button><button className="text-button" onClick={() => setDismissedRebooks((current) => new Set(current).add(appointment.id))}>Later</button></div></div> : null}
+      {appointment.studentRecap ? <div className="student-recap"><strong>Your action plan</strong><p>{appointment.studentRecap}</p></div> : null}
+    </article>)}{!data.appointments.length ? <div className="empty-state"><h2>No appointment history yet</h2><p>Your visits and staff-published action plans will appear here.</p></div> : null}</div>
+  </section>;
   if (view === "portfolio") return <section className="experience-panel"><button className="workspace-back text-button" onClick={() => setView("home")}>← OACA home</button><p className="kicker">Student-owned portfolio</p><h1>Keep useful documents with you.</h1><div className="experience-grid experience-grid--compact"><article className="production-card"><h2>Add a private document</h2><p>PDF, DOCX, XLSX, PPTX, JPEG, or PNG · 25 MB maximum. Sharing is a separate action.</p><label className="file-drop"><span>{busy ? "Working…" : "Choose a document"}</span><input type="file" accept=".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png" disabled={busy} onChange={(event) => void upload(event.target.files?.[0])} /></label><p className="form-message" aria-live="polite">{message}</p></article><article className="production-card"><h2>Visit worksheet</h2><p>Use the accessible web worksheet or print the PDF. Its session code contains no student identity.</p><div className="workspace-actions"><a className="secondary-button" href="/app/oaca/worksheet">Open HTML worksheet</a><a className="text-button" href="/resources/oaca-compass-visit-worksheet.pdf" download>Download print PDF</a></div></article></div></section>;
   const isTutor = data.currentProvider?.classification === "peer_tutor";
+  const firstName = context.displayName.split(/\s+/)[0] || "there";
+  const nextAppointment = data.appointments.filter((item) => item.startsAt && ["pending_approval", "counterproposed", "confirmed"].includes(item.status)).sort((left, right) => new Date(left.startsAt || 0).getTime() - new Date(right.startsAt || 0).getTime())[0];
+  const nextEvent = data.events.filter((item) => new Date(item.startsAt).getTime() >= Date.now()).sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime())[0];
   return <section className="experience-panel">
     <div className="experience-hero experience-hero--oaca compass-student-hero">
       <div className="compass-hero-copy">
-        <p className="kicker">Office of Academic and Career Advising</p>
-        <h1>Your support, organized.</h1>
-        <p>Schedule a visit, see required milestones, and keep your goals and action plans in one private place.</p>
+        <p className="kicker">Your Compass</p>
+        <h1>Welcome back, {firstName}.</h1>
+        <p>What would make today easier? Book support, check what’s coming up, or pick up where you left off.</p>
       </div>
       <div className="compass-hero-actions" aria-label="Compass quick actions">
-        <button onClick={() => setView("schedule")} aria-label="Request an appointment"><CompassHeroIcon kind="appointment" /><strong>Appointment</strong></button>
+        <button onClick={() => setView("schedule")} aria-label="Request an appointment"><CompassHeroIcon kind="appointment" /><strong>Make an appointment</strong></button>
         <button onClick={() => setView("notifications")} aria-label="Open notifications"><CompassHeroIcon kind="notifications" /><strong>Notifications</strong>{data.eventNotificationUnreadCount ? <small>{data.eventNotificationUnreadCount} unread</small> : null}</button>
         <button onClick={() => setView("events")} aria-label="Open events"><CompassHeroIcon kind="events" /><strong>Events</strong></button>
         <button onClick={() => setView("checkin")} aria-label="Show student check-in code"><CompassHeroIcon kind="checkin" /><strong>Check in</strong></button>
@@ -282,17 +359,21 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
       </div>
       <div className="hero-status">
         <span aria-hidden="true">⌁</span>
-        <strong>{data.nudges.length ? data.nudges.length + " appointment reminder" + (data.nudges.length === 1 ? "" : "s") : data.calendarConnected ? "Outlook connected" : "Calendar access optional"}</strong>
-        <p>{data.nudges.length ? "Open notifications to choose a time." : data.calendarConnected ? "Your free/busy connection can support Compass scheduling." : "You can use OACA Compass without granting calendar access."}</p>
+        <strong>{data.nudges.length ? data.nudges.length + " appointment reminder" + (data.nudges.length === 1 ? "" : "s") : nextAppointment ? "Your next visit is on the calendar" : "You’re all caught up"}</strong>
+        <p>{data.nudges.length ? "Open notifications when you’re ready to choose a time." : nextAppointment ? "Open My visits for the details and status." : "Compass is ready whenever you need support."}</p>
       </div>
     </div>
+    <section className="compass-at-a-glance" aria-label="Coming up">
+      <article><span>Next visit</span><strong>{nextAppointment?.serviceName || "No appointment scheduled"}</strong><small>{nextAppointment?.startsAt ? new Date(nextAppointment.startsAt).toLocaleString() : "Request support whenever you need it."}</small>{nextAppointment ? <button className="text-button" onClick={() => setView("appointments")}>View visit</button> : <button className="text-button" onClick={() => setView("schedule")}>Choose a time</button>}</article>
+      <article><span>Coming up</span><strong>{nextEvent?.title || "No upcoming events"}</strong><small>{nextEvent ? `${new Date(nextEvent.startsAt).toLocaleString()}${nextEvent.location ? ` · ${nextEvent.location}` : ""}` : "New OACA events will appear here."}</small>{nextEvent ? <button className="text-button" onClick={() => setView("events")}>View events</button> : null}</article>
+    </section>
     <div className="home-action-grid home-action-grid--experience compass-secondary-actions">
       <button onClick={() => setView("requirements")}><span>◇</span><strong>My requirements</strong><small>Milestones and additional support</small></button>
       <button onClick={() => setView("portfolio")}><span>▤</span><strong>My portfolio</strong><small>Private files and explicit sharing</small></button>
       <button onClick={() => setView("policies")}><span>§</span><strong>Policies</strong><small>Current advising and tutoring rules</small></button>
       {isTutor ? <button onClick={() => setView("tutor")}><span>✎</span><strong>Tutor desk</strong><small>Eligibility and session logs</small></button> : null}
     </div>
-    {data.restrictions.length ? <aside className="configuration-banner configuration-banner--alert"><strong>Peer tutoring scheduling is temporarily restricted.</strong><p>{data.restrictions[0].reason}. Contact the Tutoring Manager for review.</p></aside> : <aside className="configuration-banner"><strong>Policies are mapped for sandbox validation.</strong><p>Students may request appointments outside required milestones. Live scheduling still awaits office hours, Outlook free/busy, remaining service values, and administrator approval.</p></aside>}
+    {data.restrictions.length ? <aside className="configuration-banner configuration-banner--alert"><strong>Peer tutoring scheduling is temporarily restricted.</strong><p>{data.restrictions[0].reason}. Contact the Tutoring Manager for review.</p></aside> : null}
   </section>;
 }
 
@@ -312,7 +393,7 @@ function OacaStaff({ api, supabase, context, data, mode, reload, view, setView }
   if (view === "imports") return <OacaImportCenter api={api} supabase={supabase} context={context} batches={data.importBatches} reload={reload} onBack={() => setView("home")} />;
   if (view === "outreach") return <OacaEventsAndOutreach api={api} supabase={supabase} context={context} canManageOutreach={data.canManageOutreach} canManageImports={data.canManageImports} events={data.events} campaigns={data.campaigns} nudges={data.nudges} students={data.assignedStudents} providers={data.providers} services={data.services} audienceOptions={data.audienceOptions} reload={reload} onBack={() => setView("home")} />;
   if (view === "settings") return <section className="experience-panel"><button className="workspace-back text-button" onClick={() => setView("home")}>← Staff home</button><p className="kicker">Service configuration</p><h1>Policies received; operations still gated.</h1><div className="record-list">{(data.services.length ? data.services : fallbackServices).map((service) => <article key={service.key}><span className={`status-chip status-chip--${service.policyStatus === "live_approved" ? "confirmed" : "pending"}`}>{service.policyStatus.replaceAll("_", " ")}</span><h2>{service.name}</h2><p>{service.key === "peer_tutoring" ? "The 60-minute maximum, seven-day booking horizon, weekly and exam-block limits, 24-hour cancellation rule, capacity ranges, and no-show review are mapped." : "Required milestones and provider routing are mapped."}</p><small>Live activation still requires office hours, Outlook free/busy, remaining service values, and administrator approval.</small></article>)}</div><button className="secondary-button" onClick={() => setView("policies")}>Review mapped policies</button></section>;
-  return <section className="experience-panel"><div className="experience-hero experience-hero--oaca"><div><p className="kicker">OACA staff workspace</p><h1>Today’s advising work.</h1><p>See only assigned students, service workload, and the records your capability bundle permits.</p></div><div className="hero-status"><strong>{data.appointments.length}</strong><p>appointments in your authorized scope</p></div></div><div className="home-action-grid home-action-grid--experience"><button onClick={() => setView("outreach")}><span>◉</span><strong>{data.canManageOutreach ? "Events and outreach" : "Appointment nudges"}</strong><small>{data.canManageOutreach ? "Events, rich email, forms, and insights" : "Remind assigned students to schedule"}</small></button>{!["administrator","creator"].includes(mode) ? <><button onClick={() => setView("schedule_student")}><span>＋</span><strong>Schedule for a student</strong><small>Assigned or explicitly authorized students</small></button><button onClick={() => setView("records")}><span>✎</span><strong>Visit records</strong><small>Working notes, structure, and recap</small></button></> : null}{data.canViewAnalytics ? <button onClick={() => setView("analytics")}><span>▥</span><strong>Service analytics</strong><small>Aggregate workload and cohort trends</small></button> : null}{data.canManageImports ? <button onClick={() => setView("imports")}><span>⇧</span><strong>Secure data imports</strong><small>Penji history and student metadata</small></button> : null}<button onClick={() => setView("settings")}><span>⚙</span><strong>Service configuration</strong><small>Policy mapping and live gates</small></button><button onClick={() => setView("policies")}><span>§</span><strong>Policy library</strong><small>Source versions and operational rules</small></button></div></section>;
+  return <section className="experience-panel"><div className="experience-hero experience-hero--oaca"><div><p className="kicker">OACA staff workspace</p><h1>Today’s advising work.</h1><p>See only assigned students, service workload, and the records your capability bundle permits.</p></div><div className="hero-status"><strong>{data.appointments.length}</strong><p>appointments in your authorized scope</p></div></div>{mode === "creator" ? <CreatorTimePanel /> : null}<div className="home-action-grid home-action-grid--experience"><button onClick={() => setView("outreach")}><span>◉</span><strong>{data.canManageOutreach ? "Events and outreach" : "Appointment nudges"}</strong><small>{data.canManageOutreach ? "Events, rich email, forms, and insights" : "Remind assigned students to schedule"}</small></button>{!["administrator","creator"].includes(mode) ? <><button onClick={() => setView("schedule_student")}><span>＋</span><strong>Schedule for a student</strong><small>Assigned or explicitly authorized students</small></button><button onClick={() => setView("records")}><span>✎</span><strong>Visit records</strong><small>Working notes, structure, and recap</small></button></> : null}{data.canViewAnalytics ? <button onClick={() => setView("analytics")}><span>▥</span><strong>Service analytics</strong><small>Aggregate workload and cohort trends</small></button> : null}{data.canManageImports ? <button onClick={() => setView("imports")}><span>⇧</span><strong>Secure data imports</strong><small>Penji history and student metadata</small></button> : null}<button onClick={() => setView("settings")}><span>⚙</span><strong>Service configuration</strong><small>Policy mapping and live gates</small></button><button onClick={() => setView("policies")}><span>§</span><strong>Policy library</strong><small>Source versions and operational rules</small></button></div></section>;
 }
 
 function OacaWorkspace({ api, supabase, context, membership, signOut }: { api: PilotApiClient; supabase: SupabaseClient; context: AuthorizationContext; membership: ExperienceMembership; signOut: () => Promise<void> }) {
@@ -322,6 +403,7 @@ function OacaWorkspace({ api, supabase, context, membership, signOut }: { api: P
   const [mode, setMode] = useState<string>(membership.roles.includes("creator") ? "creator" : membership.roles.includes("student") ? "student" : membership.roles[0] || "staff");
   const load = useCallback(async () => { try { setData(await api.request<Bootstrap>("/api/oaca/bootstrap")); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "OACA Compass could not be loaded."); } }, [api]);
   useEffect(() => { const task = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(task); }, [load]);
+  useCreatorTimeTracking(membership.roles.includes("creator"), `Compass · ${oacaRoleLabels[mode] || mode} · ${oacaViewLabels[view]}`);
   const staff = mode !== "student";
   const studentData: Bootstrap = staff ? data : {
     ...data,
@@ -337,12 +419,11 @@ function OacaWorkspace({ api, supabase, context, membership, signOut }: { api: P
     campaigns: [],
     nudges: data.nudges.filter((nudge) => nudge.studentId === context.userId),
   };
-  const roleLabels: Record<string, string> = { creator: "Creator", administrator: "Administrator", staff: "Staff", faculty: "Faculty", student: "Student" };
   return <div className="navigate-platform navigate-platform--oaca">
     <ExperienceHeader context={context} onSignOut={signOut} />
     <main className="platform-main">
       <nav className="experience-nav compass-role-nav" aria-label="Compass dashboard role">
-        {membership.roles.length > 1 ? <label><span>Viewing dashboard as</span><select value={mode} onChange={(event) => { setMode(event.target.value); setView("home"); }}>{membership.roles.map((role) => <option key={role} value={role}>{roleLabels[role] || role.replaceAll("_", " ")}</option>)}</select></label> : <span className="status-chip">{roleLabels[mode] || mode.replaceAll("_", " ")} dashboard</span>}
+        {membership.roles.length > 1 ? <label><span>Viewing dashboard as</span><select value={mode} onChange={(event) => { setMode(event.target.value); setView("home"); }}>{membership.roles.map((role) => <option key={role} value={role}>{oacaRoleLabels[role] || role.replaceAll("_", " ")}</option>)}</select></label> : <span className="status-chip">{oacaRoleLabels[mode] || mode.replaceAll("_", " ")} dashboard</span>}
       </nav>
       {message ? <p className="form-message" aria-live="polite">{message}</p> : null}
       {staff ? <OacaStaff api={api} supabase={supabase} context={context} data={data} mode={mode} reload={load} view={view} setView={setView} /> : <OacaStudent api={api} supabase={supabase} context={context} data={studentData} view={view} setView={setView} reload={load} />}

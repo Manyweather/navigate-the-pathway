@@ -35,6 +35,9 @@ test("synthetic creator preview exposes all workspaces without production identi
   assert.ok(compass.events.length && compass.appointments.length && compass.analytics);
   assert.ok(impact.organizations.length && impact.portfolios.length && impact.snapshots.length);
   assert.doesNotMatch(JSON.stringify({ compass, impact }), /@roseman\.edu/i);
+  await syntheticPreviewApi.request("/api/oaca/appointments/cancel", { method: "POST", body: { appointmentId: "appointment-1" } });
+  const updatedCompass = await syntheticPreviewApi.request("/api/oaca/bootstrap");
+  assert.equal(updatedCompass.appointments.find((appointment) => appointment.id === "appointment-1")?.status, "cancelled");
 });
 
 test("OACA state transitions preserve explicit approval and counterproposal semantics", () => {
@@ -149,9 +152,10 @@ test("Worker API requires matching experience context and keeps endpoint familie
 });
 
 test("phone-first pilot screens include the required privacy and approval guardrails", async () => {
-  const [hub, oaca, genesis, worksheet, eventWorkspace, signInSource, styles] = await Promise.all([
+  const [hub, oaca, engagement, genesis, worksheet, eventWorkspace, signInSource, styles] = await Promise.all([
     readFile(new URL("../app/production/navigate-hub-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-compass-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/oaca-engagement-center.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/genesis-impact-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-worksheet.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-event-workspace.tsx", import.meta.url), "utf8"),
@@ -178,11 +182,23 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.match(oaca, /OacaImportCenter/);
   assert.match(oaca, /Request an Appointment/);
   assert.match(oaca, /Reason for visit/);
+  assert.match(oaca, /General advising/);
   assert.match(oaca, /Academic drop-in/);
   assert.match(oaca, /up to two drop-in visits per academic block/);
   assert.match(oaca, /You will receive a notification when your appointment is confirmed/);
+  assert.match(oaca, /<strong>Request<\/strong>/);
+  assert.match(oaca, /<strong>Confirm<\/strong>/);
+  assert.match(oaca, /<strong>Meet<\/strong>/);
+  assert.match(oaca, /Rebook/);
+  assert.match(oaca, />Later</);
+  assert.match(oaca, /Creator pilot activity/);
+  assert.match(oaca, /navigate\.creator\.compass-time\.v1/);
+  assert.doesNotMatch(oaca, /Policies are mapped for sandbox validation/);
   assert.doesNotMatch(oaca, /<a href="\/app">All experiences<\/a>/);
   assert.match(oaca, /Appointment nudges/);
+  assert.match(engagement, /<h1>Notifications<\/h1>/);
+  assert.doesNotMatch(engagement, /Updates that need your attention/);
+  assert.ok(engagement.indexOf('part="inbox"') < engagement.indexOf('part="settings"'));
   assert.match(eventWorkspace, /Run the room from one place/);
   assert.match(eventWorkspace, /Register \+ present/);
   assert.match(eventWorkspace, /permanent, identifier-free code/);

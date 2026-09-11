@@ -206,6 +206,7 @@ function genesisBootstrap() {
 class SyntheticPilotApi {
   private affiliationIds = medicineOrganization ? [medicineOrganization.id] : [];
   private studentCouncil = true;
+  private appointments = oacaBootstrap().appointments;
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     if (path === "/api/platform/experiences") return clone({ context: syntheticPreviewContext, memberships: syntheticPreviewMemberships }) as T;
@@ -217,7 +218,7 @@ class SyntheticPilotApi {
       }
       return clone({ isStudent: true, organizations: organizations.map(({ id, key, name, college, campus, aliases }) => ({ id, key, name, college, campus, aliases })), organizationIds: this.affiliationIds, studentCouncil: this.studentCouncil }) as T;
     }
-    if (path === "/api/oaca/bootstrap") return clone(oacaBootstrap()) as T;
+    if (path === "/api/oaca/bootstrap") return clone({ ...oacaBootstrap(), appointments: this.appointments }) as T;
     if (path.startsWith("/api/oaca/events/workspace")) return clone(eventWorkspace()) as T;
     if (path === "/api/oaca/event-imports" && (!options.method || options.method === "GET")) return clone([{ id: "event-import-1", status: "completed", source_event_rows: 48, source_attendance_rows: 178, occurrence_count: 22, matched_students: 76, merged_duplicates: 3, quality_summary: { note: "Illustrative aggregate only" }, requested_by: "synthetic-creator", reviewed_by: "synthetic-reviewer", reviewed_at: isoAt(-2, 11), completed_at: isoAt(-2, 12), created_at: isoAt(-3, 11) }]) as T;
     if (path === "/api/genesis/bootstrap") return clone(genesisBootstrap()) as T;
@@ -227,6 +228,19 @@ class SyntheticPilotApi {
     if (path === "/api/oaca/events/check-in") return { open: true, token: "synthetic-event-token", closesAt: isoAt(0, 16), deepLink: "/app/oaca?checkin=synthetic-event-token" } as T;
     if (path === "/api/oaca/events/check-in/student-token") return { token: "synthetic-permanent-student-qr", permanent: true } as T;
     if (path === "/api/oaca/events/check-in/self") return { title: "Learning Strategies Lab" } as T;
+    if (path === "/api/oaca/appointments/cancel") {
+      const body = options.body as { appointmentId?: string } | undefined;
+      const appointment = this.appointments.find((item) => item.id === body?.appointmentId);
+      if (appointment) appointment.status = "cancelled";
+      return clone({ id: appointment?.id, status: appointment?.status || "cancelled" }) as T;
+    }
+    if (path === "/api/oaca/appointments" && (options.method || "GET").toUpperCase() === "POST") {
+      const body = options.body as { serviceLineId?: string; providerId?: string | null; startsAt?: string; modality?: string; format?: string; topic?: string } | undefined;
+      const seed = oacaBootstrap(); const service = seed.services.find((item) => item.id === body?.serviceLineId); const provider = seed.providers.find((item) => item.id === body?.providerId);
+      const appointment = { id: `appointment-${crypto.randomUUID()}`, studentId: "synthetic-creator", studentName: "Creator preview", serviceName: service?.name || "OACA appointment", providerName: provider?.displayName || (service?.key === "academic_advising" ? seed.assignedAdvisor.displayName : null), subject: body?.topic || null, format: body?.format || "individual", startsAt: body?.startsAt || null, endsAt: null, modality: body?.modality || "teams", status: "pending_approval", sandbox: true, requestOrigin: "student" as const };
+      this.appointments = [appointment, ...this.appointments];
+      return clone({ id: appointment.id, status: appointment.status, sandbox: true }) as T;
+    }
     if (path === "/api/oaca/campaigns") return { id: "synthetic-campaign" } as T;
     return { id: "synthetic-record", ok: true } as T;
   }

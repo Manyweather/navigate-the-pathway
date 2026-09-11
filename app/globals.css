@@ -1001,6 +1001,7 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .hero-status>span { display:block; font-size:2.5rem; margin-bottom:.75rem; }
 .hero-status>strong { font:700 1.3rem Georgia,serif; }
 .compass-student-hero { grid-template-columns:minmax(0,1.3fr) minmax(240px,.7fr); }
+.compass-student-hero { background:radial-gradient(circle at 86% 14%,rgba(255,255,255,.18),transparent 28%),linear-gradient(132deg,#3447ae 0%,#5365c9 58%,#c66f67 100%); box-shadow:0 18px 44px rgba(48,61,142,.2); }
 .compass-hero-copy,.compass-hero-actions { position:relative; z-index:1; }
 .compass-hero-actions { grid-column:1/-1; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.7rem; }
 .compass-hero-actions button { min-height:104px; display:grid; place-items:center; align-content:center; gap:.25rem; padding:.75rem; border:1px solid rgba(255,255,255,.62); border-radius:18px; color:#25316f; background:rgba(255,255,255,.94); font:inherit; cursor:pointer; box-shadow:0 10px 24px rgba(26,34,96,.14); }
@@ -1009,6 +1010,12 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .compass-hero-actions button>strong { font-size:.85rem; }
 .compass-hero-actions button>small { color:#596081; font-size:.7rem; }
 .compass-secondary-actions { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.compass-at-a-glance { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; margin:1.15rem 0; }
+.compass-at-a-glance article { min-height:126px; display:grid; align-content:center; gap:.35rem; padding:1rem 1.15rem; border:1px solid #d8dcea; border-radius:18px; background:linear-gradient(145deg,#fff,#f8f9ff); }
+.compass-at-a-glance article>span { color:#596081; font-size:.76rem; font-weight:850; letter-spacing:.06em; text-transform:uppercase; }
+.compass-at-a-glance article>strong { color:#2d376f; font:700 1.2rem Georgia,"Times New Roman",serif; }
+.compass-at-a-glance article>small { color:#62677b; line-height:1.45; }
+.compass-at-a-glance .text-button { width:max-content; padding-left:0; }
 .home-action-grid--experience { margin:1.3rem 0; grid-template-columns:repeat(4,minmax(0,1fr)); }
 .home-action-grid--experience button { min-height:150px; }
 .section-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1.3rem; }
@@ -1026,6 +1033,9 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .booking-progress li.active { color:#3444a0; border-color:#6e7bd0; background:#f1f4ff; }
 .booking-progress li.complete { color:#155840; border-color:#78b89f; background:#ecf8f2; }
 .booking-progress li.complete>span { color:#fff; background:#238264; }
+.booking-progress--lifecycle { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.booking-progress--lifecycle li { grid-template-columns:30px 1fr; }
+.booking-progress--lifecycle li small { grid-column:2; color:#686b7a; line-height:1.35; }
 .experience-form,.reflection-card,.record-editor,.review-workspace { display:grid; gap:1.15rem; padding:clamp(1rem,3vw,2rem); border:1px solid rgba(89,88,84,.2); border-radius:22px; background:#fff; }
 .experience-form fieldset,.reflection-card fieldset { border:0; padding:0; margin:0; }
 .experience-form legend,.reflection-card legend { font:700 1.25rem Georgia,serif; margin-bottom:.75rem; }
@@ -1043,6 +1053,21 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .drop-in-fields { display:grid; gap:.85rem; padding:1rem 1.2rem; border:1px solid #cfd4ec; border-radius:14px; background:#f5f7ff; }
 .drop-in-fields p { margin:0; color:#4f5575; }
 .appointment-success { padding:.85rem 1rem; border:1px solid #72b696; border-radius:12px; color:#155840; background:#e7f7ef; font-weight:800; }
+.rebook-prompt { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:.9rem; padding:1rem; border:1px solid #edc790; border-radius:14px; background:#fff8e9; }
+.rebook-prompt p { margin:.25rem 0 0; color:#655b4c; }
+.creator-time-panel { display:grid; grid-template-columns:minmax(220px,.75fr) minmax(150px,.25fr) minmax(280px,1fr); gap:1rem; align-items:center; margin:1.2rem 0; padding:1.2rem; border:1px solid #cbd1ed; border-radius:20px; background:linear-gradient(135deg,#f7f8ff,#fff); }
+.creator-time-panel h2 { margin:.25rem 0; color:#2f3976; font:700 1.55rem Georgia,"Times New Roman",serif; }
+.creator-time-panel p { margin:.25rem 0; color:#5d6278; line-height:1.45; }
+.creator-time-panel>small { grid-column:1/-1; color:#686c7c; }
+.creator-time-total { display:grid; gap:.2rem; padding:1rem; border-radius:16px; color:#fff; background:#4354ba; text-align:center; }
+.creator-time-total strong { font:700 1.8rem Georgia,"Times New Roman",serif; }
+.creator-time-total span { font-size:.76rem; }
+.creator-time-breakdown { display:grid; gap:.6rem; }
+.creator-time-breakdown>div { display:grid; gap:.3rem; }
+.creator-time-breakdown>div>span { display:flex; justify-content:space-between; gap:.75rem; color:#4e536b; font-size:.77rem; }
+.creator-time-breakdown>div>span strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.creator-time-breakdown i { height:7px; overflow:hidden; border-radius:999px; background:#e2e5f3; }
+.creator-time-breakdown i::after { content:""; display:block; width:var(--creator-time-width); height:100%; border-radius:inherit; background:linear-gradient(90deg,#4354ba,#cf746b); }
 .segmented-control { display:flex; flex-wrap:wrap; gap:.6rem; }
 .segmented-control label { display:block; }
 .segmented-control input { position:absolute; opacity:0; }
@@ -1193,10 +1218,10 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .worksheet-page footer p { flex-basis:100%; }
 .worksheet-page .text-button { min-height:44px; display:inline-flex; align-items:center; }
 .navigate-platform button:focus-visible,.navigate-platform a:focus-visible,.navigate-platform input:focus-visible,.navigate-platform select:focus-visible,.navigate-platform textarea:focus-visible,.worksheet-page button:focus-visible,.worksheet-page a:focus-visible,.worksheet-page input:focus-visible,.worksheet-page textarea:focus-visible { outline:3px solid #f0b323; outline-offset:3px; }
-@media(max-width:900px) { .experience-grid,.home-action-grid--experience,.security-control-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .experience-hero { grid-template-columns:1fr; } .hero-status { max-width:560px; } .choice-grid { grid-template-columns:1fr; } .compass-hero-actions { grid-column:1; grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:900px) { .experience-grid,.home-action-grid--experience,.security-control-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .experience-hero { grid-template-columns:1fr; } .hero-status { max-width:560px; } .choice-grid { grid-template-columns:1fr; } .compass-hero-actions { grid-column:1; grid-template-columns:repeat(3,minmax(0,1fr)); } .creator-time-panel { grid-template-columns:1fr 180px; } .creator-time-breakdown { grid-column:1/-1; } }
 @media(max-width:900px) { .composer-grid,.outreach-layout,.student-event-grid { grid-template-columns:1fr; } .email-preview { position:static; } .mini-metric-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:700px) { .policy-document-grid,.policy-stat-grid,.form-row,.mapping-grid,.analytics-cohorts dl { grid-template-columns:1fr; } .requirement-item,.nudge-stack article { align-items:flex-start; flex-direction:column; } .student-event-grid .record-list article { grid-template-columns:auto 1fr; } .student-event-grid .record-list article>button { grid-column:1/-1; width:100%; } .composer-heading { flex-direction:column; } .mini-metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media(max-width:620px) { .platform-header,.worksheet-page>header { align-items:flex-start; flex-wrap:wrap; } .worksheet-page>header { flex-direction:column; } .experience-title { order:3; width:100%; align-items:flex-start; padding-left:3px; } .platform-account>span { display:none; } .platform-main { padding-top:1.2rem; } .experience-grid,.experience-grid--compact,.home-action-grid--experience,.metric-grid,.source-fields,.worksheet-actions,.security-control-grid { grid-template-columns:1fr; } .experience-card { min-height:260px; } .section-heading { flex-direction:column; } .experience-form { padding:1rem; } .source-fields label,.source-fields label:has(textarea) { grid-column:1; } .synthetic-preview-banner { grid-template-columns:auto 1fr; } .synthetic-preview-banner .secondary-button { grid-column:1 / -1; width:100%; } .compass-role-nav { justify-content:stretch; } .compass-role-nav label { width:100%; justify-content:space-between; } .compass-role-nav select { flex:1; } .compass-hero-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .compass-hero-actions button:first-child { grid-column:1/-1; } .booking-progress { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:620px) { .platform-header,.worksheet-page>header { align-items:flex-start; flex-wrap:wrap; } .worksheet-page>header { flex-direction:column; } .experience-title { order:3; width:100%; align-items:flex-start; padding-left:3px; } .platform-account>span { display:none; } .platform-main { padding-top:1.2rem; } .experience-grid,.experience-grid--compact,.home-action-grid--experience,.metric-grid,.source-fields,.worksheet-actions,.security-control-grid { grid-template-columns:1fr; } .experience-card { min-height:260px; } .section-heading { flex-direction:column; } .experience-form { padding:1rem; } .source-fields label,.source-fields label:has(textarea) { grid-column:1; } .synthetic-preview-banner { grid-template-columns:auto 1fr; } .synthetic-preview-banner .secondary-button { grid-column:1 / -1; width:100%; } .compass-role-nav { justify-content:stretch; } .compass-role-nav label { width:100%; justify-content:space-between; } .compass-role-nav select { flex:1; } .compass-hero-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .compass-hero-actions button:first-child { grid-column:1/-1; } .booking-progress,.compass-at-a-glance,.creator-time-panel { grid-template-columns:1fr; } .creator-time-breakdown { grid-column:1; } .rebook-prompt { align-items:flex-start; flex-direction:column; } }
 @media(max-width:640px) { .hub-affiliations__heading { display:grid; } .affiliation-filters,.affiliation-list { grid-template-columns:1fr; } .affiliation-list { max-height:55dvh; } .affiliation-editor__body>.primary-button { width:100%; } }
 @media print { .print-hidden,.platform-header,.experience-nav { display:none!important; } .worksheet-page { width:100%; margin:0; font-size:11pt; } .worksheet-page>section { break-inside:avoid; } .worksheet-page textarea { border:0; border-bottom:1px solid #555; border-radius:0; min-height:90px; } }
 
@@ -1255,6 +1280,11 @@ details.event-admin-card>summary { min-height:44px; display:flex; align-items:ce
 .student-event-tools { display:grid; gap:1rem; margin:1rem 0 1.5rem; }
 .student-event-tools--checkin .student-push-card,.student-event-tools--checkin .student-notification-preferences,.student-event-tools--checkin .notification-inbox { display:none; }
 .student-event-tools--notifications .student-qr-card,.student-event-tools--notifications .student-attendance-card { display:none; }
+.student-event-tools--part-inbox .student-event-tool-grid,.student-event-tools--part-inbox .student-notification-preferences,.student-event-tools--part-inbox .student-attendance-card { display:none; }
+.student-event-tools--part-settings .notification-inbox,.student-event-tools--part-settings .student-attendance-card { display:none; }
+.notification-settings-footer { margin-top:2rem; padding-top:1.5rem; border-top:1px solid #d7dbea; }
+.notification-settings-footer h2 { margin:.2rem 0; font:700 1.65rem Georgia,"Times New Roman",serif; }
+.notification-settings-footer>div>p:last-child { color:#62677b; }
 .student-event-list { display:grid; gap:1rem; }
 .student-event-list>article { display:grid; grid-template-columns:minmax(180px,.38fr) minmax(0,.62fr); gap:1.1rem; overflow:hidden; border:1px solid var(--event-border); border-radius:20px; background:#fff; box-shadow:0 9px 28px rgba(34,45,93,.08); }
 .student-event-list>article>img,.student-event-list__mark { width:100%; height:100%; min-height:230px; object-fit:cover; }
