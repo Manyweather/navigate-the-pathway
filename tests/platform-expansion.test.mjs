@@ -16,7 +16,7 @@ import {
   suppressSmallGroup,
 } from "../app/production/platform-model.ts";
 import { organizationCollegeOrder, organizationsForSelect, studentOrganizations } from "../app/production/student-organizations.ts";
-import { SYNTHETIC_PERSONA_KEY, syntheticPreviewApi, syntheticPreviewContext, syntheticPreviewMemberships } from "../app/production/synthetic-preview.ts";
+import { SYNTHETIC_PERSONA_KEY, syntheticMembershipsForPersona, syntheticPreviewApi, syntheticPreviewContext, syntheticPreviewMemberships } from "../app/production/synthetic-preview.ts";
 import { parseRecoveryCallback } from "../app/production/auth-recovery.ts";
 
 test("Compass is the parent for three isolated workspace destinations", () => {
@@ -27,6 +27,9 @@ test("Compass is the parent for three isolated workspace destinations", () => {
   assert.equal(experiences.genesis.href, "/app/compass/impact");
   assert.equal(experiences.genesis.name, "Impact Workspace");
   assert.equal(defaultWorkspaceFor(syntheticPreviewMemberships, null), "compass");
+  const impactStudentMemberships = syntheticMembershipsForPersona("impact_student");
+  assert.equal(defaultWorkspaceFor(impactStudentMemberships, null), "impact");
+  assert.equal(defaultWorkspaceFor(impactStudentMemberships, "compass"), "impact");
   for (const role of ["faculty", "staff", "administrator", "creator", "principal_investigator", "mentor", "community_liaison"]) assert.equal(staffMfaRoles.has(role), true);
 });
 
@@ -102,6 +105,16 @@ test("Creator Preview personas are scoped before dashboard data is returned", as
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
   }
+});
+
+test("Impact student preview opens only the Impact home surface", async () => {
+  const shell = await readFile(new URL("../app/production/compass-platform-shell.tsx", import.meta.url), "utf8");
+  const access = await readFile(new URL("../app/production/platform-access.tsx", import.meta.url), "utf8");
+  const impact = await readFile(new URL("../app/production/genesis-impact-app.tsx", import.meta.url), "utf8");
+  assert.match(shell, /current === "impact" && currentExperience\?\.roles\.includes\("student"\)/);
+  assert.match(shell, /window\.location\.replace\(target\)/);
+  assert.match(access, /previewPersona === "impact_student" && experience === "oaca"/);
+  assert.match(impact, /student \? "\/app\/compass\/impact" : "\/app\/compass"/);
 });
 
 test("password recovery takes priority over account loading and offers a safe preview fallback", async () => {

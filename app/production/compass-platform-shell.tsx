@@ -50,6 +50,7 @@ export function WorkspaceSwitcher({ memberships, current, api, previewMode }: { 
   const currentExperience = active.find((item) => experienceToWorkspace[item.experienceKey] === current);
   const pathwayOnly = active.length === 1 && currentExperience?.experienceKey === "pathway" && currentExperience.roles.includes("student");
   if (pathwayOnly) return <span className="workspace-access-label">Pre-med student · Pathway only</span>;
+  if (current === "impact" && currentExperience?.roles.includes("student")) return <span className="workspace-access-label">Impact Workspace</span>;
   if (active.length <= 1) return <span className="workspace-access-label">{workspaceLabel(currentExperience?.experienceKey || "oaca")}</span>;
   return <label className="workspace-switcher"><span>Workspace</span><select aria-label="Switch Compass workspace" value={current} onChange={(event) => {
     const workspace = event.target.value as WorkspaceKey;
@@ -62,9 +63,14 @@ export function WorkspaceSwitcher({ memberships, current, api, previewMode }: { 
 
 export function CreatorPreviewBanner({ persona, onPersona, onExit }: { persona: SyntheticPersonaKey | null; onPersona: (persona: SyntheticPersonaKey) => void; onExit: () => void }) {
   if (!persona) return null;
+  const changePersona = (next: SyntheticPersonaKey) => {
+    onPersona(next);
+    const target = SYNTHETIC_PERSONAS.find((item) => item.key === next)?.defaultPath || "/app/compass";
+    if (window.location.pathname !== target) window.location.replace(target);
+  };
   return <aside className="creator-preview-shell" role="status">
     <div><span className="creator-preview-shell__mark" aria-hidden="true">◇</span><span><strong>Creator Preview</strong><small>Fictional records · strict role-scoped responses</small></span></div>
-    <label><span>Viewing as</span><select value={persona} onChange={(event) => onPersona(event.target.value as SyntheticPersonaKey)}>{SYNTHETIC_PERSONAS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
+    <label><span>Viewing as</span><select value={persona} onChange={(event) => changePersona(event.target.value as SyntheticPersonaKey)}>{SYNTHETIC_PERSONAS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
     <button className="text-button" onClick={onExit}>Exit preview</button>
   </aside>;
 }

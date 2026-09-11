@@ -34,6 +34,11 @@ export type PlatformAccessValue = {
   signOut: () => Promise<void>;
 };
 
+function PreviewWorkspaceRedirect({ href }: { href: string }) {
+  useEffect(() => { window.location.replace(href); }, [href]);
+  return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Impact" title="Opening your workspace…" /></section></main>;
+}
+
 export function PlatformAccess({ experience, children }: {
   experience?: ExperienceKey;
   children: (value: PlatformAccessValue) => React.ReactNode;
@@ -145,6 +150,7 @@ export function PlatformAccess({ experience, children }: {
     const previewMemberships = syntheticMembershipsForPersona(previewPersona);
     const previewContext = syntheticContextForPersona(previewPersona);
     const membership = experience ? previewMemberships.find((item) => item.experienceKey === experience) : null;
+    if (previewPersona === "impact_student" && experience === "oaca") return <PreviewWorkspaceRedirect href="/app/compass/impact" />;
     if (experience && !membership) return <main className="production-auth"><section className="production-auth-card"><h1>Preview unavailable</h1><a className="secondary-button" href="/app">Return to Navigate</a></section></main>;
     const exitPreview = async () => {
       window.localStorage.removeItem(SYNTHETIC_PREVIEW_KEY);

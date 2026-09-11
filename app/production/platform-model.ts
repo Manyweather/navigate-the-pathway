@@ -72,6 +72,8 @@ export function authorizedWorkspaceKeys(memberships: ExperienceMembership[]) {
 
 export function defaultWorkspaceFor(memberships: ExperienceMembership[], preferred?: WorkspaceKey | null): WorkspaceKey | null {
   const authorized = authorizedWorkspaceKeys(memberships);
+  const impactStudent = memberships.some((membership) => membership.experienceKey === "genesis" && membership.status === "active" && membership.featureEnabled && membership.roles.includes("student"));
+  if (impactStudent && authorized.includes("impact")) return "impact";
   if (preferred && authorized.includes(preferred)) return preferred;
   if (authorized.includes("compass")) return "compass";
   if (authorized.length === 1) return authorized[0];
