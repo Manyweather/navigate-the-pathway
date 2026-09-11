@@ -66,6 +66,7 @@ export function PlatformAccess({ experience, children }: {
     const task = window.setTimeout(() => {
       const query = new URLSearchParams(window.location.search);
       const requestedPreview = query.get("preview");
+      const requestedDemoRole = query.get("demo");
       const storedPreview = window.localStorage.getItem(SYNTHETIC_PREVIEW_KEY) === "true";
       const storedScope = window.localStorage.getItem(SYNTHETIC_PREVIEW_SCOPE_KEY);
       const scope = requestedPreview === "compass"
@@ -75,9 +76,20 @@ export function PlatformAccess({ experience, children }: {
           : storedPreview
             ? storedScope === "compass" ? "compass" : "creator"
             : null;
-      if (requestedPreview === "compass" && storedScope !== "compass") {
-        window.localStorage.setItem(SYNTHETIC_PERSONA_KEY, "compass_staff");
-        updatePreviewPersona("compass_staff");
+      if (requestedPreview === "compass") {
+        const requestedPersona: SyntheticPersonaKey = requestedDemoRole === "admin"
+          ? "compass_director"
+          : requestedDemoRole === "student"
+            ? "compass_student"
+            : requestedDemoRole === "career"
+              ? "career_advisor"
+              : requestedDemoRole === "academic"
+                ? "academic_advisor"
+                : storedScope !== "compass"
+                  ? "academic_advisor"
+                  : getSyntheticPreviewPersona();
+        window.localStorage.setItem(SYNTHETIC_PERSONA_KEY, requestedPersona);
+        updatePreviewPersona(requestedPersona);
       }
       const preview = scope !== null;
       const recovery = parseRecoveryCallback(window.location.search, window.location.hash);
@@ -166,7 +178,8 @@ export function PlatformAccess({ experience, children }: {
   }, [load]);
 
   if (previewMode && configured === "preview") {
-    const scopedPersona = previewScope === "compass" && !["compass_student", "compass_staff"].includes(previewPersona) ? "compass_staff" : previewPersona;
+    const compassPreviewRoles: SyntheticPersonaKey[] = ["compass_student", "academic_advisor", "career_advisor", "compass_director"];
+    const scopedPersona = previewScope === "compass" && !compassPreviewRoles.includes(previewPersona) ? "academic_advisor" : previewPersona;
     const previewMemberships = syntheticMembershipsForPersona(scopedPersona);
     const previewContext = syntheticContextForPersona(scopedPersona);
     const membership = experience ? previewMemberships.find((item) => item.experienceKey === experience) : null;

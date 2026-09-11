@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { PilotApiClient } from "./api-client";
+import { DemoWorkspaceTutorial, type DemoTutorialWorkspace } from "./demo-workspace-tutorial";
 import { experiences, experienceToWorkspace, type ExperienceKey, type ExperienceMembership, type WorkspaceKey } from "./platform-model";
 import { SYNTHETIC_PERSONAS, type SyntheticPersonaKey } from "./synthetic-preview";
 
@@ -49,10 +50,10 @@ export function WorkspaceSwitcher({ memberships, current, api, previewMode }: { 
   const active = memberships.filter((item) => item.status === "active" && item.featureEnabled);
   const currentExperience = active.find((item) => experienceToWorkspace[item.experienceKey] === current);
   const pathwayOnly = active.length === 1 && currentExperience?.experienceKey === "pathway" && currentExperience.roles.includes("student");
-  if (pathwayOnly) return <span className="workspace-access-label">Pre-med student · Pathway only</span>;
-  if (current === "impact" && currentExperience?.roles.includes("student")) return <span className="workspace-access-label">Impact Workspace</span>;
-  if (active.length <= 1) return <span className="workspace-access-label">{workspaceLabel(currentExperience?.experienceKey || "oaca")}</span>;
-  return <label className="workspace-switcher"><span>Workspace</span><select aria-label="Switch Compass workspace" value={current} onChange={(event) => {
+  if (pathwayOnly) return <span className="workspace-access-label" data-demo-guide="workspace-switcher">Pre-med student · Pathway only</span>;
+  if (current === "impact" && currentExperience?.roles.includes("student")) return <span className="workspace-access-label" data-demo-guide="workspace-switcher">Impact Workspace</span>;
+  if (active.length <= 1) return <span className="workspace-access-label" data-demo-guide="workspace-switcher">{workspaceLabel(currentExperience?.experienceKey || "oaca")}</span>;
+  return <label className="workspace-switcher" data-demo-guide="workspace-switcher"><span>Workspace</span><select aria-label="Switch Compass workspace" value={current} onChange={(event) => {
     const workspace = event.target.value as WorkspaceKey;
     const next = active.find((item) => experienceToWorkspace[item.experienceKey] === workspace);
     if (!next) return;
@@ -61,19 +62,20 @@ export function WorkspaceSwitcher({ memberships, current, api, previewMode }: { 
   }}>{active.map((item) => <option key={item.experienceKey} value={experienceToWorkspace[item.experienceKey]}>{workspaceLabel(item.experienceKey)}</option>)}</select></label>;
 }
 
-export function CreatorPreviewBanner({ persona, onPersona, onExit, scope = "creator" }: { persona: SyntheticPersonaKey | null; onPersona: (persona: SyntheticPersonaKey) => void; onExit: () => void; scope?: "creator" | "compass" }) {
+export function CreatorPreviewBanner({ persona, onPersona, onExit, scope = "creator", tutorialWorkspace = "compass" }: { persona: SyntheticPersonaKey | null; onPersona: (persona: SyntheticPersonaKey) => void; onExit: () => void; scope?: "creator" | "compass"; tutorialWorkspace?: DemoTutorialWorkspace }) {
   if (!persona) return null;
   const personaOptions = scope === "compass"
-    ? SYNTHETIC_PERSONAS.filter((item) => item.key === "compass_staff" || item.key === "compass_student")
+    ? SYNTHETIC_PERSONAS.filter((item) => ["compass_student", "academic_advisor", "career_advisor", "compass_director"].includes(item.key))
     : SYNTHETIC_PERSONAS;
   const changePersona = (next: SyntheticPersonaKey) => {
     onPersona(next);
     const target = SYNTHETIC_PERSONAS.find((item) => item.key === next)?.defaultPath || "/app/compass";
     if (window.location.pathname !== target) window.location.replace(target);
   };
-  return <aside className="creator-preview-shell" role="status">
+  return <aside className="creator-preview-shell" role="status" data-demo-guide="preview-banner">
     <div><span className="creator-preview-shell__mark" aria-hidden="true">◇</span><span><strong>{scope === "compass" ? "Compass Demo" : "Creator Preview"}</strong><small>Fictional records · strict role-scoped responses</small></span></div>
-    <label><span>Viewing as</span><select value={persona} onChange={(event) => changePersona(event.target.value as SyntheticPersonaKey)}>{personaOptions.map((item) => <option key={item.key} value={item.key}>{item.label.replace("Compass ", "")}</option>)}</select></label>
+    <label data-demo-guide="role-switcher"><span>Viewing as</span><select value={persona} onChange={(event) => changePersona(event.target.value as SyntheticPersonaKey)}>{personaOptions.map((item) => <option key={item.key} value={item.key}>{item.label.replace("Compass ", "")}</option>)}</select></label>
+    <DemoWorkspaceTutorial key={`${tutorialWorkspace}:${persona}`} workspace={tutorialWorkspace} persona={persona} />
     <button className="text-button" onClick={onExit}>{scope === "compass" ? "Leave demo" : "Exit preview"}</button>
   </aside>;
 }
