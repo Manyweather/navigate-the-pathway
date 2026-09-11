@@ -80,7 +80,7 @@ test("the complete organization catalog is ordered Medicine-first and gates the 
 });
 
 test("platform migrations are additive, identity-aware, audited, and immutable where required", async () => {
-  const [foundation, catalog, actions, oacaPolicies, oacaImports, oacaOutreach, eventOperations, affiliations] = await Promise.all([
+  const [foundation, catalog, actions, oacaPolicies, oacaImports, oacaOutreach, eventOperations, affiliations, bookingRefinements] = await Promise.all([
     readFile(new URL("../supabase/migrations/202609100001_three_experience_platform.sql", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/202609100002_genesis_organization_catalog.sql", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/202609100003_experience_vertical_slice_actions.sql", import.meta.url), "utf8"),
@@ -89,13 +89,14 @@ test("platform migrations are additive, identity-aware, audited, and immutable w
     readFile(new URL("../supabase/migrations/202609100007_oaca_events_outreach.sql", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/202609100008_oaca_event_operations.sql", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/202609100009_student_affiliations_platform_creator.sql", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/202609100010_oaca_student_booking_refinements.sql", import.meta.url), "utf8"),
   ]);
   assert.match(foundation, /insert into public\.experience_role_assignments[\s\S]*from public\.role_assignments/i);
   assert.match(foundation, /public\.current_profile_user_id\(\)/);
   assert.match(foundation, /prevent_genesis_snapshot_changes/);
   assert.match(foundation, /create policy oaca_messages_participants/);
   assert.doesNotMatch(foundation, /oaca_messages.*administrator/i);
-  assert.doesNotMatch(foundation + catalog + actions + oacaPolicies + oacaImports + oacaOutreach + eventOperations + affiliations, /\b(drop table|truncate|delete from public\.profiles|alter table public\.role_assignments drop)\b/i);
+  assert.doesNotMatch(foundation + catalog + actions + oacaPolicies + oacaImports + oacaOutreach + eventOperations + affiliations + bookingRefinements, /\b(drop table|truncate|delete from public\.profiles|alter table public\.role_assignments drop)\b/i);
   assert.match(catalog, /'College of Medicine'.*true,1/);
   assert.match(actions, /service\.policy_status <> 'live_approved'/);
   assert.match(actions, /Approved organization membership is required to publish/);
@@ -129,6 +130,9 @@ test("platform migrations are additive, identity-aware, audited, and immutable w
   assert.match(affiliations, /student_council/);
   assert.match(affiliations, /sync_platform_creator_access/);
   assert.match(affiliations, /These affiliations deliberately do not grant/);
+  assert.match(bookingRefinements, /Academic drop-ins are limited to two visits per academic block/);
+  assert.match(bookingRefinements, /oaca_one_active_permanent_student_qr/);
+  assert.match(bookingRefinements, /deduplicated/);
 });
 
 test("Worker API requires matching experience context and keeps endpoint families stable", async () => {
@@ -172,11 +176,16 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.match(oaca, /student-facing recap/i);
   assert.match(oaca, /Secure data imports/);
   assert.match(oaca, /OacaImportCenter/);
-  assert.match(oaca, /Events and updates/);
+  assert.match(oaca, /Request an Appointment/);
+  assert.match(oaca, /Reason for visit/);
+  assert.match(oaca, /Academic drop-in/);
+  assert.match(oaca, /up to two drop-in visits per academic block/);
+  assert.match(oaca, /You will receive a notification when your appointment is confirmed/);
+  assert.doesNotMatch(oaca, /<a href="\/app">All experiences<\/a>/);
   assert.match(oaca, /Appointment nudges/);
   assert.match(eventWorkspace, /Run the room from one place/);
   assert.match(eventWorkspace, /Register \+ present/);
-  assert.match(eventWorkspace, /Create 5-minute code/);
+  assert.match(eventWorkspace, /permanent, identifier-free code/);
   assert.match(eventWorkspace, /Compass notifications/);
   assert.match(eventWorkspace, /Notification preferences and quiet hours/);
   assert.match(genesis, /Not yet available/);

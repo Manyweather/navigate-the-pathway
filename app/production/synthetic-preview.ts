@@ -75,9 +75,9 @@ const medicineOrganization = organizations.find((organization) => organization.p
 
 function oacaEvents() {
   return [
-    { id: "event-today", title: "Learning Strategies Lab", description: "A practical workshop for planning the next exam block.", startsAt: isoAt(0, 14), endsAt: isoAt(0, 15), modality: "in_person", location: "Discovery Room 214", capacity: 40, registrationCount: 24, registered: true, status: "published", audience: { includeAllStudents: true }, formId: null },
-    { id: "event-upcoming", title: "Specialty Exploration Forum", description: "Meet clinicians and prepare questions for career advising.", startsAt: isoAt(3, 16), endsAt: isoAt(3, 17, 30), modality: "hybrid", location: "Flagship Auditorium + Teams", capacity: null, registrationCount: 58, registered: true, status: "published", audience: { cohortLabels: ["Class of 2029"] }, formId: null },
-    { id: "event-past", title: "Foundations Planning Session", description: "Illustrative completed event used to demonstrate attendance and follow-up.", startsAt: isoAt(-7, 12), endsAt: isoAt(-7, 13), modality: "in_person", location: "OACA Collaboration Room", capacity: 32, registrationCount: 21, registered: true, status: "completed", audience: { cohortLabels: ["Class of 2029"] }, formId: null },
+    { id: "event-today", title: "Learning Strategies Lab", description: "A practical, facilitated workshop for planning the next exam block. Bring your current study plan and leave with a focused weekly rhythm, accountability checkpoints, and a short list of questions for your advisor.", imageUrl: "/media/cohort-commons-poster.jpg", imageAlt: "Abstract Roseman event artwork with maroon points", hostName: "OACA Learning Support", startsAt: isoAt(0, 14), endsAt: isoAt(0, 15), modality: "in_person", location: "Discovery Room 214", capacity: 40, registrationCount: 24, registered: true, status: "published", audience: { includeAllStudents: true }, formId: null },
+    { id: "event-upcoming", title: "Specialty Exploration Forum", description: "Meet clinicians representing several specialties, hear how they approached career decisions, and prepare useful questions for future career-advising conversations. Students may attend in person or through Teams.", imageUrl: "/media/reflection-studio-poster.jpg", imageAlt: "Abstract Roseman event artwork with a maroon letterform and grid", hostName: "OACA Career Advising", startsAt: isoAt(3, 16), endsAt: isoAt(3, 17, 30), modality: "hybrid", location: "Flagship Auditorium + Teams", capacity: null, registrationCount: 58, registered: true, status: "published", audience: { cohortLabels: ["Class of 2029"] }, formId: null },
+    { id: "event-past", title: "Foundations Planning Session", description: "An interactive planning session focused on upcoming academic milestones, time management, and choosing the right advising support. This completed synthetic event demonstrates attendance history and follow-up.", imageUrl: "/assets/brand/oaca-emblem.png", imageAlt: "OACA emblem", hostName: "Office of Academic and Career Advising", startsAt: isoAt(-7, 12), endsAt: isoAt(-7, 13), modality: "in_person", location: "OACA Collaboration Room", capacity: 32, registrationCount: 21, registered: true, status: "completed", audience: { cohortLabels: ["Class of 2029"] }, formId: null },
   ];
 }
 
@@ -90,21 +90,22 @@ function oacaBootstrap() {
       { id: "service-tutoring", key: "peer_tutoring", name: "Peer tutoring", providerRule: "choice", policyStatus: "sandbox_approved", modalities: ["in_person", "teams"], durationMinutes: 60 },
     ],
     providers: [
-      { id: "provider-academic", displayName: "Dr. Morgan Lee", classification: "academic_advisor", subjects: [], modalities: ["in_person", "phone", "teams"] },
-      { id: "provider-career", displayName: "Jordan Rivera", classification: "career_advisor", subjects: [], modalities: ["in_person", "teams"] },
-      { id: "provider-tutor", displayName: "Avery Chen", classification: "peer_tutor", subjects: ["Foundations", "Clinical skills"], modalities: ["in_person", "teams"] },
+      { id: "provider-academic", displayName: "Dr. Morgan Lee", classification: "faculty", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
+      { id: "provider-dropin", displayName: "Dr. Morgan Patel", classification: "faculty", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
+      { id: "provider-career", displayName: "Jordan Rivera", classification: "staff", subjects: [], modalities: ["in_person", "teams"], serviceKeys: ["career_advising"] },
+      { id: "provider-tutor", displayName: "Avery Chen", classification: "peer_tutor", subjects: ["Foundations", "Clinical skills"], modalities: ["in_person", "teams"], serviceKeys: ["peer_tutoring"] },
     ],
     appointments: [
-      { id: "appointment-1", studentId: "student-1", studentName: "Taylor Morgan", serviceName: "Academic advising", providerName: "Dr. Morgan Lee", startsAt: isoAt(1, 10), endsAt: isoAt(1, 10, 30), modality: "teams", status: "confirmed", sandbox: true, requestOrigin: "student", studentRecap: "Review the weekly study plan and return with two questions." },
+      { id: "appointment-1", studentId: "synthetic-creator", studentName: "Creator preview", serviceName: "Academic advising", providerName: "Dr. Morgan Lee", startsAt: isoAt(1, 10), endsAt: isoAt(1, 10, 30), modality: "teams", status: "confirmed", sandbox: true, requestOrigin: "student", studentRecap: "Review the weekly study plan and return with two questions." },
       { id: "appointment-2", studentId: "student-2", studentName: "Riley Thompson", serviceName: "Peer tutoring", providerName: "Avery Chen", subject: "Foundations", format: "individual", startsAt: isoAt(2, 13), endsAt: isoAt(2, 14), modality: "in_person", status: "pending_approval", sandbox: true, requestOrigin: "student" },
     ],
-    assignedAdvisor: { id: "provider-academic", displayName: "Dr. Morgan Lee", classification: "academic_advisor", subjects: [], modalities: ["in_person", "phone", "teams"] },
+    assignedAdvisor: { id: "provider-academic", displayName: "Dr. Morgan Lee", classification: "faculty", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
     assignedStudents: [
       { id: "student-1", displayName: "Taylor Morgan" },
       { id: "student-2", displayName: "Riley Thompson" },
       { id: "student-3", displayName: "Cameron Ellis" },
     ],
-    currentProvider: { id: "provider-academic", displayName: "Dr. Morgan Lee", classification: "academic_advisor", subjects: [], modalities: ["in_person", "phone", "teams"] },
+    currentProvider: { id: "provider-academic", displayName: "Dr. Morgan Lee", classification: "faculty", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
     policyDocuments: [],
     policyRules: [],
     acknowledgments: [],
@@ -138,7 +139,7 @@ function oacaBootstrap() {
     campaigns: [
       { id: "campaign-1", name: "Specialty forum invitation", subject: "Plan your specialty exploration", previewText: "Reserve a place and bring your questions.", status: "sent", audience: { cohortLabels: ["Class of 2029"] }, scheduledFor: null, sentAt: isoAt(-4, 9), content: { heading: "Explore specialties with intention" }, recipientCount: 76, deliveredCount: 73, openedCount: 52, clickedCount: 34, formSubmittedCount: 18, eventRegisteredCount: 24, appointmentRequestedCount: 11, minimumGroupSize: 10 },
     ],
-    nudges: [{ id: "nudge-1", studentId: "student-2", studentName: "Riley Thompson", serviceKey: "career_advising", providerName: "Jordan Rivera", dueBy: isoAt(14, 17), status: "delivered", createdAt: isoAt(-2, 10) }],
+    nudges: [{ id: "nudge-1", studentId: "synthetic-creator", studentName: "Creator preview", serviceKey: "career_advising", providerName: "Jordan Rivera", dueBy: isoAt(14, 17), status: "delivered", createdAt: isoAt(-2, 10) }],
     communications: [],
     forms: [],
     audienceOptions: { cohorts: ["Class of 2029"], phases: ["Foundations", "Clerkship", "Advanced"], years: ["M1", "M2", "M3", "M4"], campuses: ["Summerlin", "Henderson"] },
@@ -224,7 +225,7 @@ class SyntheticPilotApi {
     if (path === "/api/platform/notification-preferences") return { smsEnabled: false } as T;
     if (path === "/api/oaca/events/attendance") return { version: 3 } as T;
     if (path === "/api/oaca/events/check-in") return { open: true, token: "synthetic-event-token", closesAt: isoAt(0, 16), deepLink: "/app/oaca?checkin=synthetic-event-token" } as T;
-    if (path === "/api/oaca/events/check-in/student-token") return { token: "synthetic-personal-token", expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() } as T;
+    if (path === "/api/oaca/events/check-in/student-token") return { token: "synthetic-permanent-student-qr", permanent: true } as T;
     if (path === "/api/oaca/events/check-in/self") return { title: "Learning Strategies Lab" } as T;
     if (path === "/api/oaca/campaigns") return { id: "synthetic-campaign" } as T;
     return { id: "synthetic-record", ok: true } as T;

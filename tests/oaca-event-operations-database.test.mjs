@@ -10,6 +10,9 @@ const student="30000000-0000-4000-8000-000000000005";
 const walkin="30000000-0000-4000-8000-000000000006";
 const eventsFile="30000000-0000-4000-8000-000000000007";
 const logsFile="30000000-0000-4000-8000-000000000008";
+const academicService="30000000-0000-4000-8000-000000000009";
+const assignedProvider="30000000-0000-4000-8000-000000000010";
+const dropInProvider="30000000-0000-4000-8000-000000000011";
 
 async function asUser(db,userId,sql,params=[],aal="aal2") {
   await db.query("select set_config('request.jwt.claim.sub',$1,false),set_config('request.jwt.claims',$2,false)",[userId,JSON.stringify({sub:userId,aal})]);
@@ -18,7 +21,7 @@ async function asUser(db,userId,sql,params=[],aal="aal2") {
 }
 
 test("event rosters, attendance, QR check-in, notifications, conversations, and paired imports are scoped",async()=>{
-  const db=await testDatabase("202609100008");
+  const db=await testDatabase("202609100010");
   try{
     await db.exec("create function public.digest(value text, algorithm text) returns bytea language sql immutable as $$select decode(md5(value)||md5(value||'x'),'hex')$$");
     await db.exec(`
@@ -29,7 +32,17 @@ test("event rosters, attendance, QR check-in, notifications, conversations, and 
       insert into public.experience_capability_assignments(user_id,experience_key,capability,organization_id) values('${staff}','oaca','oaca.outreach.manage','${org}');
       insert into public.platform_notification_preferences(user_id,email_enabled,sms_enabled) values('${student}',true,false),('${walkin}',true,false);
       insert into public.platform_files(id,owner_id,experience_key,storage_path,original_name,mime_type,size_bytes,scan_status) values('${eventsFile}','${owner}','oaca','${owner}/oaca/event-imports/events.csv','events.csv','text/csv',100,'clean'),('${logsFile}','${owner}','oaca','${owner}/oaca/event-imports/logs.csv','logs.csv','text/csv',100,'clean');
+      insert into public.oaca_service_lines(id,organization_id,key,name,provider_rule,duration_minutes,policy_status) values('${academicService}','${org}','academic_advising','Academic advising','assigned',30,'sandbox_approved');
+      insert into public.oaca_providers(id,user_id,organization_id,classification,modalities) values('${assignedProvider}','${owner}','${org}','faculty',array['teams']),('${dropInProvider}','${staff}','${org}','staff',array['teams']);
+      insert into public.oaca_provider_services(provider_id,service_line_id) values('${assignedProvider}','${academicService}'),('${dropInProvider}','${academicService}');
+      insert into public.oaca_advisor_assignments(student_id,provider_id) values('${student}','${assignedProvider}');
     `);
+    for(const [index,startsAt] of ["2030-10-08T12:00:00-07:00","2030-10-15T12:00:00-07:00"].entries()){
+      const appointment=await asUser(db,student,"select public.oaca_create_appointment($1::jsonb) result",[JSON.stringify({serviceLineId:academicService,providerId:dropInProvider,startsAt,modality:"teams",format:"individual",topic:`Drop-in question ${index+1}`,policyContext:{reasonForVisit:"Quick drop-in question",academicDropIn:true,academicBlockKey:"Block 3",academicDropInProviderId:dropInProvider}})]);
+      const routed=await db.query("select provider_id from public.oaca_appointments where id=$1",[appointment.rows[0].result.id]);
+      assert.equal(routed.rows[0].provider_id,dropInProvider);
+    }
+    await assert.rejects(()=>asUser(db,student,"select public.oaca_create_appointment($1::jsonb)",[JSON.stringify({serviceLineId:academicService,providerId:dropInProvider,startsAt:"2030-10-22T12:00:00-07:00",modality:"teams",format:"individual",topic:"Third drop-in",policyContext:{reasonForVisit:"Quick drop-in question",academicDropIn:true,academicBlockKey:"Block 3",academicDropInProviderId:dropInProvider}})]),/limited to two visits per academic block/i);
     const created=await asUser(db,owner,"select (public.oaca_create_event($1::jsonb)).id as id",[JSON.stringify({title:"Student Success Lab",description:"Practice and connect.",startsAt:"2030-10-01T12:00:00-07:00",endsAt:"2030-10-01T13:00:00-07:00",modality:"in_person",location:"Innovation Hall",audience:{includeAllStudents:true}})]);
     const eventId=created.rows[0].id;
     await asUser(db,owner,"select public.oaca_publish_event($1::jsonb)",[JSON.stringify({eventId})]);
@@ -47,8 +60,12 @@ test("event rosters, attendance, QR check-in, notifications, conversations, and 
 
     const personal=await asUser(db,student,"select public.oaca_issue_student_qr('{}'::jsonb) result");
     const personalToken=personal.rows[0].result.token;
+    assert.equal(personal.rows[0].result.permanent,true);
+    const samePersonal=await asUser(db,student,"select public.oaca_issue_student_qr('{}'::jsonb) result");
+    assert.equal(samePersonal.rows[0].result.token,personalToken);
     await asUser(db,owner,"select public.oaca_scan_student_qr($1::jsonb)",[JSON.stringify({eventId,token:personalToken})]);
-    await assert.rejects(()=>asUser(db,owner,"select public.oaca_scan_student_qr($1::jsonb)",[JSON.stringify({eventId,token:personalToken})]),/expired or was already used/i);
+    const repeatedScan=await asUser(db,owner,"select public.oaca_scan_student_qr($1::jsonb) result",[JSON.stringify({eventId,token:personalToken})]);
+    assert.equal(repeatedScan.rows[0].result.deduplicated,true);
 
     const checkin=await asUser(db,owner,"select public.oaca_set_event_checkin($1::jsonb) result",[JSON.stringify({eventId,action:"open",minutes:60})]);
     await asUser(db,walkin,"select public.oaca_self_checkin($1::jsonb)",[JSON.stringify({token:checkin.rows[0].result.token})]);
