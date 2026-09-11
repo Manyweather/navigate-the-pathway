@@ -17,14 +17,15 @@ async function render() {
   return fetchBuilt(new Request("http://localhost/demo", { headers: { accept: "text/html" } }));
 }
 
-test("server renders the Rosie access gate before protected views", async () => {
+test("server opens the fictional Pathway demonstration without an access code", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
-  assert.match(html, /Playtest access code/);
-  assert.match(html, /Rosie saved your place/);
-  assert.match(html, /not a student account or institutional login/i);
+  assert.match(html, /Navigate The Pathway/);
+  assert.match(html, /Start Rosie&#x27;s explanation/);
+  assert.match(html, /Reviewer views/);
+  assert.doesNotMatch(html, /Playtest access code/);
   assert.doesNotMatch(html, /Your site is taking shape/);
 });
 
