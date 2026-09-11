@@ -15,6 +15,7 @@ import {
   suppressSmallGroup,
 } from "../app/production/platform-model.ts";
 import { organizationCollegeOrder, organizationsForSelect, studentOrganizations } from "../app/production/student-organizations.ts";
+import { syntheticPreviewApi, syntheticPreviewContext, syntheticPreviewMemberships } from "../app/production/synthetic-preview.ts";
 
 test("Navigate exposes three isolated experience destinations", () => {
   assert.deepEqual(Object.keys(experiences), ["pathway", "oaca", "genesis"]);
@@ -22,6 +23,18 @@ test("Navigate exposes three isolated experience destinations", () => {
   assert.equal(experiences.oaca.href, "/app/oaca");
   assert.equal(experiences.genesis.href, "/app/genesis");
   for (const role of ["faculty", "staff", "administrator", "creator", "principal_investigator", "mentor", "community_liaison"]) assert.equal(staffMfaRoles.has(role), true);
+});
+
+test("synthetic creator preview exposes all workspaces without production identities", async () => {
+  assert.equal(syntheticPreviewContext.principalType, "creator");
+  assert.equal(syntheticPreviewContext.aal, "aal2");
+  assert.equal(syntheticPreviewMemberships.length, 3);
+  assert.equal(syntheticPreviewMemberships.every((membership) => membership.roles.includes("creator")), true);
+  const compass = await syntheticPreviewApi.request("/api/oaca/bootstrap");
+  const impact = await syntheticPreviewApi.request("/api/genesis/bootstrap");
+  assert.ok(compass.events.length && compass.appointments.length && compass.analytics);
+  assert.ok(impact.organizations.length && impact.portfolios.length && impact.snapshots.length);
+  assert.doesNotMatch(JSON.stringify({ compass, impact }), /@roseman\.edu/i);
 });
 
 test("OACA state transitions preserve explicit approval and counterproposal semantics", () => {

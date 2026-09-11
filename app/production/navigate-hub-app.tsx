@@ -53,7 +53,7 @@ function StudentAffiliations({ api }: { api: PilotApiClient }) {
 }
 
 export function NavigateHubApp() {
-  return <PlatformAccess>{({ api, context, memberships, signOut }) => {
+  return <PlatformAccess>{({ api, context, memberships, previewMode, signOut }) => {
     const active = memberships.filter((membership) => membership.status === "active" && membership.featureEnabled);
     return <div className="navigate-platform navigate-platform--hub">
       <header className="platform-header">
@@ -61,6 +61,7 @@ export function NavigateHubApp() {
         <div className="platform-account"><span>{context.displayName}</span><button className="text-button" onClick={() => void signOut()}>Sign out</button></div>
       </header>
       <main className="platform-main" id="main-content">
+        {previewMode ? <aside className="synthetic-preview-banner" role="status"><span aria-hidden="true">◇</span><div><strong>Synthetic pilot preview</strong><p>Every name and record here is fictional. Actions are temporary and no production data is read or changed.</p></div><button className="secondary-button" onClick={() => void signOut()}>Exit preview</button></aside> : null}
         <section className="hub-intro" aria-labelledby="hub-title">
           <p className="kicker">One account · separate workspaces</p>
           <h1 id="hub-title">Where would you like to go?</h1>
@@ -69,7 +70,8 @@ export function NavigateHubApp() {
         <section className="experience-grid" aria-label="Your Navigate experiences">
           {active.map((membership) => {
             const experience = experiences[membership.experienceKey];
-            return <a key={membership.experienceKey} className={`experience-card experience-card--${experience.accent}`} href={experience.href}>
+            const href = previewMode && membership.experienceKey === "pathway" ? "/demo" : experience.href;
+            return <a key={membership.experienceKey} className={`experience-card experience-card--${experience.accent}`} href={href}>
               <span className="experience-card__mark" aria-hidden="true">{membership.experienceKey === "pathway" ? "↗" : membership.experienceKey === "oaca" ? "⌁" : "✦"}</span>
               <div><p className="kicker">{membership.roles.map((role) => role.replaceAll("_", " ")).join(" · ")}</p><h2>{experience.name}</h2><p>{experience.description}</p></div>
               <strong>Open workspace <span aria-hidden="true">→</span></strong>

@@ -181,7 +181,7 @@ function OacaWorkspace({ api, supabase, context, membership, signOut }: { api: P
   const [data, setData] = useState<Bootstrap>(emptyBootstrap);
   const [message, setMessage] = useState("Loading OACA Compass…");
   const [view, setView] = useState<OacaView>("home");
-  const [mode, setMode] = useState(membership.roles.includes("student") ? "student" : membership.roles[0] || "staff");
+  const [mode, setMode] = useState<string>(membership.roles.includes("creator") ? "creator" : membership.roles.includes("student") ? "student" : membership.roles[0] || "staff");
   const load = useCallback(async () => { try { setData(await api.request<Bootstrap>("/api/oaca/bootstrap")); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "OACA Compass could not be loaded."); } }, [api]);
   useEffect(() => { const task = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(task); }, [load]);
   const staff = mode !== "student";

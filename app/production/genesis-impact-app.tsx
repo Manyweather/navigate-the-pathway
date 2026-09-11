@@ -62,7 +62,7 @@ function MentorReview({ api, data, reload, onBack }: { api: PilotApiClient; data
 }
 
 function GenesisWorkspace({ api, context, membership, signOut }: { api: PilotApiClient; context: AuthorizationContext; membership: ExperienceMembership; signOut: () => Promise<void> }) {
-  const [data, setData] = useState<GenesisBootstrap>(initialData); const [view, setView] = useState<GenesisView>("home"); const [message, setMessage] = useState("Loading Impact Studio…"); const [mode, setMode] = useState(membership.roles.includes("student") ? "student" : membership.roles[0] || "mentor");
+  const [data, setData] = useState<GenesisBootstrap>(initialData); const [view, setView] = useState<GenesisView>("home"); const [message, setMessage] = useState("Loading Impact Studio…"); const [mode, setMode] = useState<string>(membership.roles.includes("creator") ? "creator" : membership.roles.includes("student") ? "student" : membership.roles[0] || "mentor");
   const load = useCallback(async () => { try { const value = await api.request<GenesisBootstrap>("/api/genesis/bootstrap"); setData({ ...initialData, ...value, organizations: value.organizations?.length ? value.organizations : initialData.organizations }); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "Impact Studio could not be loaded."); } }, [api]);
   useEffect(() => {
     const task = window.setTimeout(() => void load(), 0);
