@@ -3,6 +3,7 @@ import { workspaceRoute, workspaceScheduled, WorkspaceError, type WorkspaceServi
 import { calendarPublicRoute, type CalendarServices } from "./workspace-calendars";
 import { experienceRoute } from "./experience-api";
 import { normalizePenjiEventExports } from "../app/production/oaca-event-model";
+import type { AuthorizationContext as ProductionAuthorizationContext } from "../app/production/types";
 
 type AuthenticatedUser = {
   id: string;
@@ -1909,6 +1910,7 @@ export default {
     ctx.waitUntil(Promise.all([
       workspaceScheduled(calendarServices(env)),
       serviceRest(env,"rpc/oaca_enqueue_due_event_notifications",{method:"POST",body:"{}"}),
+      serviceRest(env,"rpc/oaca_enqueue_event_coordinator_digests",{method:"POST",body:"{}"}),
       processOacaEventImports(env),
     ]).then(()=>undefined));
   },
@@ -1958,7 +1960,7 @@ function workspaceServices(env:Env,user:AuthenticatedUser):WorkspaceServices {
 function experienceServices(env: Env, user: AuthenticatedUser) {
   return {
     ...workspaceServices(env, user),
-    context: async () => enrichPrincipalContext(env, user, await authorization(env, user)) as AuthorizationContext,
+    context: async () => (await enrichPrincipalContext(env, user, await authorization(env, user))) as unknown as ProductionAuthorizationContext,
   };
 }
 

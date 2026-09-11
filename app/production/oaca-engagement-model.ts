@@ -7,6 +7,7 @@ export type OacaCampaignStatus = (typeof oacaCampaignStatuses)[number];
 export type OacaEngagementEvent = (typeof oacaEngagementEvents)[number];
 
 export type OacaAudience = {
+  includeAllMembers?: boolean;
   includeAllStudents?: boolean;
   cohortLabels?: string[];
   phases?: string[];
@@ -14,6 +15,11 @@ export type OacaAudience = {
   campuses?: string[];
   assignedProviderIds?: string[];
   studentIds?: string[];
+  organizationIds?: string[];
+  studentCouncil?: boolean;
+  memberRoles?: string[];
+  userIds?: string[];
+  excludeUserIds?: string[];
 };
 
 export type OacaFormField = {
@@ -36,6 +42,7 @@ export type OacaCampaignContent = {
 };
 
 export function describeOacaAudience(audience: OacaAudience) {
+  if (audience.includeAllMembers) return "All active Compass members";
   if (audience.includeAllStudents) return "All active OACA students";
   const parts = [
     ...(audience.cohortLabels || []).map((value) => `Cohort: ${value}`),
@@ -45,11 +52,16 @@ export function describeOacaAudience(audience: OacaAudience) {
   ];
   if (audience.assignedProviderIds?.length) parts.push(`${audience.assignedProviderIds.length} advisor group${audience.assignedProviderIds.length === 1 ? "" : "s"}`);
   if (audience.studentIds?.length) parts.push(`${audience.studentIds.length} selected student${audience.studentIds.length === 1 ? "" : "s"}`);
+  if (audience.organizationIds?.length) parts.push(`${audience.organizationIds.length} interest group${audience.organizationIds.length === 1 ? "" : "s"}`);
+  if (audience.studentCouncil) parts.push("Student Council");
+  if (audience.memberRoles?.length) parts.push(`${audience.memberRoles.length} staff or faculty group${audience.memberRoles.length === 1 ? "" : "s"}`);
+  if (audience.userIds?.length) parts.push(`${audience.userIds.length} named person${audience.userIds.length === 1 ? "" : "s"}`);
+  if (audience.excludeUserIds?.length) parts.push(`${audience.excludeUserIds.length} excluded`);
   return parts.join(" · ") || "No audience selected";
 }
 
 export function validateOacaAudience(audience: OacaAudience) {
-  return Boolean(audience.includeAllStudents || audience.cohortLabels?.length || audience.phases?.length || audience.years?.length || audience.campuses?.length || audience.assignedProviderIds?.length || audience.studentIds?.length);
+  return Boolean(audience.includeAllMembers || audience.includeAllStudents || audience.cohortLabels?.length || audience.phases?.length || audience.years?.length || audience.campuses?.length || audience.assignedProviderIds?.length || audience.studentIds?.length || audience.organizationIds?.length || audience.studentCouncil || audience.memberRoles?.length || audience.userIds?.length);
 }
 
 export function validateCampaignContent(content: OacaCampaignContent) {

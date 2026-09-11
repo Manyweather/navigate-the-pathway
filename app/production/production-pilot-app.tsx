@@ -85,6 +85,32 @@ export function SignIn({ supabase }: { supabase: SupabaseClient }) {
   return <main className="production-auth"><section className="production-auth-card"><h1 className="sr-only">Compass, Pathway, and Impact Studio sign in</h1><ul className="auth-experience-list" aria-label="Available Roseman experiences"><li className="auth-experience-card auth-experience-card--compass"><div className="auth-experience-graphic"><ExperienceGraphic experience="compass" /></div><div><strong>Compass</strong><span>Advising, tutoring, events, and student support.</span></div></li><li className="auth-experience-card auth-experience-card--pathway"><div className="auth-experience-graphic"><ExperienceGraphic experience="pathway" /></div><div><strong>Navigate the Pathway</strong><span>Premed reflection, preparation, and portfolio.</span></div></li><li className="auth-experience-card auth-experience-card--impact"><div className="auth-experience-graphic"><ExperienceGraphic experience="impact" /></div><div><strong>Impact Studio</strong><span>Community initiative design, coaching, and handoff.</span></div></li></ul><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the synthetic pilot</strong><small>Open all workspaces as a creator using fictional records. Nothing here reads or changes student data.</small></span><span aria-hidden="true">→</span></a><RosieGuide pose="idle" compact eyebrow="Account hub" title="Use your approved email invitation today." body="Roseman Microsoft SSO is coming soon. Calendar access remains a separate choice, and staff verify a second factor before protected records open." /><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Coming soon</span></div><div className="auth-divider" aria-hidden="true"><span>sign in with invited email</span></div><form className="production-form" onSubmit={signIn}><label><span>Email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="primary-button" disabled={busy}>{busy ? "Checking..." : "Sign in with email"}</button><button type="button" className="text-button" onClick={reset} disabled={busy}>Set or reset password</button><p className="form-message" aria-live="polite">{message}</p></form><p className="privacy-note">Sign-in consent never grants calendar access. Access is limited to active memberships and approved invitations.</p></section></main>;
 }
 
+export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseClient; onComplete: () => void }) {
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const updatePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (password.length < 12) { setMessage("Use at least 12 characters for your new password."); return; }
+    if (password !== confirmation) { setMessage("The passwords do not match."); return; }
+    setBusy(true); setMessage("");
+    const { error } = await supabase.auth.updateUser({ password });
+    setBusy(false);
+    if (error) { setMessage("Your password could not be updated. Request a new secure link and try again."); return; }
+    onComplete();
+  };
+  return <main className="production-auth"><section className="production-auth-card production-auth-card--recovery">
+    <RosieGuide pose="idle" compact eyebrow="Secure password reset" title="Choose your new password." body="Your email link was accepted. Set a new password below, then Navigate will open your account." priority />
+    <form className="production-form" onSubmit={updatePassword}>
+      <label><span>New password</span><input type="password" autoComplete="new-password" minLength={12} required value={password} onChange={(event) => setPassword(event.target.value)} /><small>Use at least 12 characters.</small></label>
+      <label><span>Confirm new password</span><input type="password" autoComplete="new-password" minLength={12} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
+      <button className="primary-button" disabled={busy}>{busy ? "Updating…" : "Set new password"}</button>
+      <p className="form-message" aria-live="polite">{message}</p>
+    </form>
+  </section></main>;
+}
+
 export function MfaGate({ supabase, onVerified }: { supabase: SupabaseClient; onVerified: () => void }) {
   const [enrollment, setEnrollment] = useState<AuthMFAEnrollResponse["data"] | null>(null);
   const [code, setCode] = useState("");

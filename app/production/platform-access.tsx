@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { RosieGuide } from "../components/rosie-guide";
 import { PilotApiClient } from "./api-client";
-import { ConfigurationRequired, MfaGate, SignIn } from "./production-pilot-app";
+import { ConfigurationRequired, MfaGate, PasswordRecovery, SignIn } from "./production-pilot-app";
 import { getSupabaseBrowserClient, loadProductionConfiguration } from "./supabase-client";
 import { staffMfaRoles, type ExperienceKey, type ExperienceMembership } from "./platform-model";
 import type { AuthorizationContext } from "./types";
@@ -31,25 +31,30 @@ export function PlatformAccess({ experience, children }: {
   experience?: ExperienceKey;
   children: (value: PlatformAccessValue) => React.ReactNode;
 }) {
+  const [previewMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const query = new URLSearchParams(window.location.search);
+    return query.get("preview") === "creator" || window.localStorage.getItem(SYNTHETIC_PREVIEW_KEY) === "true";
+  });
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [configured, setConfigured] = useState<"loading" | "ready" | "preview" | "error">("loading");
-  const [previewMode, setPreviewMode] = useState(false);
+  const [configured, setConfigured] = useState<"loading" | "ready" | "preview" | "error">(() => previewMode ? "preview" : "loading");
   const [context, setContext] = useState<AuthorizationContext | null>(null);
   const [memberships, setMemberships] = useState<ExperienceMembership[]>([]);
   const [message, setMessage] = useState("Opening your Navigate account…");
+  const [accountLoadFailed, setAccountLoadFailed] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return /(?:^|[?#&])type=recovery(?:&|$)/.test(`${window.location.search}${window.location.hash}`);
+  });
   const [mfaVerified, setMfaVerified] = useState(false);
   const api = useMemo(() => previewMode ? syntheticPreviewApi : supabase ? new PilotApiClient(supabase, undefined, experience) : null, [experience, previewMode, supabase]);
 
   useEffect(() => {
-    const query = new URLSearchParams(window.location.search);
-    const requestedPreview = query.get("preview") === "creator";
-    const savedPreview = window.localStorage.getItem(SYNTHETIC_PREVIEW_KEY) === "true";
-    if (requestedPreview || savedPreview) {
+    if (previewMode) {
+      const requestedPreview = new URLSearchParams(window.location.search).get("preview") === "creator";
       window.localStorage.setItem(SYNTHETIC_PREVIEW_KEY, "true");
       if (requestedPreview) window.history.replaceState({}, "", window.location.pathname);
-      setPreviewMode(true);
-      setConfigured("preview");
       return;
     }
     loadProductionConfiguration().then(() => {
@@ -57,25 +62,30 @@ export function PlatformAccess({ experience, children }: {
       if (!client) throw new Error("Secure setup is not connected yet.");
       setSupabase(client); setConfigured("ready");
     }).catch(() => setConfigured("error"));
-  }, []);
+  }, [previewMode]);
 
   useEffect(() => {
     if (!supabase || previewMode) return;
     void supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
+    const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      setSession(nextSession);
+      if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
+    });
     return () => data.subscription.unsubscribe();
   }, [previewMode, supabase]);
 
   const load = useCallback(async () => {
-    if (!api || !session) return;
+    if (!api || !session || recoveryMode) return;
     setMessage("Opening your Navigate account…");
+    setAccountLoadFailed(false);
     try {
       const value = await api.request<{ context: AuthorizationContext; memberships: ExperienceMembership[] }>("/api/platform/experiences");
       setContext(value.context); setMemberships(value.memberships); setMessage("");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Your account could not be opened.");
+    } catch {
+      setAccountLoadFailed(true);
+      setMessage("The secure workspace update is not connected yet.");
     }
-  }, [api, session]);
+  }, [api, recoveryMode, session]);
 
   useEffect(() => {
     const task = window.setTimeout(() => void load(), 0);
@@ -95,6 +105,13 @@ export function PlatformAccess({ experience, children }: {
   if (configured === "error") return <ConfigurationRequired />;
   if (!supabase || configured === "loading") return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate" title="Connecting your secure account…" /></section></main>;
   if (!session) return <SignIn supabase={supabase} />;
+  if (recoveryMode) return <PasswordRecovery supabase={supabase} onComplete={() => { setRecoveryMode(false); setContext(null); setMessage("Opening your Navigate account…"); }} />;
+  if (accountLoadFailed) return <main className="production-auth"><section className="production-auth-card">
+    <RosieGuide pose="idle" compact eyebrow="Account connected" title="Your password was accepted." body="The expanded secure workspace is still being connected to this pilot. You can explore every new dashboard now with fictional records." priority />
+    <a className="preview-entry" href="/app?preview=creator"><span><strong>Open the Creator preview</strong><small>Compass, Navigate the Pathway, and Impact Studio with synthetic data only.</small></span><span aria-hidden="true">→</span></a>
+    <button className="text-button" onClick={() => void supabase.auth.signOut()}>Return to sign in</button>
+    <p className="form-message" aria-live="polite">{message}</p>
+  </section></main>;
   if (!context || !api) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate" title="Opening your account hub…" /><p className="form-message" aria-live="polite">{message}</p></section></main>;
 
   const membership = experience ? memberships.find((item) => item.experienceKey === experience && item.status === "active" && item.featureEnabled) : null;

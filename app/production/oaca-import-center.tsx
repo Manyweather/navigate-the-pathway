@@ -66,8 +66,8 @@ function MappingEditor({ batch, api, reload }: { batch: OacaImportBatch; api: Pi
 
 export function OacaImportCenter({ api, supabase, context, batches, reload, onBack }: { api: PilotApiClient; supabase: SupabaseClient; context: AuthorizationContext; batches: OacaImportBatch[]; reload: () => Promise<void>; onBack: () => void }) {
   const [datasetType, setDatasetType] = useState<OacaImportDataset>("penji_sessions");
-  const [cohortLabel, setCohortLabel] = useState(oacaHistoricalBaseline.cohortLabel);
-  const [periodStartsOn, setPeriodStartsOn] = useState(oacaHistoricalBaseline.coverageStartsOn);
+  const [cohortLabel, setCohortLabel] = useState<string>(oacaHistoricalBaseline.cohortLabel);
+  const [periodStartsOn, setPeriodStartsOn] = useState<string>(oacaHistoricalBaseline.coverageStartsOn);
   const [periodEndsOn, setPeriodEndsOn] = useState("");
   const [attested, setAttested] = useState(false);
   const [file, setFile] = useState<File | null>(null);

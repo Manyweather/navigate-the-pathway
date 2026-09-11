@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { expandWeeklyDates, normalizeAttendance, normalizeCapacity, parseCsv, summarizePenjiEventFiles } from "../app/production/oaca-event-model.ts";
+import { eventBucket, expandWeeklyDates, normalizeAttendance, normalizeCapacity, parseCsv, summarizePenjiEventFiles } from "../app/production/oaca-event-model.ts";
 
 test("Penji event normalization expands weekly dates and treats 9999 as unlimited", () => {
   assert.deepEqual(expandWeeklyDates("2026-09-01", "2026-09-22"), ["2026-09-01", "2026-09-08", "2026-09-15", "2026-09-22"]);
@@ -8,6 +8,13 @@ test("Penji event normalization expands weekly dates and treats 9999 as unlimite
   assert.equal(normalizeCapacity("30"), 30);
   assert.equal(normalizeAttendance(""), "not_recorded");
   assert.equal(normalizeAttendance("Present"), "present");
+});
+
+test("event buckets use the Pacific-time occurrence window", () => {
+  const now = new Date("2026-09-10T19:00:00.000Z");
+  assert.equal(eventBucket("2026-09-10T18:00:00.000Z", "2026-09-10T20:00:00.000Z", now), "today");
+  assert.equal(eventBucket("2026-09-11T18:00:00.000Z", "2026-09-11T20:00:00.000Z", now), "upcoming");
+  assert.equal(eventBucket("2026-09-03T19:00:00.000Z", "2026-09-03T20:00:00.000Z", now), "past");
 });
 
 test("quoted CSV content is parsed while non-operational metadata stays outside normalization", () => {

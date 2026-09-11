@@ -134,11 +134,13 @@ export function summarizePenjiEventFiles(eventsSource: string, attendanceSource:
   };
 }
 
-export function eventBucket(startsAt: string, now = new Date()) {
+export function eventBucket(startsAt: string, endsAt?: string | null, now = new Date()) {
   const start = new Date(startsAt);
+  const end = endsAt ? new Date(endsAt) : start;
   const startDay = start.toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const endDay = end.toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
   const today = now.toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
-  if (startDay === today) return "today" as const;
+  if (startDay <= today && endDay >= today) return "today" as const;
   return start > now ? "upcoming" as const : "past" as const;
 }
 

@@ -193,6 +193,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
   const [submitted, setSubmitted] = useState(false);
   const [dismissedRebooks, setDismissedRebooks] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [loadedAt] = useState(() => Date.now());
   const services = data.services.length ? data.services : fallbackServices;
   const selectedService = services.find((service) => service.key === serviceKey) || fallbackServices[0];
   const academicDropInProviders = data.providers.filter((provider) => provider.serviceKeys?.includes("academic_advising") && provider.id !== data.assignedAdvisor?.id && (provider.modalities.includes(modality) || !provider.modalities.length));
@@ -346,7 +347,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
   const isTutor = data.currentProvider?.classification === "peer_tutor";
   const firstName = context.displayName.split(/\s+/)[0] || "there";
   const nextAppointment = data.appointments.filter((item) => item.startsAt && ["pending_approval", "counterproposed", "confirmed"].includes(item.status)).sort((left, right) => new Date(left.startsAt || 0).getTime() - new Date(right.startsAt || 0).getTime())[0];
-  const nextEvent = data.events.filter((item) => new Date(item.startsAt).getTime() >= Date.now()).sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime())[0];
+  const nextEvent = data.events.filter((item) => new Date(item.startsAt).getTime() >= loadedAt).sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime())[0];
   return <section className="experience-panel">
     <div className="experience-hero experience-hero--oaca compass-student-hero">
       <div className="compass-hero-copy">

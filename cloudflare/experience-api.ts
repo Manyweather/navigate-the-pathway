@@ -203,6 +203,14 @@ export async function experienceRoute(request: Request, services: ExperienceServ
     const membership = await requireMembership(request, services, "oaca");
     if (url.pathname === "/api/oaca/bootstrap" && request.method === "GET") return workspaceJson(await oacaBootstrap(services, membership));
     if (url.pathname === "/api/oaca/events/workspace" && request.method === "GET") return workspaceJson(await services.rpc("oaca_event_workspace", { payload: { eventId: url.searchParams.get("eventId") || null } }));
+    if (url.pathname === "/api/oaca/events/audience-preview" && request.method === "POST") {
+      requireRole(membership, ["faculty","staff","administrator"]);
+      return workspaceJson(await services.rpc("oaca_preview_event_audience", { payload: await workspaceBody(request) }));
+    }
+    if (url.pathname === "/api/oaca/events/recipients/refresh" && request.method === "POST") {
+      requireRole(membership, ["faculty","staff","administrator"]);
+      return workspaceJson(await services.rpc("oaca_refresh_event_recipients", { payload: await workspaceBody(request) }));
+    }
     if (url.pathname === "/api/oaca/events/update" && request.method === "POST") {
       requireRole(membership, ["faculty","staff","administrator"]);
       return workspaceJson(await services.rpc("oaca_update_event", { payload: await workspaceBody(request) }));
@@ -218,6 +226,10 @@ export async function experienceRoute(request: Request, services: ExperienceServ
     if (url.pathname === "/api/oaca/events/hosts" && request.method === "POST") {
       requireRole(membership, ["faculty","staff","administrator"]);
       return workspaceJson(await services.rpc("oaca_assign_event_host", { payload: await workspaceBody(request) }), 201);
+    }
+    if (url.pathname === "/api/oaca/events/hosts" && request.method === "DELETE") {
+      requireRole(membership, ["faculty","staff","administrator"]);
+      return workspaceJson(await services.rpc("oaca_remove_event_host", { payload: await workspaceBody(request) }));
     }
     if (url.pathname === "/api/oaca/events/check-in" && request.method === "POST") {
       requireRole(membership, ["faculty","staff","administrator"]);
@@ -265,6 +277,10 @@ export async function experienceRoute(request: Request, services: ExperienceServ
       requireRole(membership, ["faculty","staff","administrator"]);
       return workspaceJson(await services.rpc("oaca_save_event_notification_rule", { payload: await workspaceBody(request) }));
     }
+    if (url.pathname === "/api/oaca/event-coordinator-alert-rules" && request.method === "POST") {
+      requireRole(membership, ["faculty","staff","administrator"]);
+      return workspaceJson(await services.rpc("oaca_save_event_coordinator_alert_rules", { payload: await workspaceBody(request) }));
+    }
     if (url.pathname === "/api/oaca/event-messages" && request.method === "POST") {
       requireRole(membership, ["student","faculty","staff","administrator"]);
       return workspaceJson(await services.rpc("oaca_send_event_message", { payload: await workspaceBody(request) }), 201);
@@ -275,7 +291,7 @@ export async function experienceRoute(request: Request, services: ExperienceServ
       return workspaceJson(await services.rpc("oaca_publish_event", { payload: await workspaceBody(request) }));
     }
     if (url.pathname === "/api/oaca/events/register" && request.method === "POST") {
-      requireRole(membership, ["student"]);
+      requireRole(membership, ["student","faculty","staff","administrator"]);
       return workspaceJson(await services.rpc("oaca_register_event", { payload: await workspaceBody(request) }), 201);
     }
     if (url.pathname === "/api/oaca/events" && request.method === "POST") {

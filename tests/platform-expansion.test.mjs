@@ -41,6 +41,16 @@ test("synthetic creator preview exposes all workspaces without production identi
   assert.equal(updatedCompass.appointments.find((appointment) => appointment.id === "appointment-1")?.status, "cancelled");
 });
 
+test("password recovery takes priority over account loading and offers a safe preview fallback", async () => {
+  const access = await readFile(new URL("../app/production/platform-access.tsx", import.meta.url), "utf8");
+  const signIn = await readFile(new URL("../app/production/production-pilot-app.tsx", import.meta.url), "utf8");
+  assert.match(access, /PASSWORD_RECOVERY/);
+  assert.match(access, /recoveryMode/);
+  assert.match(access, /Open the Creator preview/);
+  assert.match(signIn, /supabase\.auth\.updateUser\(\{ password \}\)/);
+  assert.match(signIn, /Set new password/);
+});
+
 test("OACA state transitions preserve explicit approval and counterproposal semantics", () => {
   assert.deepEqual(oacaAppointmentStates, ["draft", "pending_approval", "counterproposed", "confirmed", "declined", "cancelled", "completed", "no_show"]);
   assert.equal(canTransitionOacaAppointment("pending_approval", "confirmed"), true);
