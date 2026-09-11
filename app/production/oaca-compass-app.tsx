@@ -443,7 +443,7 @@ function OacaStaff({ api, supabase, context, data, mode, reload, view, setView }
   </section>;
 }
 
-function OacaWorkspace({ api, supabase, context, membership, memberships, previewMode, previewPersona, setPreviewPersona, signOut }: { api: PilotApiClient; supabase: SupabaseClient; context: AuthorizationContext; membership: ExperienceMembership; memberships: ExperienceMembership[]; previewMode: boolean; previewPersona: SyntheticPersonaKey | null; setPreviewPersona: (persona: SyntheticPersonaKey) => void; signOut: () => Promise<void> }) {
+function OacaWorkspace({ api, supabase, context, membership, memberships, previewMode, previewScope, previewPersona, setPreviewPersona, signOut }: { api: PilotApiClient; supabase: SupabaseClient; context: AuthorizationContext; membership: ExperienceMembership; memberships: ExperienceMembership[]; previewMode: boolean; previewScope: "creator" | "compass" | null; previewPersona: SyntheticPersonaKey | null; setPreviewPersona: (persona: SyntheticPersonaKey) => void; signOut: () => Promise<void> }) {
   const [data, setData] = useState<Bootstrap>(emptyBootstrap);
   const [message, setMessage] = useState("Loading Compass…");
   const [view, setView] = useState<OacaView>("home");
@@ -470,7 +470,7 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
     nudges: data.nudges.filter((nudge) => nudge.studentId === context.userId),
   };
   return <div className="navigate-platform navigate-platform--oaca">
-    <CreatorPreviewBanner persona={previewPersona} onPersona={setPreviewPersona} onExit={() => void signOut()} />
+    <CreatorPreviewBanner persona={previewPersona} onPersona={setPreviewPersona} onExit={() => void signOut()} scope={previewScope || "creator"} />
     <ExperienceHeader api={api} context={context} memberships={memberships} previewMode={previewMode} onSignOut={signOut} />
     <main className="platform-main">
       <nav className="experience-nav compass-role-nav" aria-label="Compass dashboard role">
@@ -483,8 +483,8 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
 }
 
 export function OacaCompassApp() {
-  return <PlatformAccess experience="oaca">{({ api, supabase, context, memberships, previewMode, previewPersona, setPreviewPersona, signOut }) => {
+  return <PlatformAccess experience="oaca">{({ api, supabase, context, memberships, previewMode, previewScope, previewPersona, setPreviewPersona, signOut }) => {
     const membership = memberships.find((item) => item.experienceKey === "oaca")!;
-    return <OacaWorkspace key={previewPersona || context.userId} api={api} supabase={supabase} context={context} membership={membership} memberships={memberships} previewMode={previewMode} previewPersona={previewPersona} setPreviewPersona={setPreviewPersona} signOut={signOut} />;
+    return <OacaWorkspace key={previewPersona || context.userId} api={api} supabase={supabase} context={context} membership={membership} memberships={memberships} previewMode={previewMode} previewScope={previewScope} previewPersona={previewPersona} setPreviewPersona={setPreviewPersona} signOut={signOut} />;
   }}</PlatformAccess>;
 }

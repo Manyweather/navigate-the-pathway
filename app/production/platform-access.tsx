@@ -13,6 +13,7 @@ import {
   getSyntheticPreviewPersona,
   setSyntheticPreviewPersona,
   SYNTHETIC_PREVIEW_KEY,
+  SYNTHETIC_PREVIEW_SCOPE_KEY,
   SYNTHETIC_PERSONA_KEY,
   syntheticPreviewApi,
   syntheticContextForPersona,
@@ -29,6 +30,7 @@ export type PlatformAccessValue = {
   context: AuthorizationContext;
   memberships: ExperienceMembership[];
   previewMode: boolean;
+  previewScope: "creator" | "compass" | null;
   previewPersona: SyntheticPersonaKey | null;
   setPreviewPersona: (persona: SyntheticPersonaKey) => void;
   signOut: () => Promise<void>;
@@ -45,6 +47,7 @@ export function PlatformAccess({ experience, children }: {
 }) {
   const [clientReady, setClientReady] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [previewScope, setPreviewScope] = useState<"creator" | "compass" | null>(null);
   const [previewPersona, updatePreviewPersona] = useState<SyntheticPersonaKey>(() => getSyntheticPreviewPersona());
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -62,9 +65,24 @@ export function PlatformAccess({ experience, children }: {
   useEffect(() => {
     const task = window.setTimeout(() => {
       const query = new URLSearchParams(window.location.search);
-      const preview = query.get("preview") === "creator" || window.localStorage.getItem(SYNTHETIC_PREVIEW_KEY) === "true";
+      const requestedPreview = query.get("preview");
+      const storedPreview = window.localStorage.getItem(SYNTHETIC_PREVIEW_KEY) === "true";
+      const storedScope = window.localStorage.getItem(SYNTHETIC_PREVIEW_SCOPE_KEY);
+      const scope = requestedPreview === "compass"
+        ? "compass"
+        : requestedPreview === "creator"
+          ? "creator"
+          : storedPreview
+            ? storedScope === "compass" ? "compass" : "creator"
+            : null;
+      if (requestedPreview === "compass" && storedScope !== "compass") {
+        window.localStorage.setItem(SYNTHETIC_PERSONA_KEY, "compass_staff");
+        updatePreviewPersona("compass_staff");
+      }
+      const preview = scope !== null;
       const recovery = parseRecoveryCallback(window.location.search, window.location.hash);
       setPreviewMode(preview);
+      setPreviewScope(scope);
       setConfigured(preview ? "preview" : "loading");
       setRecoveryMode(recovery.requested && !recovery.errorMessage);
       setRecoveryError(recovery.errorMessage);
@@ -76,9 +94,10 @@ export function PlatformAccess({ experience, children }: {
   useEffect(() => {
     if (!clientReady) return;
     if (previewMode) {
-      const requestedPreview = new URLSearchParams(window.location.search).get("preview") === "creator";
+      const requestedPreview = new URLSearchParams(window.location.search).get("preview");
       window.localStorage.setItem(SYNTHETIC_PREVIEW_KEY, "true");
-      if (requestedPreview) window.history.replaceState({}, "", window.location.pathname);
+      window.localStorage.setItem(SYNTHETIC_PREVIEW_SCOPE_KEY, previewScope || "creator");
+      if (requestedPreview === "creator") window.history.replaceState({}, "", window.location.pathname);
       return;
     }
     loadProductionConfiguration().then(() => {
@@ -86,7 +105,7 @@ export function PlatformAccess({ experience, children }: {
       if (!client) throw new Error("Secure setup is not connected yet.");
       setSupabase(client); setConfigured("ready");
     }).catch(() => setConfigured("error"));
-  }, [clientReady, previewMode]);
+  }, [clientReady, previewMode, previewScope]);
 
   useEffect(() => {
     if (!previewMode) return;
@@ -147,17 +166,19 @@ export function PlatformAccess({ experience, children }: {
   }, [load]);
 
   if (previewMode && configured === "preview") {
-    const previewMemberships = syntheticMembershipsForPersona(previewPersona);
-    const previewContext = syntheticContextForPersona(previewPersona);
+    const scopedPersona = previewScope === "compass" && !["compass_student", "compass_staff"].includes(previewPersona) ? "compass_staff" : previewPersona;
+    const previewMemberships = syntheticMembershipsForPersona(scopedPersona);
+    const previewContext = syntheticContextForPersona(scopedPersona);
     const membership = experience ? previewMemberships.find((item) => item.experienceKey === experience) : null;
     if (previewPersona === "impact_student" && experience === "oaca") return <PreviewWorkspaceRedirect href="/app/compass/impact" />;
     if (experience && !membership) return <main className="production-auth"><section className="production-auth-card"><h1>Preview unavailable</h1><a className="secondary-button" href="/app">Return to Navigate</a></section></main>;
     const exitPreview = async () => {
       window.localStorage.removeItem(SYNTHETIC_PREVIEW_KEY);
       window.localStorage.removeItem(SYNTHETIC_PERSONA_KEY);
+      window.localStorage.removeItem(SYNTHETIC_PREVIEW_SCOPE_KEY);
       window.location.assign("/app");
     };
-    return <>{children({ session: syntheticPreviewSession, supabase: syntheticPreviewSupabase, api: syntheticPreviewApi, context: previewContext, memberships: previewMemberships, previewMode: true, previewPersona, setPreviewPersona: setSyntheticPreviewPersona, signOut: exitPreview })}</>;
+    return <>{children({ session: syntheticPreviewSession, supabase: syntheticPreviewSupabase, api: syntheticPreviewApi, context: previewContext, memberships: previewMemberships, previewMode: true, previewScope, previewPersona: scopedPersona, setPreviewPersona: setSyntheticPreviewPersona, signOut: exitPreview })}</>;
   }
 
   if (configured === "error") return <ConfigurationRequired />;
@@ -186,5 +207,5 @@ export function PlatformAccess({ experience, children }: {
   if (needsMfa) return <MfaGate supabase={supabase} onVerified={() => { setMfaVerified(true); void load(); }} />;
 
   const signOut = async () => { try { await api.request("/api/activity/signout", { method: "POST", body: {} }); } finally { await supabase.auth.signOut(); } };
-  return <>{children({ session, supabase, api, context, memberships, previewMode: false, previewPersona: null, setPreviewPersona: () => undefined, signOut })}</>;
+  return <>{children({ session, supabase, api, context, memberships, previewMode: false, previewScope: null, previewPersona: null, setPreviewPersona: () => undefined, signOut })}</>;
 }

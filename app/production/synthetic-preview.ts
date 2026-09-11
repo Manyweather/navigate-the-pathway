@@ -12,6 +12,7 @@ type RequestOptions = Omit<RequestInit, "body"> & { body?: unknown };
 
 export const SYNTHETIC_PREVIEW_KEY = "navigate.synthetic-pilot-preview";
 export const SYNTHETIC_PERSONA_KEY = "navigate.synthetic-pilot-persona.v1";
+export const SYNTHETIC_PREVIEW_SCOPE_KEY = "navigate.synthetic-pilot-scope.v1";
 
 export type SyntheticPersonaKey = "pathway_student" | "compass_student" | "compass_staff" | "impact_student" | "impact_administrator" | "community_liaison" | "platform_creator";
 
@@ -45,6 +46,7 @@ export function clearSyntheticPreview() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(SYNTHETIC_PREVIEW_KEY);
   window.localStorage.removeItem(SYNTHETIC_PERSONA_KEY);
+  window.localStorage.removeItem(SYNTHETIC_PREVIEW_SCOPE_KEY);
 }
 
 export const syntheticPreviewContext: AuthorizationContext = {
