@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   acceptedUploadTypes,
   canTransitionOacaAppointment,
+  defaultWorkspaceFor,
   experiences,
   genesisEventCanPublish,
   maximumUploadBytes,
@@ -15,14 +16,16 @@ import {
   suppressSmallGroup,
 } from "../app/production/platform-model.ts";
 import { organizationCollegeOrder, organizationsForSelect, studentOrganizations } from "../app/production/student-organizations.ts";
-import { syntheticPreviewApi, syntheticPreviewContext, syntheticPreviewMemberships } from "../app/production/synthetic-preview.ts";
+import { SYNTHETIC_PERSONA_KEY, syntheticPreviewApi, syntheticPreviewContext, syntheticPreviewMemberships } from "../app/production/synthetic-preview.ts";
 
-test("Navigate exposes three isolated experience destinations", () => {
+test("Compass is the parent for three isolated workspace destinations", () => {
   assert.deepEqual(Object.keys(experiences), ["pathway", "oaca", "genesis"]);
   assert.equal(experiences.pathway.href, "/app/pathway");
-  assert.equal(experiences.oaca.href, "/app/oaca");
+  assert.equal(experiences.oaca.href, "/app/compass");
   assert.equal(experiences.oaca.name, "Compass");
-  assert.equal(experiences.genesis.href, "/app/genesis");
+  assert.equal(experiences.genesis.href, "/app/compass/impact");
+  assert.equal(experiences.genesis.name, "Impact Workspace");
+  assert.equal(defaultWorkspaceFor(syntheticPreviewMemberships, null), "compass");
   for (const role of ["faculty", "staff", "administrator", "creator", "principal_investigator", "mentor", "community_liaison"]) assert.equal(staffMfaRoles.has(role), true);
 });
 
@@ -39,6 +42,42 @@ test("synthetic creator preview exposes all workspaces without production identi
   await syntheticPreviewApi.request("/api/oaca/appointments/cancel", { method: "POST", body: { appointmentId: "appointment-1" } });
   const updatedCompass = await syntheticPreviewApi.request("/api/oaca/bootstrap");
   assert.equal(updatedCompass.appointments.find((appointment) => appointment.id === "appointment-1")?.status, "cancelled");
+});
+
+test("Creator Preview personas are scoped before dashboard data is returned", async () => {
+  const values = new Map();
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    localStorage: { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)), removeItem: (key) => values.delete(key) },
+    dispatchEvent: () => true,
+  };
+  try {
+    values.set(SYNTHETIC_PERSONA_KEY, "compass_student");
+    const studentPlatform = await syntheticPreviewApi.request("/api/platform/experiences");
+    assert.deepEqual(studentPlatform.memberships.map((item) => item.experienceKey), ["oaca"]);
+    const studentCompass = await syntheticPreviewApi.request("/api/oaca/bootstrap");
+    assert.deepEqual(studentCompass.assignedStudents, []);
+    assert.equal(studentCompass.analytics, null);
+    assert.equal(studentCompass.canManageImports, false);
+    await assert.rejects(() => syntheticPreviewApi.request("/api/oaca/analytics", { method: "POST", body: {} }), /Student preview responses cannot access staff/);
+    const affiliations = await syntheticPreviewApi.request("/api/platform/affiliations");
+    assert.equal(affiliations.studentCouncil, true);
+    assert.equal(affiliations.impactAccessStatus, "locked");
+
+    values.set(SYNTHETIC_PERSONA_KEY, "impact_student");
+    const impactStudent = await syntheticPreviewApi.request("/api/genesis/bootstrap");
+    assert.equal(impactStudent.accessStatus, "active");
+    assert.deepEqual(impactStudent.accessQueue, []);
+    assert.deepEqual(impactStudent.notifications, []);
+
+    values.set(SYNTHETIC_PERSONA_KEY, "community_liaison");
+    const liaison = await syntheticPreviewApi.request("/api/genesis/bootstrap");
+    assert.ok(liaison.accessQueue.length > 0);
+    assert.ok(liaison.notifications.length > 0);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
 });
 
 test("password recovery takes priority over account loading and offers a safe preview fallback", async () => {
@@ -97,7 +136,7 @@ test("the complete organization catalog is ordered Medicine-first and gates the 
 });
 
 test("platform migrations are additive, identity-aware, audited, and immutable where required", async () => {
-  const [foundation, catalog, actions, oacaPolicies, oacaImports, oacaOutreach, eventOperations, affiliations, bookingRefinements] = await Promise.all([
+  const [foundation, catalog, actions, oacaPolicies, oacaImports, oacaOutreach, eventOperations, affiliations, bookingRefinements, compassParent] = await Promise.all([
     readFile(new URL("../supabase/migrations/202609100001_three_experience_platform.sql", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/202609100002_genesis_organization_catalog.sql", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/202609100003_experience_vertical_slice_actions.sql", import.meta.url), "utf8"),
@@ -107,13 +146,14 @@ test("platform migrations are additive, identity-aware, audited, and immutable w
     readFile(new URL("../supabase/migrations/202609100008_oaca_event_operations.sql", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/202609100009_student_affiliations_platform_creator.sql", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/202609100010_oaca_student_booking_refinements.sql", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/202609110001_compass_parent_platform.sql", import.meta.url), "utf8"),
   ]);
   assert.match(foundation, /insert into public\.experience_role_assignments[\s\S]*from public\.role_assignments/i);
   assert.match(foundation, /public\.current_profile_user_id\(\)/);
   assert.match(foundation, /prevent_genesis_snapshot_changes/);
   assert.match(foundation, /create policy oaca_messages_participants/);
   assert.doesNotMatch(foundation, /oaca_messages.*administrator/i);
-  assert.doesNotMatch(foundation + catalog + actions + oacaPolicies + oacaImports + oacaOutreach + eventOperations + affiliations + bookingRefinements, /\b(drop table|truncate|delete from public\.profiles|alter table public\.role_assignments drop)\b/i);
+  assert.doesNotMatch(foundation + catalog + actions + oacaPolicies + oacaImports + oacaOutreach + eventOperations + affiliations + bookingRefinements + compassParent, /\b(drop table|truncate|delete from public\.profiles|alter table public\.role_assignments drop)\b/i);
   assert.match(catalog, /'College of Medicine'.*true,1/);
   assert.match(actions, /service\.policy_status <> 'live_approved'/);
   assert.match(actions, /Approved organization membership is required to publish/);
@@ -150,6 +190,16 @@ test("platform migrations are additive, identity-aware, audited, and immutable w
   assert.match(bookingRefinements, /Academic drop-ins are limited to two visits per academic block/);
   assert.match(bookingRefinements, /oaca_one_active_permanent_student_qr/);
   assert.match(bookingRefinements, /deduplicated/);
+  assert.match(compassParent, /platform_workspace_preferences/);
+  assert.match(compassParent, /verification_status.*pending.*approved.*declined.*ended/s);
+  assert.match(compassParent, /Student Council|student_council/i);
+  assert.match(compassParent, /genesis_decide_affiliation/);
+  assert.match(compassParent, /genesis_submit_event/);
+  assert.match(compassParent, /genesis_decide_event/);
+  assert.match(compassParent, /genesis_event_calendar_jobs/);
+  assert.match(compassParent, /impact:event:submitted/);
+  assert.match(compassParent, /enforce_genesis_student_write_affiliation/);
+  assert.match(compassParent, /Impact editing is read-only until an interest-group affiliation is approved/);
 });
 
 test("Worker API requires matching experience context and keeps endpoint families stable", async () => {
@@ -161,12 +211,28 @@ test("Worker API requires matching experience context and keeps endpoint familie
   assert.match(worker, /x-navigate-experience/);
   assert.match(client, /"x-navigate-experience"/);
   assert.match(api, /request\.headers\.get\("x-navigate-experience"\) !== experienceKey/);
+  assert.match(api, /const isCreator = membership\.roles\.includes\("creator"\)/);
+  assert.match(api, /analyticsOrganizationIds = activeOrganizationIds\.filter\(\(organizationId\) => isCreator \|\|/);
   for (const family of ["/api/platform/", "/api/oaca/", "/api/genesis/"]) assert.match(worker + api, new RegExp(family.replaceAll("/", "\\/")));
-  for (const endpoint of ["/api/platform/affiliations", "/api/oaca/events", "/api/oaca/events/attendance", "/api/oaca/events/check-in", "/api/oaca/event-imports", "/api/oaca/event-notifications", "/api/oaca/event-messages", "/api/platform/push-subscriptions", "/api/oaca/campaigns", "/api/oaca/nudges", "/api/oaca/forms/respond"]) assert.match(api, new RegExp(endpoint.replaceAll("/", "\\/")));
+  for (const endpoint of ["/api/platform/affiliations", "/api/platform/workspace-preference", "/api/oaca/events", "/api/oaca/events/attendance", "/api/oaca/events/check-in", "/api/oaca/event-imports", "/api/oaca/event-notifications", "/api/oaca/event-messages", "/api/platform/push-subscriptions", "/api/oaca/campaigns", "/api/oaca/nudges", "/api/oaca/forms/respond", "/api/genesis/access-requests/decide", "/api/genesis/events/submit", "/api/genesis/events/decision", "/api/genesis/calendar"]) assert.match(api, new RegExp(endpoint.replaceAll("/", "\\/")));
+});
+
+test("Compass is the published application identity and Creator Preview remains directly accessible", async () => {
+  const [layout, appPage, signIn] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/production-pilot-app.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(layout, /applicationName: "Compass"/);
+  assert.match(layout, /default: "Compass"/);
+  assert.doesNotMatch(layout, /template: "%s \| Navigate"/);
+  assert.match(appPage, /absolute: "Compass"/);
+  assert.match(signIn, /href="\/app\?preview=creator"/);
+  assert.match(signIn, /Explore the Creator Preview/);
 });
 
 test("phone-first pilot screens include the required privacy and approval guardrails", async () => {
-  const [hub, oaca, engagement, genesis, worksheet, eventWorkspace, signInSource, styles] = await Promise.all([
+  const [hub, oaca, engagement, genesis, worksheet, eventWorkspace, signInSource, styles, shell, assetUrl] = await Promise.all([
     readFile(new URL("../app/production/navigate-hub-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-compass-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-engagement-center.tsx", import.meta.url), "utf8"),
@@ -175,19 +241,23 @@ test("phone-first pilot screens include the required privacy and approval guardr
     readFile(new URL("../app/production/oaca-event-workspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/production-pilot-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/compass-platform-shell.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/asset-url.ts", import.meta.url), "utf8"),
   ]);
   const signIn = signInSource.slice(signInSource.indexOf("export function SignIn"), signInSource.indexOf("export function MfaGate"));
   assert.doesNotMatch(signIn, /One Roseman account|Three experiences\. One sign-in\.|Your roles determine which separate workspaces appear/);
-  for (const experience of ["Compass", "Navigate the Pathway", "Impact Studio"]) assert.match(signIn, new RegExp(experience));
+  assert.match(signIn, /Compass/);
+  assert.doesNotMatch(signIn, /Available Roseman experiences|Navigate the Pathway<|Impact Studio</);
   assert.doesNotMatch(signIn, /OACA Compass/);
   assert.doesNotMatch(signIn, /GENESIS/);
-  for (const graphic of ["compass", "pathway", "impact"]) assert.match(signIn, new RegExp(`ExperienceGraphic experience="${graphic}"`));
-  assert.match(signIn, /Roseman Microsoft SSO is coming soon/);
+  assert.doesNotMatch(signIn, /ExperienceGraphic/);
+  assert.match(signIn, /Roseman Microsoft SSO/);
+  assert.match(signIn, /Coming soon/);
   assert.match(signIn, /Sign-in is taking too long/);
   assert.doesNotMatch(signIn, /navigate-pathway-mark/);
-  assert.match(hub, /only|active/);
-  assert.match(hub, /Student Council/);
-  assert.match(hub, /same Roseman directory used in GENESIS/);
+  assert.match(hub, /Opening your authorized workspace/);
+  assert.match(hub, /defaultWorkspaceFor/);
+  assert.match(hub, /access is pending administrator approval/i);
   assert.match(oaca, /Required milestones are reminders, not limits/);
   assert.match(oaca, /Schedule for a student/);
   assert.match(oaca, /Current agreement acknowledged/);
@@ -208,6 +278,10 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.match(oaca, />Later</);
   assert.match(oaca, /Creator pilot activity/);
   assert.match(oaca, /navigate\.creator\.compass-time\.v1/);
+  assert.match(oaca, /key=\{previewPersona \|\| context\.userId\}/);
+  assert.match(genesis, /key=\{previewPersona \|\| context\.userId\}/);
+  assert.match(shell, /navigate\.creator\.preview-time\.v2/);
+  assert.doesNotMatch(assetUrl, /document\.baseURI/);
   assert.match(oaca, /rucom-logo-white\.svg/);
   assert.match(oaca, /<strong>Compass<\/strong>/);
   assert.doesNotMatch(oaca, /<strong>OACA Compass<\/strong>/);
@@ -224,7 +298,9 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.match(eventWorkspace, /Notification preferences and quiet hours/);
   assert.match(genesis, /Not yet available/);
   assert.match(genesis, /immutable/);
-  assert.match(genesis, /mentor and liaison approvals are both recorded/i);
+  assert.match(genesis, /dual-approved events reach the Impact calendar/i);
+  assert.match(genesis, /Verify interest-group affiliations/);
+  assert.match(genesis, /Every active Community Liaison/);
   assert.match(worksheet, /contains no name, email, or student identifier/i);
   assert.match(styles, /min-height:44px/);
   assert.match(styles, /prefers-reduced-motion/);

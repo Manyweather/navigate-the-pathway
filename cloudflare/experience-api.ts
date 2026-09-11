@@ -21,11 +21,12 @@ async function requireMembership(request: Request, services: ExperienceServices,
 }
 
 function requireRole(membership: ExperienceMembership, roles: string[]) {
+  if (membership.roles.includes("creator")) return;
   if (!membership.roles.some((role) => roles.includes(role))) throw new WorkspaceError(403, "Your experience role does not permit this action.");
 }
 
 function requireCapability(membership: ExperienceMembership, capability: string, administratorBypass = true) {
-  if (administratorBypass && membership.roles.includes("administrator")) return;
+  if (membership.roles.includes("creator") || (administratorBypass && membership.roles.includes("administrator"))) return;
   if (!membership.capabilities.includes(capability)) throw new WorkspaceError(403, "A separate capability is required for this action.");
 }
 
@@ -43,19 +44,31 @@ async function platformExperiences(services: ExperienceServices) {
   return { context: { ...context, experienceMemberships: assigned }, memberships: assigned };
 }
 
+async function platformWorkspacePreference(services: ExperienceServices) {
+  const rows = await services.service<Array<{ last_workspace_key: "compass" | "pathway" | "impact"; last_opened_at: string }>>(`platform_workspace_preferences?user_id=eq.${services.user.id}&select=last_workspace_key,last_opened_at&limit=1`);
+  return { lastWorkspaceKey: rows[0]?.last_workspace_key || null, lastOpenedAt: rows[0]?.last_opened_at || null };
+}
+
 async function platformAffiliations(services: ExperienceServices) {
   const assigned = await memberships(services);
   const isStudent = assigned.some((membership) => membership.status === "active" && membership.roles.includes("student"));
-  if (!isStudent) return { isStudent: false, organizations: [], organizationIds: [], studentCouncil: false };
+  if (!isStudent) return { isStudent: false, organizations: [], affiliations: [], studentCouncil: false, impactAccessStatus: "locked", impactHref: null };
   const [organizations, affiliations] = await Promise.all([
     services.service<Array<Record<string, unknown>>>("genesis_organizations?archived_at=is.null&select=id,directory_key,name,college,campus,aliases,sort_priority&order=sort_priority,name"),
-    services.service<Array<Record<string, unknown>>>(`platform_student_affiliations?student_id=eq.${services.user.id}&ended_at=is.null&select=affiliation_type,organization_id,designation`),
+    services.service<Array<Record<string, unknown>>>(`platform_student_affiliations?student_id=eq.${services.user.id}&select=id,affiliation_type,organization_id,designation,verification_status,requested_at,reviewed_by,reviewed_at,review_note,ended_at&order=requested_at.desc`),
   ]);
+  const reviewerIds = [...new Set(affiliations.map((item) => item.reviewed_by).filter(Boolean).map(String))];
+  const reviewers = reviewerIds.length ? await services.service<Array<{ user_id: string; display_name: string }>>(`profiles?user_id=in.(${reviewerIds.join(",")})&select=user_id,display_name`) : [];
+  const interestGroups = affiliations.filter((item) => item.affiliation_type === "interest_group");
+  const approved = interestGroups.some((item) => item.verification_status === "approved" && !item.ended_at);
+  const preserved = interestGroups.some((item) => item.verification_status === "ended" || (item.verification_status === "approved" && item.ended_at));
   return {
     isStudent: true,
     organizations: organizations.map((item) => ({ id: item.id, key: item.directory_key, name: item.name, college: item.college, campus: item.campus, aliases: item.aliases || [] })),
-    organizationIds: affiliations.filter((item) => item.affiliation_type === "interest_group").map((item) => item.organization_id),
-    studentCouncil: affiliations.some((item) => item.affiliation_type === "student_council"),
+    affiliations: interestGroups.map((item) => ({ id: item.id, organizationId: item.organization_id, organizationName: organizations.find((organization) => organization.id === item.organization_id)?.name || "Student organization", status: item.verification_status, requestedAt: item.requested_at, reviewedAt: item.reviewed_at, reviewerName: reviewers.find((profile) => profile.user_id === item.reviewed_by)?.display_name || null, reviewNote: item.review_note })),
+    studentCouncil: affiliations.some((item) => item.affiliation_type === "student_council" && !item.ended_at),
+    impactAccessStatus: approved ? "active" : preserved ? "read_only" : "locked",
+    impactHref: approved || preserved ? "/app/compass/impact" : null,
   };
 }
 
@@ -80,6 +93,7 @@ async function createFile(request: Request, services: ExperienceServices) {
 
 async function oacaBootstrap(services: ExperienceServices, membership: ExperienceMembership) {
   const [scope, context] = await Promise.all([assignmentScope(services, "oaca"), services.context()]);
+  const isCreator = membership.roles.includes("creator");
   const organizationIds = [...new Set(scope.map((item) => item.organization_id).filter(Boolean))] as string[];
   const activeOrganizationIds = context.activeOrganizationId && organizationIds.includes(context.activeOrganizationId) ? [context.activeOrganizationId] : organizationIds;
   const scopedCapabilities = organizationIds.length ? await services.service<Array<{ organization_id: string | null; capability: string }>>(`experience_capability_assignments?user_id=eq.${services.user.id}&experience_key=eq.oaca&revoked_at=is.null&select=organization_id,capability`) : [];
@@ -92,7 +106,7 @@ async function oacaBootstrap(services: ExperienceServices, membership: Experienc
   const providerServices = serviceIds.length && providerRows.length ? await services.service<Array<{ provider_id: string; service_line_id: string; subjects: string[]; formats: string[] }>>(`oaca_provider_services?provider_id=in.(${providerRows.map((item) => item.id).join(",")})&select=provider_id,service_line_id,subjects,formats`) : [];
   const providers = providerRows.map((item) => ({ id: String(item.id), displayName: providerProfiles.find((profile) => profile.user_id === item.user_id)?.display_name || "OACA provider", classification: String(item.classification), modalities: Array.isArray(item.modalities) ? item.modalities : [], subjects: providerServices.filter((row) => row.provider_id === item.id).flatMap((row) => row.subjects || []), serviceKeys: providerServices.filter((row) => row.provider_id === item.id).map((row) => String(serviceRows.find((service) => service.id === row.service_line_id)?.key || "")).filter(Boolean) }));
   const ownProvider = providerRows.find((item) => item.user_id === services.user.id);
-  const outreachOrganizationIds = activeOrganizationIds.filter((organizationId) => scope.some((assignment) => assignment.organization_id === organizationId && assignment.role === "administrator") || scopedCapabilities.some((assignment) => assignment.organization_id === organizationId && assignment.capability === "oaca.outreach.manage"));
+  const outreachOrganizationIds = activeOrganizationIds.filter((organizationId) => isCreator || scope.some((assignment) => assignment.organization_id === organizationId && assignment.role === "administrator") || scopedCapabilities.some((assignment) => assignment.organization_id === organizationId && assignment.capability === "oaca.outreach.manage"));
   const outreachInsightsOrganizationIds = activeOrganizationIds.filter((organizationId) => outreachOrganizationIds.includes(organizationId) || scopedCapabilities.some((assignment) => assignment.organization_id === organizationId && assignment.capability === "oaca.outreach.insights"));
   const canManageOutreach = outreachOrganizationIds.length > 0;
   const canViewOutreachInsights = outreachInsightsOrganizationIds.length > 0;
@@ -114,8 +128,8 @@ async function oacaBootstrap(services: ExperienceServices, membership: Experienc
   const restrictions = membership.roles.includes("student") ? await services.service<Array<Record<string, unknown>>>(`oaca_scheduling_restrictions?student_id=eq.${services.user.id}&released_at=is.null&select=id,service_line_id,reason,starts_at,ends_at`) : [];
   const tutorComplianceRows = ownProvider?.classification === "peer_tutor" ? await services.service<Array<Record<string, unknown>>>(`oaca_tutor_compliance?provider_id=eq.${ownProvider.id}&select=provider_id,application_approved_at,faculty_recommendation_at,interview_completed_at,workday_onboarding_at,training_completed_at,handbook_acknowledgment_id,eligible_at,suspended_at,suspension_reason&limit=1`) : [];
   const calendar = await services.service<Array<{ id: string }>>(`pathway_calendar_connections?user_id=eq.${services.user.id}&provider=eq.microsoft&status=eq.connected&select=id&limit=1`);
-  const importOrganizationIds = activeOrganizationIds.filter((organizationId) => scope.some((assignment) => assignment.organization_id === organizationId && assignment.role === "administrator") || scopedCapabilities.some((assignment) => assignment.organization_id === organizationId && assignment.capability === "oaca.import.manage"));
-  const analyticsOrganizationIds = activeOrganizationIds.filter((organizationId) => scope.some((assignment) => assignment.organization_id === organizationId && assignment.role === "administrator") || scopedCapabilities.some((assignment) => assignment.organization_id === organizationId && assignment.capability === "oaca.analytics.aggregate"));
+  const importOrganizationIds = activeOrganizationIds.filter((organizationId) => isCreator || scope.some((assignment) => assignment.organization_id === organizationId && assignment.role === "administrator") || scopedCapabilities.some((assignment) => assignment.organization_id === organizationId && assignment.capability === "oaca.import.manage"));
+  const analyticsOrganizationIds = activeOrganizationIds.filter((organizationId) => isCreator || scope.some((assignment) => assignment.organization_id === organizationId && assignment.role === "administrator") || scopedCapabilities.some((assignment) => assignment.organization_id === organizationId && assignment.capability === "oaca.analytics.aggregate"));
   const canManageImports = importOrganizationIds.length > 0;
   const canViewAnalytics = analyticsOrganizationIds.length > 0;
   const importBatches = canManageImports ? await services.service<Array<Record<string, unknown>>>(`oaca_import_batches?organization_id=in.(${importOrganizationIds.join(",")})&select=id,file_id,source_system,dataset_type,cohort_label,period_starts_on,period_ends_on,contains_real_student_data,source_headers,column_mapping,status,total_rows,valid_rows,invalid_rows,matched_students,quality_summary,requested_by,reviewed_by,reviewed_at,created_at,completed_at&order=created_at.desc&limit=50`) : [];
@@ -174,23 +188,41 @@ async function genesisBootstrap(services: ExperienceServices, membership: Experi
   const initiativeIds = initiativeRows.map((item) => item.id);
   const snapshots = initiativeIds.length ? await services.service<Array<Record<string, unknown>>>(`genesis_snapshots?initiative_id=in.(${initiativeIds.join(",")})&select=id,initiative_id,published_at,attribution,content&order=published_at.desc`) : [];
   const handoffs = initiativeIds.length ? await services.service<Array<Record<string, unknown>>>(`genesis_handoffs?initiative_id=in.(${initiativeIds.join(",")})&select=id,initiative_id,status,next_steward_email&order=created_at.desc`) : [];
-  const events = initiativeIds.length ? await services.service<Array<Record<string, unknown>>>(`genesis_events?initiative_id=in.(${initiativeIds.join(",")})&select=id,title,status,starts_at&order=starts_at.desc.nullslast`) : [];
-  const reviewMemberships = membership.roles.some((role) => ["mentor","administrator"].includes(role)) ? await services.service<Array<{ organization_id: string }>>(`genesis_organization_memberships?user_id=eq.${services.user.id}&status=eq.approved&role=in.(mentor,administrator)&select=organization_id`) : [];
-  const reviewPortfolios = reviewMemberships.length ? await services.service<Array<{ id: string; title: string; organization_id: string }>>(`genesis_portfolios?organization_id=in.(${reviewMemberships.map((item) => item.organization_id).join(",")})&archived_at=is.null&select=id,title,organization_id`) : [];
+  const ownAffiliations = membership.roles.includes("student") ? await services.service<Array<Record<string, unknown>>>(`platform_student_affiliations?student_id=eq.${services.user.id}&affiliation_type=eq.interest_group&select=id,student_id,organization_id,verification_status,requested_at,reviewed_by,reviewed_at,review_note,request_context,ended_at&order=requested_at.desc`) : [];
+  const approvedOrganizationIds = ownAffiliations.filter((item) => item.verification_status === "approved" && !item.ended_at).map((item) => String(item.organization_id));
+  const reviewMemberships = membership.roles.some((role) => ["mentor","administrator","community_liaison","creator"].includes(role)) ? await services.service<Array<{ organization_id: string }>>(`genesis_organization_memberships?user_id=eq.${services.user.id}&status=eq.approved&role=in.(mentor,administrator,community_liaison)&select=organization_id`) : [];
+  const reviewOrganizationIds = membership.roles.some((role) => ["administrator","community_liaison","creator"].includes(role)) ? organizations.map((item) => String(item.id)) : reviewMemberships.map((item) => item.organization_id);
+  const visibleEventFilter = membership.roles.includes("student") ? (initiativeIds.length ? `initiative_id=in.(${initiativeIds.join(",")})` : "created_by=eq.00000000-0000-0000-0000-000000000000") : reviewOrganizationIds.length ? `organization_id=in.(${reviewOrganizationIds.join(",")})` : "created_by=eq.00000000-0000-0000-0000-000000000000";
+  const events = await services.service<Array<Record<string, unknown>>>(`genesis_events?${visibleEventFilter}&select=id,title,objective,organization_id,status,starts_at,mentor_approved_at,liaison_approved_at,submitted_at,reviewer_feedback&order=starts_at.desc.nullslast`);
+  const reviewPortfolios = reviewOrganizationIds.length ? await services.service<Array<{ id: string; title: string; organization_id: string }>>(`genesis_portfolios?organization_id=in.(${reviewOrganizationIds.join(",")})&archived_at=is.null&select=id,title,organization_id`) : [];
   const reviews = reviewPortfolios.length ? await services.service<Array<Record<string, unknown>>>(`genesis_portfolio_versions?portfolio_id=in.(${reviewPortfolios.map((item) => item.id).join(",")})&status=eq.submitted&select=id,portfolio_id,version,content,status&order=submitted_at`) : [];
+  const canReviewAccess = membership.roles.some((role) => ["administrator","community_liaison","creator"].includes(role));
+  const accessQueue = canReviewAccess ? await services.service<Array<Record<string, unknown>>>("platform_student_affiliations?affiliation_type=eq.interest_group&verification_status=eq.pending&ended_at=is.null&select=id,student_id,organization_id,verification_status,requested_at,request_context&order=requested_at") : [];
+  const queueStudentIds = [...new Set(accessQueue.map((item) => String(item.student_id)))];
+  const queueProfiles = queueStudentIds.length ? await services.service<Array<{ user_id: string; display_name: string }>>(`profiles?user_id=in.(${queueStudentIds.join(",")})&select=user_id,display_name`) : [];
+  const notifications = canReviewAccess ? await services.service<Array<Record<string, unknown>>>(`platform_notifications?experience_key=eq.genesis&user_id=eq.${services.user.id}&dismissed_at=is.null&select=id,title,body,entity_id,read_at,created_at&order=created_at.desc&limit=100`) : [];
   return {
     organizations: organizations.map((item) => ({ id: item.id, key: item.directory_key, name: item.name, college: item.college, campus: item.campus, mission: item.mission, advisor: item.advisor, aliases: item.aliases || [], sourceDate: item.source_date, pilotAvailable: item.pilot_available })),
     portfolios: portfolios.map((item) => { const version = versions.find((row) => row.portfolio_id === item.id && row.version === item.current_version) || versions.find((row) => row.portfolio_id === item.id); return { id: item.id, title: item.title, organizationId: item.organization_id, organizationName: organizations.find((organization) => organization.id === item.organization_id)?.name || "Organization", currentVersion: item.current_version, status: version?.status || "draft", content: version?.content || {}, mentorFeedback: version?.mentor_feedback }; }),
     reviews: reviews.map((item) => ({ id: item.portfolio_id, title: reviewPortfolios.find((portfolio) => portfolio.id === item.portfolio_id)?.title || "Submitted initiative", organizationId: reviewPortfolios.find((portfolio) => portfolio.id === item.portfolio_id)?.organization_id || "", organizationName: "", currentVersion: item.version, status: item.status, content: item.content || {} })),
     snapshots: snapshots.map((item) => ({ id: item.id, title: (item.content as Record<string, unknown>)?.title || "Initiative snapshot", publishedAt: item.published_at, authorName: (item.attribution as Record<string, unknown>)?.authorName || "Student author" })),
     handoffs: handoffs.map((item) => ({ id: item.id, title: initiativeRows.find((initiative) => initiative.id === item.initiative_id)?.title || "Initiative handoff", status: item.status, nextSteward: item.next_steward_email })),
-    events: events.map((item) => ({ id: item.id, title: item.title, status: item.status, startsAt: item.starts_at })),
+    events: events.map((item) => ({ id: item.id, title: item.title, objective: item.objective, organizationId: item.organization_id, organizationName: organizations.find((organization) => organization.id === item.organization_id)?.name || "Student organization", status: item.status, startsAt: item.starts_at, mentorApprovedAt: item.mentor_approved_at, liaisonApprovedAt: item.liaison_approved_at, submittedAt: item.submitted_at, reviewerFeedback: item.reviewer_feedback })),
+    calendarEvents: events.filter((item) => item.status === "published").map((item) => ({ id: item.id, title: item.title, objective: item.objective, organizationId: item.organization_id, organizationName: organizations.find((organization) => organization.id === item.organization_id)?.name || "Student organization", status: item.status, startsAt: item.starts_at })),
+    affiliations: ownAffiliations.map((item) => ({ id: item.id, studentId: item.student_id, studentName: "You", organizationId: item.organization_id, organizationName: organizations.find((organization) => organization.id === item.organization_id)?.name || "Student organization", status: item.verification_status, requestedAt: item.requested_at, reviewedAt: item.reviewed_at, reviewerName: null, reviewNote: item.review_note })),
+    approvedOrganizationIds,
+    accessStatus: approvedOrganizationIds.length ? "active" : ownAffiliations.some((item) => item.verification_status === "ended") ? "read_only" : "pending",
+    canEdit: approvedOrganizationIds.length > 0 || canReviewAccess,
+    accessQueue: accessQueue.map((item) => ({ id: item.id, studentId: item.student_id, studentName: queueProfiles.find((profile) => profile.user_id === item.student_id)?.display_name || "Student", organizationId: item.organization_id, organizationName: organizations.find((organization) => organization.id === item.organization_id)?.name || "Student organization", status: item.verification_status, requestedAt: item.requested_at, reviewedAt: null, reviewerName: null, reviewNote: null, requestContext: item.request_context })),
+    notifications: notifications.map((item) => ({ id: item.id, title: item.title, body: item.body, eventId: item.entity_id, readAt: item.read_at, createdAt: item.created_at })),
   };
 }
 
 export async function experienceRoute(request: Request, services: ExperienceServices): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.pathname === "/api/platform/experiences" && request.method === "GET") return workspaceJson(await platformExperiences(services));
+  if (url.pathname === "/api/platform/workspace-preference" && request.method === "GET") return workspaceJson(await platformWorkspacePreference(services));
+  if (url.pathname === "/api/platform/workspace-preference" && request.method === "POST") return workspaceJson(await services.rpc("platform_save_workspace_preference", { payload: await workspaceBody(request) }));
   if (url.pathname === "/api/platform/affiliations" && request.method === "GET") return workspaceJson(await platformAffiliations(services));
   if (url.pathname === "/api/platform/affiliations" && request.method === "POST") return workspaceJson(await services.rpc("platform_save_student_affiliations", { payload: await workspaceBody(request) }));
   if (url.pathname === "/api/platform/files" && request.method === "POST") return workspaceJson(await createFile(request, services), 201);
@@ -384,13 +416,19 @@ export async function experienceRoute(request: Request, services: ExperienceServ
   if (url.pathname.startsWith("/api/genesis/")) {
     const membership = await requireMembership(request, services, "genesis");
     if (url.pathname === "/api/genesis/bootstrap" && request.method === "GET") return workspaceJson(await genesisBootstrap(services, membership));
+    if (url.pathname === "/api/genesis/calendar" && request.method === "GET") return workspaceJson((await genesisBootstrap(services, membership)).calendarEvents);
     const body = await workspaceBody(request);
     const routes: Record<string, { role: string[]; rpc: string }> = {
       "/api/genesis/reflections": { role: ["student"], rpc: "genesis_save_reflection" },
       "/api/genesis/reviews": { role: ["student"], rpc: "genesis_submit_review" },
       "/api/genesis/snapshots": { role: ["student"], rpc: "genesis_publish_snapshot" },
       "/api/genesis/handoffs": { role: ["student"], rpc: "genesis_create_handoff" },
-      "/api/genesis/events": { role: ["student","mentor","community_liaison"], rpc: "genesis_create_event" },
+      "/api/genesis/events": { role: ["student"], rpc: "genesis_create_event" },
+      "/api/genesis/events/submit": { role: ["student"], rpc: "genesis_submit_event" },
+      "/api/genesis/events/decision": { role: ["mentor","community_liaison","administrator"], rpc: "genesis_decide_event" },
+      "/api/genesis/events/change": { role: ["student","mentor","community_liaison","administrator"], rpc: "genesis_change_event" },
+      "/api/genesis/events/cancel": { role: ["student","mentor","community_liaison","administrator"], rpc: "genesis_cancel_event" },
+      "/api/genesis/access-requests/decide": { role: ["community_liaison","administrator"], rpc: "genesis_decide_affiliation" },
       "/api/genesis/review-decisions": { role: ["mentor","administrator"], rpc: "genesis_review_decide" },
     };
     const route = routes[url.pathname];

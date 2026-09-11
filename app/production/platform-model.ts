@@ -1,4 +1,5 @@
 export type ExperienceKey = "pathway" | "oaca" | "genesis";
+export type WorkspaceKey = "compass" | "pathway" | "impact";
 
 export type ExperienceRole =
   | "student"
@@ -18,6 +19,7 @@ export type ExperienceMembership = {
   capabilities: string[];
   status: "active" | "invited" | "suspended" | "archived";
   featureEnabled: boolean;
+  launchState?: "active" | "read_only" | "pending";
 };
 
 export const experiences: Record<ExperienceKey, {
@@ -37,18 +39,45 @@ export const experiences: Record<ExperienceKey, {
   oaca: {
     name: "Compass",
     shortName: "Compass",
-    href: "/app/oaca",
+    href: "/app/compass",
     description: "Schedule advising and tutoring, prepare for visits, and follow through on your goals.",
     accent: "oaca",
   },
   genesis: {
-    name: "GENESIS Impact Studio",
-    shortName: "Impact Studio",
-    href: "/app/genesis",
+    name: "Impact Workspace",
+    shortName: "Impact",
+    href: "/app/compass/impact",
     description: "Develop a grounded, sustainable community initiative with coaching and a clear handoff.",
     accent: "genesis",
   },
 };
+
+export const workspaceToExperience: Record<WorkspaceKey, ExperienceKey> = {
+  compass: "oaca",
+  pathway: "pathway",
+  impact: "genesis",
+};
+
+export const experienceToWorkspace: Record<ExperienceKey, WorkspaceKey> = {
+  oaca: "compass",
+  pathway: "pathway",
+  genesis: "impact",
+};
+
+export function authorizedWorkspaceKeys(memberships: ExperienceMembership[]) {
+  return memberships
+    .filter((membership) => membership.status === "active" && membership.featureEnabled)
+    .map((membership) => experienceToWorkspace[membership.experienceKey]);
+}
+
+export function defaultWorkspaceFor(memberships: ExperienceMembership[], preferred?: WorkspaceKey | null): WorkspaceKey | null {
+  const authorized = authorizedWorkspaceKeys(memberships);
+  if (preferred && authorized.includes(preferred)) return preferred;
+  if (authorized.includes("compass")) return "compass";
+  if (authorized.length === 1) return authorized[0];
+  if (authorized.includes("impact")) return "impact";
+  return authorized[0] || null;
+}
 
 export const staffMfaRoles = new Set<ExperienceRole>([
   "advisor",

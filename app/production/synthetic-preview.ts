@@ -11,6 +11,41 @@ import type { AuthorizationContext } from "./types";
 type RequestOptions = Omit<RequestInit, "body"> & { body?: unknown };
 
 export const SYNTHETIC_PREVIEW_KEY = "navigate.synthetic-pilot-preview";
+export const SYNTHETIC_PERSONA_KEY = "navigate.synthetic-pilot-persona.v1";
+
+export type SyntheticPersonaKey = "pathway_student" | "compass_student" | "compass_staff" | "impact_student" | "impact_administrator" | "community_liaison" | "platform_creator";
+
+export const SYNTHETIC_PERSONAS: Array<{ key: SyntheticPersonaKey; label: string; defaultPath: string }> = [
+  { key: "pathway_student", label: "Pathway pre-med student", defaultPath: "/app/pathway" },
+  { key: "compass_student", label: "Compass student", defaultPath: "/app/compass" },
+  { key: "compass_staff", label: "Compass staff/advisor", defaultPath: "/app/compass" },
+  { key: "impact_student", label: "Impact student", defaultPath: "/app/compass/impact" },
+  { key: "impact_administrator", label: "Impact Administrator", defaultPath: "/app/compass/impact" },
+  { key: "community_liaison", label: "Community Liaison", defaultPath: "/app/compass/impact" },
+  { key: "platform_creator", label: "Platform Creator", defaultPath: "/app/compass" },
+];
+
+export function getSyntheticPreviewPersona(): SyntheticPersonaKey {
+  if (typeof window === "undefined") return "platform_creator";
+  const saved = window.localStorage.getItem(SYNTHETIC_PERSONA_KEY) as SyntheticPersonaKey | null;
+  return SYNTHETIC_PERSONAS.some((item) => item.key === saved) ? saved! : "platform_creator";
+}
+
+export function setSyntheticPreviewPersona(persona: SyntheticPersonaKey) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SYNTHETIC_PERSONA_KEY, persona);
+  window.dispatchEvent(new CustomEvent("navigate:preview-persona", { detail: persona }));
+}
+
+export function isSyntheticPreviewActive() {
+  return typeof window !== "undefined" && window.localStorage.getItem(SYNTHETIC_PREVIEW_KEY) === "true";
+}
+
+export function clearSyntheticPreview() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SYNTHETIC_PREVIEW_KEY);
+  window.localStorage.removeItem(SYNTHETIC_PERSONA_KEY);
+}
 
 export const syntheticPreviewContext: AuthorizationContext = {
   userId: "synthetic-creator",
@@ -29,10 +64,35 @@ export const syntheticPreviewContext: AuthorizationContext = {
 };
 
 export const syntheticPreviewMemberships: ExperienceMembership[] = [
-  { experienceKey: "pathway", experienceName: experiences.pathway.name, roles: ["creator", "administrator", "advisor", "student"], capabilities: ["pathway.creator"], status: "active", featureEnabled: true },
-  { experienceKey: "oaca", experienceName: experiences.oaca.name, roles: ["creator", "administrator", "staff", "faculty", "student"], capabilities: ["oaca.admin", "oaca.schedule", "oaca.records", "oaca.analytics", "oaca.import", "oaca.outreach"], status: "active", featureEnabled: true },
-  { experienceKey: "genesis", experienceName: experiences.genesis.name, roles: ["creator", "administrator", "mentor", "community_liaison", "student"], capabilities: ["genesis.admin", "genesis.review", "genesis.portfolio.own", "genesis.snapshot.publish"], status: "active", featureEnabled: true },
+  { experienceKey: "oaca", experienceName: experiences.oaca.name, roles: ["creator"], capabilities: ["oaca.admin", "oaca.schedule", "oaca.records", "oaca.analytics", "oaca.import", "oaca.outreach"], status: "active", featureEnabled: true },
+  { experienceKey: "pathway", experienceName: experiences.pathway.name, roles: ["creator"], capabilities: ["pathway.creator"], status: "active", featureEnabled: true },
+  { experienceKey: "genesis", experienceName: experiences.genesis.name, roles: ["creator"], capabilities: ["genesis.admin", "genesis.review", "genesis.portfolio.own", "genesis.snapshot.publish"], status: "active", featureEnabled: true },
 ];
+
+export function syntheticMembershipsForPersona(persona: SyntheticPersonaKey): ExperienceMembership[] {
+  const membership = (experienceKey: "pathway" | "oaca" | "genesis", roles: ExperienceMembership["roles"], capabilities: string[] = [], launchState: ExperienceMembership["launchState"] = "active"): ExperienceMembership => ({
+    experienceKey, experienceName: experiences[experienceKey].name, roles, capabilities, status: "active", featureEnabled: true, launchState,
+  });
+  if (persona === "pathway_student") return [membership("pathway", ["student"])];
+  if (persona === "compass_student") return [membership("oaca", ["student"], ["oaca.schedule", "oaca.portfolio.own"])];
+  if (persona === "compass_staff") return [membership("oaca", ["staff"], ["oaca.schedule", "oaca.records", "oaca.outreach"] )];
+  if (persona === "impact_student") return [membership("oaca", ["student"], ["oaca.schedule"]), membership("genesis", ["student"], ["genesis.portfolio.own", "genesis.snapshot.publish"])];
+  if (persona === "impact_administrator") return [membership("genesis", ["administrator"], ["genesis.admin", "genesis.review"] )];
+  if (persona === "community_liaison") return [membership("genesis", ["community_liaison"], ["genesis.review", "genesis.events.decide"] )];
+  return clone(syntheticPreviewMemberships);
+}
+
+export function syntheticContextForPersona(persona: SyntheticPersonaKey): AuthorizationContext {
+  const isStudent = ["pathway_student", "compass_student", "impact_student"].includes(persona);
+  const context = clone(syntheticPreviewContext);
+  context.userId = isStudent ? `synthetic-${persona.replaceAll("_", "-")}` : `synthetic-${persona.replaceAll("_", "-")}`;
+  context.authUserId = context.userId;
+  context.displayName = persona === "pathway_student" ? "Jordan Premed" : persona === "impact_student" ? "Taylor Morgan" : persona === "compass_student" ? "Taylor Morgan" : persona === "community_liaison" ? "Cameron Brooks" : persona === "impact_administrator" ? "Avery Chen" : persona === "compass_staff" ? "Dr. Morgan Lee" : "Creator preview";
+  context.principalType = persona === "platform_creator" ? "creator" : null;
+  context.capabilities = syntheticMembershipsForPersona(persona).flatMap((item) => item.capabilities);
+  context.experienceMemberships = syntheticMembershipsForPersona(persona);
+  return context;
+}
 
 syntheticPreviewContext.experienceMemberships = syntheticPreviewMemberships;
 
@@ -206,6 +266,7 @@ type SyntheticEventState = {
 };
 
 const syntheticEventStorageKey="navigate.compass.synthetic-events.v2";
+const syntheticImpactStorageKey="navigate.compass.synthetic-impact.v1";
 
 function defaultSyntheticEventState():SyntheticEventState {
   const events=[...oacaEvents(),...penjiHistoryEvents()].map((event)=>({
@@ -219,8 +280,8 @@ function defaultSyntheticEventState():SyntheticEventState {
   return {
     events,hosts,
     notices:[
-      {id:"staff-notice-message",eventId:"event-today",category:"event_staff_message",title:"New event message",body:"A student asked a question about Learning Strategies Lab.",deepLink:"/app/oaca?event=event-today",readAt:null,dismissedAt:null,createdAt:isoAt(0,9)},
-      {id:"staff-notice-rsvp",eventId:"event-upcoming",category:"event_staff_digest",title:"Specialty Exploration Forum activity",body:"12 RSVPs and 2 waitlist updates in the last hour.",deepLink:"/app/oaca?event=event-upcoming",readAt:null,dismissedAt:null,createdAt:isoAt(-1,11)},
+      {id:"staff-notice-message",eventId:"event-today",category:"event_staff_message",title:"New event message",body:"A student asked a question about Learning Strategies Lab.",deepLink:"/app/compass?event=event-today",readAt:null,dismissedAt:null,createdAt:isoAt(0,9)},
+      {id:"staff-notice-rsvp",eventId:"event-upcoming",category:"event_staff_digest",title:"Specialty Exploration Forum activity",body:"12 RSVPs and 2 waitlist updates in the last hour.",deepLink:"/app/compass?event=event-upcoming",readAt:null,dismissedAt:null,createdAt:isoAt(-1,11)},
     ],
     attendeeRules:Object.fromEntries(events.map((event)=>[event.id,[
       {id:`${event.id}-24h`,type:"reminder",offsetMinutes:1440,channels:["in_app","email"],enabled:true,scheduledFor:null,generation:1},
@@ -349,7 +410,29 @@ function eventWorkspace(state:SyntheticEventState,selectedId="") {
   };
 }
 
-function genesisBootstrap() {
+type SyntheticAffiliation = { id: string; studentId: string; studentName: string; organizationId: string; organizationName: string; status: "pending" | "approved" | "declined" | "ended"; requestedAt: string; reviewedAt: string | null; reviewerName: string | null; reviewNote: string | null; requestContext: string };
+type SyntheticImpactEvent = { id: string; title: string; objective: string; organizationId: string; organizationName: string; status: string; startsAt: string | null; mentorApprovedAt: string | null; liaisonApprovedAt: string | null; submittedAt: string | null; reviewerFeedback: string | null };
+type SyntheticImpactNotification = { id: string; title: string; body: string; eventId: string; readAt: string | null; createdAt: string };
+
+function defaultSyntheticAffiliations(): SyntheticAffiliation[] {
+  const organizationId = medicineOrganization?.id || "medicine-organization";
+  const organizationName = medicineOrganization?.name || "College of Medicine student organization";
+  return [
+    { id: "affiliation-pending", studentId: "synthetic-compass-student", studentName: "Taylor Morgan", organizationId, organizationName, status: "pending", requestedAt: isoAt(-2, 10), reviewedAt: null, reviewerName: null, reviewNote: null, requestContext: "I participate in the group and want to develop a community initiative." },
+    { id: "affiliation-approved", studentId: "synthetic-impact-student", studentName: "Taylor Morgan", organizationId, organizationName, status: "approved", requestedAt: isoAt(-40, 10), reviewedAt: isoAt(-38, 14), reviewerName: "Cameron Brooks", reviewNote: "Verified against the organization roster.", requestContext: "Active member for the current academic year." },
+  ];
+}
+
+function defaultSyntheticImpactEvents(): SyntheticImpactEvent[] {
+  const organizationId = medicineOrganization?.id || "medicine-organization";
+  const organizationName = medicineOrganization?.name || "College of Medicine student organization";
+  return [
+    { id: "impact-event-1", title: "Community listening circle", objective: "Listen before defining the next screening initiative.", organizationId, organizationName, status: "mentor_approved", startsAt: isoAt(10, 17), mentorApprovedAt: isoAt(-1, 13), liaisonApprovedAt: null, submittedAt: isoAt(-2, 10), reviewerFeedback: "Mentor review complete; Community Liaison decision is pending." },
+    { id: "impact-event-2", title: "Neighborhood health resource exchange", objective: "Share community-defined referral resources.", organizationId, organizationName, status: "published", startsAt: isoAt(21, 11), mentorApprovedAt: isoAt(-8, 10), liaisonApprovedAt: isoAt(-7, 15), submittedAt: isoAt(-10, 10), reviewerFeedback: null },
+  ];
+}
+
+function genesisBootstrap(persona: SyntheticPersonaKey, affiliations: SyntheticAffiliation[], impactEvents: SyntheticImpactEvent[], impactNotifications: SyntheticImpactNotification[]) {
   const organizationName = medicineOrganization?.name || "College of Medicine student organization";
   const organizationId = medicineOrganization?.id || "medicine-organization";
   const portfolio = {
@@ -367,19 +450,33 @@ function genesisBootstrap() {
       sustainability: "Document partner roles, recurring costs, referral ownership, and a student-to-student succession rhythm.",
     },
   };
+  const context = syntheticContextForPersona(persona);
+  const staff = ["impact_administrator", "community_liaison", "platform_creator"].includes(persona);
+  const ownAffiliations = affiliations.filter((item) => item.studentId === context.userId);
+  const approved = ownAffiliations.filter((item) => item.status === "approved");
   return {
     organizations,
-    portfolios: [portfolio],
-    reviews: [portfolio],
-    snapshots: [{ id: "snapshot-1", title: "Community listening summary · version 3", publishedAt: isoAt(-12, 10), authorName: "Taylor Morgan" }],
-    handoffs: [{ id: "handoff-1", title: "Spring continuation package", status: "offered", nextSteward: "Riley Thompson" }],
-    events: [{ id: "genesis-event-1", title: "Community listening circle", status: "mentor_approved", startsAt: isoAt(10, 17) }],
+    portfolios: staff || persona === "impact_student" ? [portfolio] : [],
+    reviews: staff ? [portfolio] : [],
+    snapshots: staff || persona === "impact_student" ? [{ id: "snapshot-1", title: "Community listening summary · version 3", publishedAt: isoAt(-12, 10), authorName: "Taylor Morgan" }] : [],
+    handoffs: staff || persona === "impact_student" ? [{ id: "handoff-1", title: "Spring continuation package", status: "offered", nextSteward: "Riley Thompson" }] : [],
+    events: impactEvents,
+    calendarEvents: impactEvents.filter((item) => item.status === "published"),
+    affiliations: ownAffiliations,
+    approvedOrganizationIds: approved.map((item) => item.organizationId),
+    accessStatus: approved.length ? "active" : ownAffiliations.some((item) => item.status !== "ended") ? "pending" : "read_only",
+    canEdit: approved.length > 0 || staff,
+    accessQueue: staff ? affiliations.filter((item) => item.status === "pending") : [],
+    notifications: ["community_liaison", "impact_administrator", "platform_creator"].includes(persona) ? impactNotifications : [],
   };
 }
 
 class SyntheticPilotApi {
-  private affiliationIds = medicineOrganization ? [medicineOrganization.id] : [];
-  private studentCouncil = true;
+  private affiliations = defaultSyntheticAffiliations();
+  private studentCouncilByPersona: Record<string, boolean> = { compass_student: true, impact_student: false };
+  private impactEvents = defaultSyntheticImpactEvents();
+  private impactNotifications: SyntheticImpactNotification[] = [{ id: "impact-notice-1", title: "Impact event needs a Liaison decision", body: "Community listening circle completed mentor review.", eventId: "impact-event-1", readAt: null, createdAt: isoAt(-1, 13) }];
+  private impactLoaded = false;
   private appointments:SyntheticAppointment[] = oacaBootstrap().appointments;
   private eventState:SyntheticEventState=defaultSyntheticEventState();
   private eventsLoaded=false;
@@ -412,6 +509,23 @@ class SyntheticPilotApi {
     if(typeof window!=="undefined")window.localStorage.setItem(syntheticEventStorageKey,JSON.stringify(this.eventState));
   }
 
+  private ensureImpactLoaded() {
+    if (this.impactLoaded) return;
+    this.impactLoaded = true;
+    if (typeof window === "undefined") return;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(syntheticImpactStorageKey) || "null") as { affiliations?: SyntheticAffiliation[]; events?: SyntheticImpactEvent[]; notifications?: SyntheticImpactNotification[]; studentCouncil?: Record<string, boolean> } | null;
+      if (saved?.affiliations) this.affiliations = saved.affiliations;
+      if (saved?.events) this.impactEvents = saved.events;
+      if (saved?.notifications) this.impactNotifications = saved.notifications;
+      if (saved?.studentCouncil) this.studentCouncilByPersona = saved.studentCouncil;
+    } catch { /* Invalid local preview state falls back to known fictional records. */ }
+  }
+
+  private saveImpact() {
+    if (typeof window !== "undefined") window.localStorage.setItem(syntheticImpactStorageKey, JSON.stringify({ affiliations: this.affiliations, events: this.impactEvents, notifications: this.impactNotifications, studentCouncil: this.studentCouncilByPersona }));
+  }
+
   private previewAudience(audience:OacaAudience) {
     const exclusions=new Set(audience.excludeUserIds||[]);
     let count=audience.includeAllMembers?126:0;
@@ -427,21 +541,53 @@ class SyntheticPilotApi {
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     this.ensureEventsLoaded();
+    this.ensureImpactLoaded();
     const route=path.split("?")[0];
     const method=(options.method||"GET").toUpperCase();
-    if (path === "/api/platform/experiences") return clone({ context: syntheticPreviewContext, memberships: syntheticPreviewMemberships }) as T;
-    if (path === "/api/platform/affiliations") {
-      if ((options.method || "GET").toUpperCase() === "POST") {
-        const body = options.body as { organizationIds?: string[]; studentCouncil?: boolean } | undefined;
-        this.affiliationIds = body?.organizationIds || [];
-        this.studentCouncil = Boolean(body?.studentCouncil);
-      }
-      return clone({ isStudent: true, organizations: organizations.map(({ id, key, name, college, campus, aliases }) => ({ id, key, name, college, campus, aliases })), organizationIds: this.affiliationIds, studentCouncil: this.studentCouncil }) as T;
+    const persona = getSyntheticPreviewPersona();
+    const context = syntheticContextForPersona(persona);
+    const personaMemberships = syntheticMembershipsForPersona(persona);
+    const requiredExperience = route.startsWith("/api/oaca/") ? "oaca" : route.startsWith("/api/genesis/") ? "genesis" : null;
+    if (requiredExperience && !personaMemberships.some((item) => item.experienceKey === requiredExperience)) throw new Error("This preview role is not authorized for that workspace.");
+    const oacaRoles = personaMemberships.find((item) => item.experienceKey === "oaca")?.roles || [];
+    const oacaStudentOnly = oacaRoles.length > 0 && oacaRoles.every((role) => role === "student");
+    const staffOnlyOacaRoutes = ["/api/oaca/events/audience-preview", "/api/oaca/events/recipients/refresh", "/api/oaca/events/update", "/api/oaca/events/publish", "/api/oaca/events/hosts", "/api/oaca/event-imports", "/api/oaca/event-notification-rules", "/api/oaca/event-coordinator-alert-rules", "/api/oaca/campaigns", "/api/oaca/imports", "/api/oaca/analytics", "/api/oaca/appointments/on-behalf", "/api/oaca/appointment-decisions", "/api/oaca/records"];
+    if (oacaStudentOnly && staffOnlyOacaRoutes.some((prefix) => route.startsWith(prefix))) throw new Error("Student preview responses cannot access staff records or actions.");
+    if (path === "/api/platform/experiences") return clone({ context, memberships: personaMemberships }) as T;
+    if (route === "/api/platform/workspace-preference") {
+      const key = "navigate.last-workspace";
+      if (method === "POST" && typeof window !== "undefined") window.localStorage.setItem(key, String((options.body as { lastWorkspaceKey?: string })?.lastWorkspaceKey || "compass"));
+      return { lastWorkspaceKey: typeof window !== "undefined" ? window.localStorage.getItem(key) : null } as T;
     }
-    if (path === "/api/oaca/bootstrap") return clone({ ...oacaBootstrap(), appointments: this.appointments, events:this.eventState.events }) as T;
+    if (path === "/api/platform/affiliations") {
+      if (!personaMemberships.some((item) => item.roles.includes("student"))) return clone({ isStudent: false, organizations: [], affiliations: [], studentCouncil: false, impactAccessStatus: "locked", impactHref: null }) as T;
+      if (method === "POST") {
+        const body = options.body as { organizationIds?: string[]; studentCouncil?: boolean } | undefined;
+        const selected = new Set(body?.organizationIds || []);
+        const current = this.affiliations.filter((item) => item.studentId === context.userId);
+        for (const item of current) if (!selected.has(item.organizationId) && ["pending", "approved"].includes(item.status)) item.status = "ended";
+        for (const organizationId of selected) if (!current.some((item) => item.organizationId === organizationId && ["pending", "approved"].includes(item.status))) {
+          const organization = organizations.find((item) => item.id === organizationId);
+          this.affiliations.push({ id: `affiliation-${crypto.randomUUID()}`, studentId: context.userId, studentName: context.displayName, organizationId, organizationName: organization?.name || "Student organization", status: "pending", requestedAt: new Date().toISOString(), reviewedAt: null, reviewerName: null, reviewNote: null, requestContext: "Submitted through the Compass student profile." });
+        }
+        this.studentCouncilByPersona[persona] = Boolean(body?.studentCouncil);
+        this.saveImpact();
+      }
+      const own = this.affiliations.filter((item) => item.studentId === context.userId);
+      const hasApproved = own.some((item) => item.status === "approved");
+      const hasEndedApproval = own.some((item) => item.status === "ended" && item.reviewedAt);
+      return clone({ isStudent: true, organizations: organizations.map(({ id, key, name, college, campus, aliases }) => ({ id, key, name, college, campus, aliases })), affiliations: own, studentCouncil: Boolean(this.studentCouncilByPersona[persona]), impactAccessStatus: hasApproved ? "active" : hasEndedApproval ? "read_only" : "locked", impactHref: hasApproved || hasEndedApproval ? "/app/compass/impact" : null }) as T;
+    }
+    if (path === "/api/oaca/bootstrap") {
+      const base = { ...oacaBootstrap(), appointments: this.appointments.map((item, index) => index === 0 ? { ...item, studentId: context.userId, studentName: context.displayName } : item), events:this.eventState.events };
+      const isStudent = personaMemberships.find((item) => item.experienceKey === "oaca")?.roles.includes("student");
+      return clone(isStudent ? { ...base, appointments: base.appointments.filter((item) => item.studentId === context.userId), assignedStudents: [], currentProvider: null, canManageImports: false, canViewAnalytics: false, importBatches: [], analytics: null, canManageOutreach: false, canViewOutreachInsights: false, campaigns: [], nudges: base.nudges.filter((item) => item.studentId === context.userId) } : base) as T;
+    }
     if (route === "/api/oaca/events/workspace") {
       const eventId=new URL(path,"https://preview.local").searchParams.get("eventId")||"";
-      return clone(eventWorkspace(this.eventState,eventId)) as T;
+      const workspace = eventWorkspace(this.eventState,eventId);
+      const studentOnly = personaMemberships.find((item) => item.experienceKey === "oaca")?.roles.every((role) => role === "student");
+      return clone(studentOnly ? { ...workspace, roster: [], hosts: [], staffOptions: [], coordinatorAlertRules: [], activity: [], corrections: [], deliveries: null, threads: [] } : workspace) as T;
     }
     if(route==="/api/oaca/events/audience-preview"&&method==="POST") {
       const body=options.body as {audience?:OacaAudience}|undefined;
@@ -462,7 +608,7 @@ class SyntheticPilotApi {
       this.eventState.hosts[id]=coordinators.map((userId)=>({userId,displayName:syntheticStaff.find((person)=>person.userId===userId)?.displayName||"Compass staff",role:"owner"}));
       this.eventState.attendeeRules[id]=body.attendeeNotificationRules||[];
       this.eventState.coordinatorRules[id]=body.coordinatorAlertRules||[];
-      if(publish)this.eventState.notices.unshift({id:`notice-${id}`,eventId:id,category:"event_staff_change",title:`Published: ${record.title}`,body:`${this.previewAudience(record.audience).count} invitation recipients resolved.`,deepLink:`/app/oaca?event=${id}`,readAt:null,dismissedAt:null,createdAt:new Date().toISOString()});
+      if(publish)this.eventState.notices.unshift({id:`notice-${id}`,eventId:id,category:"event_staff_change",title:`Published: ${record.title}`,body:`${this.previewAudience(record.audience).count} invitation recipients resolved.`,deepLink:`/app/compass?event=${id}`,readAt:null,dismissedAt:null,createdAt:new Date().toISOString()});
       this.saveEvents();
       return clone({id,status:record.status,recipientCount:publish?this.previewAudience(record.audience).count:0}) as T;
     }
@@ -474,13 +620,49 @@ class SyntheticPilotApi {
     if(route==="/api/oaca/event-notification-rules"&&method==="POST") {const body=options.body as {eventId:string;type:string;offsetMinutes:number|null;enabled:boolean;channels:string[]};const rules=this.eventState.attendeeRules[body.eventId]||[];const index=rules.findIndex((item)=>item.type===body.type&&item.offsetMinutes===body.offsetMinutes);const next={id:index>=0?rules[index].id:`rule-${crypto.randomUUID()}`,type:body.type,offsetMinutes:body.offsetMinutes,enabled:body.enabled,channels:body.channels,scheduledFor:null,generation:index>=0?rules[index].generation+1:1};if(index>=0)rules[index]=next;else rules.push(next);this.eventState.attendeeRules[body.eventId]=rules;this.saveEvents();return clone(next) as T;}
     if(route==="/api/oaca/event-coordinator-alert-rules"&&method==="POST") {const body=options.body as {eventId:string;rules:SyntheticEventState["coordinatorRules"][string]};this.eventState.coordinatorRules[body.eventId]=body.rules;this.saveEvents();return {ok:true} as T;}
     if(route==="/api/platform/notifications/action"&&method==="POST") {const body=options.body as {notificationId:string;action:"read"|"dismiss"};const notice=this.eventState.notices.find((item)=>item.id===body.notificationId);if(notice){if(body.action==="read")notice.readAt=new Date().toISOString();else notice.dismissedAt=new Date().toISOString();this.saveEvents();}return {ok:true} as T;}
-    if(route==="/api/oaca/synthetic/reset"&&method==="POST") {this.eventState=defaultSyntheticEventState();this.saveEvents();return {ok:true} as T;}
+    if(route==="/api/oaca/synthetic/reset"&&method==="POST") {this.eventState=defaultSyntheticEventState();this.affiliations=defaultSyntheticAffiliations();this.impactEvents=defaultSyntheticImpactEvents();this.impactNotifications=[{ id: "impact-notice-1", title: "Impact event needs a Liaison decision", body: "Community listening circle completed mentor review.", eventId: "impact-event-1", readAt: null, createdAt: isoAt(-1, 13) }];this.saveEvents();this.saveImpact();return {ok:true} as T;}
     if (path === "/api/oaca/event-imports" && (!options.method || options.method === "GET")) return clone([{ id: "event-import-1", status: "completed", source_event_rows: 48, source_attendance_rows: 178, occurrence_count: 22, matched_students: 76, merged_duplicates: 3, quality_summary: { note: "Illustrative aggregate only" }, requested_by: "synthetic-creator", reviewed_by: "synthetic-reviewer", reviewed_at: isoAt(-2, 11), completed_at: isoAt(-2, 12), created_at: isoAt(-3, 11) }]) as T;
-    if (path === "/api/genesis/bootstrap") return clone(genesisBootstrap()) as T;
+    if (path === "/api/genesis/bootstrap") return clone(genesisBootstrap(persona, this.affiliations, this.impactEvents, this.impactNotifications)) as T;
+    if (path === "/api/genesis/access-requests/decide" && method === "POST") {
+      if (!["impact_administrator", "community_liaison", "platform_creator"].includes(persona)) throw new Error("Only an Impact Administrator or Community Liaison may verify an affiliation.");
+      const body = options.body as { affiliationId?: string; decision?: "approved" | "declined"; reviewNote?: string };
+      const item = this.affiliations.find((candidate) => candidate.id === body.affiliationId);
+      if (!item || item.status !== "pending") throw new Error("This request has already been reviewed.");
+      item.status = body.decision === "approved" ? "approved" : "declined"; item.reviewedAt = new Date().toISOString(); item.reviewerName = context.displayName; item.reviewNote = body.reviewNote || null;
+      this.saveImpact(); return clone(item) as T;
+    }
+    if (path === "/api/genesis/events" && method === "POST") {
+      if (persona !== "impact_student" && persona !== "platform_creator") throw new Error("Only an approved Impact student may create an event draft.");
+      const body = options.body as Record<string, unknown>; const id = `impact-event-${crypto.randomUUID()}`;
+      const event: SyntheticImpactEvent = { id, title: String(body.title || "Untitled Impact event"), objective: String(body.objective || ""), organizationId: String(body.organizationId || medicineOrganization?.id || "medicine-organization"), organizationName: medicineOrganization?.name || "Student organization", status: "draft", startsAt: body.startsAt ? String(body.startsAt) : null, mentorApprovedAt: null, liaisonApprovedAt: null, submittedAt: null, reviewerFeedback: null };
+      this.impactEvents.unshift(event); this.saveImpact(); return clone(event) as T;
+    }
+    if (path === "/api/genesis/events/submit" && method === "POST") {
+      const event = this.impactEvents.find((item) => item.id === (options.body as { eventId?: string })?.eventId); if (!event || event.status !== "draft") throw new Error("Only a draft event can be submitted.");
+      event.status = "submitted"; event.submittedAt = new Date().toISOString(); this.impactNotifications.unshift({ id: `impact-notice-${event.id}`, title: "Impact event submitted", body: `${event.title} needs mentor and Community Liaison review.`, eventId: event.id, readAt: null, createdAt: new Date().toISOString() }); this.saveImpact(); return clone(event) as T;
+    }
+    if (path === "/api/genesis/events/decision" && method === "POST") {
+      const body = options.body as { eventId?: string; reviewerType?: "mentor" | "liaison"; decision?: "approve" | "changes_requested"; feedback?: string }; const event = this.impactEvents.find((item) => item.id === body.eventId); if (!event) throw new Error("Event not found.");
+      if (body.decision === "changes_requested") { event.status = "changes_requested"; event.reviewerFeedback = body.feedback || null; this.saveImpact(); return clone(event) as T; }
+      if (body.reviewerType === "mentor") { if (!["submitted", "changes_requested"].includes(event.status)) throw new Error("This mentor decision is no longer pending."); event.mentorApprovedAt = new Date().toISOString(); event.status = "mentor_approved"; }
+      else { if (!event.mentorApprovedAt || event.liaisonApprovedAt) throw new Error("The Liaison decision is no longer pending."); event.liaisonApprovedAt = new Date().toISOString(); event.status = "published"; }
+      this.saveImpact(); return clone(event) as T;
+    }
+    if (path === "/api/genesis/events/change" && method === "POST") {
+      const body = options.body as { eventId?: string; title?: string; startsAt?: string }; const event = this.impactEvents.find((item) => item.id === body.eventId); if (!event) throw new Error("Event not found.");
+      if (body.title) event.title = body.title; if (body.startsAt) event.startsAt = body.startsAt;
+      if (event.status === "published") this.impactNotifications.unshift({ id: `impact-change-${event.id}-${Date.now()}`, title: "Published Impact event changed", body: `${event.title} has updated details.`, eventId: event.id, readAt: null, createdAt: new Date().toISOString() });
+      this.saveImpact(); return clone(event) as T;
+    }
+    if (path === "/api/genesis/events/cancel" && method === "POST") {
+      const event = this.impactEvents.find((item) => item.id === (options.body as { eventId?: string })?.eventId); if (!event) throw new Error("Event not found."); event.status = "cancelled";
+      this.impactNotifications.unshift({ id: `impact-cancel-${event.id}`, title: "Impact event cancelled", body: `${event.title} was cancelled.`, eventId: event.id, readAt: null, createdAt: new Date().toISOString() }); this.saveImpact(); return clone(event) as T;
+    }
+    if (path === "/api/genesis/calendar" && method === "GET") return clone(this.impactEvents.filter((item) => item.status === "published")) as T;
     if (path === "/api/platform/files") return { id: "synthetic-file" } as T;
     if (path === "/api/platform/notification-preferences") return { smsEnabled: false } as T;
     if (path === "/api/oaca/events/attendance") return { version: 3 } as T;
-    if (path === "/api/oaca/events/check-in") return { open: true, token: "synthetic-event-token", closesAt: isoAt(0, 16), deepLink: "/app/oaca?checkin=synthetic-event-token" } as T;
+    if (path === "/api/oaca/events/check-in") return { open: true, token: "synthetic-event-token", closesAt: isoAt(0, 16), deepLink: "/app/compass?checkin=synthetic-event-token" } as T;
     if (path === "/api/oaca/events/check-in/student-token") return { token: "synthetic-permanent-student-qr", permanent: true } as T;
     if (path === "/api/oaca/events/check-in/self") return { title: "Learning Strategies Lab" } as T;
     if (path === "/api/oaca/appointments/cancel") {
@@ -492,7 +674,7 @@ class SyntheticPilotApi {
     if (path === "/api/oaca/appointments" && (options.method || "GET").toUpperCase() === "POST") {
       const body = options.body as { serviceLineId?: string; providerId?: string | null; startsAt?: string; modality?: string; format?: string; topic?: string } | undefined;
       const seed = oacaBootstrap(); const service = seed.services.find((item) => item.id === body?.serviceLineId); const provider = seed.providers.find((item) => item.id === body?.providerId);
-      const appointment:SyntheticAppointment = { id: `appointment-${crypto.randomUUID()}`, studentId: "synthetic-creator", studentName: "Creator preview", serviceName: service?.name || "OACA appointment", providerName: provider?.displayName || (service?.key === "academic_advising" ? seed.assignedAdvisor.displayName : null), subject: body?.topic || null, format: body?.format || "individual", startsAt: body?.startsAt || null, endsAt: null, modality: body?.modality || "teams", status: "pending_approval", sandbox: true, requestOrigin: "student" };
+      const appointment:SyntheticAppointment = { id: `appointment-${crypto.randomUUID()}`, studentId: context.userId, studentName: context.displayName, serviceName: service?.name || "Compass appointment", providerName: provider?.displayName || (service?.key === "academic_advising" ? seed.assignedAdvisor.displayName : null), subject: body?.topic || null, format: body?.format || "individual", startsAt: body?.startsAt || null, endsAt: null, modality: body?.modality || "teams", status: "pending_approval", sandbox: true, requestOrigin: "student" };
       this.appointments = [appointment, ...this.appointments];
       return clone({ id: appointment.id, status: appointment.status, sandbox: true }) as T;
     }

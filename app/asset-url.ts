@@ -1,5 +1,6 @@
 export function assetUrl(path: string) {
   const relativePath = path.replace(/^\/+/, "");
-  if (typeof document === "undefined") return `/${relativePath}`;
-  return new URL(relativePath, document.baseURI).pathname;
+  const configuredBase = import.meta.env?.BASE_URL || "/";
+  const base = configuredBase.endsWith("/") ? configuredBase : `${configuredBase}/`;
+  return `${base}${relativePath}`;
 }

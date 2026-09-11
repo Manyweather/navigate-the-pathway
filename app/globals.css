@@ -1233,6 +1233,45 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 @media(max-width:640px) { .hub-affiliations__heading { display:grid; } .affiliation-filters,.affiliation-list { grid-template-columns:1fr; } .affiliation-list { max-height:55dvh; } .affiliation-editor__body>.primary-button { width:100%; } }
 @media print { .print-hidden,.platform-header,.experience-nav { display:none!important; } .worksheet-page { width:100%; margin:0; font-size:11pt; } .worksheet-page>section { break-inside:avoid; } .worksheet-page textarea { border:0; border-bottom:1px solid #555; border-radius:0; min-height:90px; } }
 
+/* Compass parent shell */
+.creator-preview-shell { position:relative; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:1rem; min-height:64px; padding:.65rem clamp(1rem,4vw,3rem); color:#35244d; border-bottom:1px solid rgba(110,79,152,.25); background:linear-gradient(100deg,#f2ecfa,#fff); }
+.creator-preview-shell>div { display:flex; align-items:center; gap:.7rem; }
+.creator-preview-shell>div>span:last-child { display:grid; gap:.1rem; }
+.creator-preview-shell small { color:#665a70; }
+.creator-preview-shell__mark { width:38px; height:38px; display:grid; place-items:center; color:#fff; border-radius:12px; background:#6e4f98; }
+.creator-preview-shell label,.workspace-switcher { display:flex; align-items:center; gap:.55rem; font-size:.78rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.creator-preview-shell select,.workspace-switcher select { min-height:44px; padding:.55rem 2.4rem .55rem .8rem; border:1px solid rgba(89,88,84,.3); border-radius:12px; color:#342b2e; background:#fff; font:700 .9rem/1 system-ui,sans-serif; text-transform:none; }
+.workspace-access-label { display:inline-flex; align-items:center; min-height:44px; padding:.55rem .8rem; color:inherit; border:1px solid currentColor; border-radius:999px; font-size:.8rem; font-weight:800; opacity:.88; }
+.platform-header--oaca .workspace-switcher,.platform-header--genesis .workspace-switcher { color:#fff; margin-left:auto; }
+.platform-header--oaca .workspace-switcher select,.platform-header--genesis .workspace-switcher select { border-color:rgba(255,255,255,.4); }
+.access-pending-card { width:min(720px,100%); margin:10vh auto; padding:clamp(1.5rem,5vw,3rem); text-align:center; border:1px solid rgba(89,88,84,.2); border-radius:28px; background:#fff; box-shadow:0 24px 70px rgba(54,39,45,.12); }
+.access-pending-card h1 { font:700 clamp(2rem,6vw,3.6rem)/1.04 Georgia,serif; color:#3a292f; }
+.compass-gateway-mark,.compass-signin__mark { width:72px; height:72px; display:grid; place-items:center; margin:0 auto 1rem; color:#fff; border-radius:24px; background:linear-gradient(145deg,#791034,#a84465); font-size:2rem; box-shadow:0 16px 34px rgba(121,16,52,.22); }
+.compass-signin { display:grid; gap:1.15rem; }
+.compass-signin__identity { display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:center; }
+.compass-signin__identity .compass-signin__mark { margin:0; }
+.compass-signin__identity h1 { margin:.1rem 0 .35rem; font:700 clamp(2rem,5vw,3.2rem)/1.03 Georgia,serif; color:#321f26; }
+.compass-signin__identity p:last-child { margin:0; color:#5d5557; line-height:1.5; }
+.compass-signin .sso-coming-soon { display:grid; grid-template-columns:1fr auto; gap:.25rem .75rem; padding:1rem; border:1px solid #c9d9ee; border-radius:16px; color:#27466b; background:#f3f8ff; }
+.compass-signin .sso-coming-soon small { grid-column:1/-1; }
+.pathway-invite-note { padding:1rem; border-left:4px solid #bd7b2c; border-radius:8px 14px 14px 8px; background:#fff8ee; }
+.pathway-invite-note p { margin:.3rem 0 0; color:#5d5557; line-height:1.45; }
+.affiliation-status-list { display:grid; gap:.65rem; margin:1rem 0; }
+.affiliation-status-list article { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:.35rem .7rem; padding:.85rem; border:1px solid rgba(89,88,84,.17); border-radius:14px; background:#fbfaf8; }
+.affiliation-status-list article small { grid-column:2; color:#6c6461; }
+.impact-notification-list { display:grid; gap:.75rem; margin:1rem 0; }
+.impact-notification-list article { padding:1rem; border:1px solid #e2c187; border-radius:16px; background:#fff8e9; }
+.impact-notification-list strong { display:block; margin:.55rem 0 .2rem; }
+
+@media(max-width:760px) {
+  .creator-preview-shell { align-items:stretch; flex-direction:column; }
+  .creator-preview-shell label { display:grid; grid-template-columns:auto 1fr; }
+  .creator-preview-shell select { width:100%; }
+  .platform-header--oaca .workspace-switcher,.platform-header--genesis .workspace-switcher { order:4; width:100%; display:grid; grid-template-columns:auto 1fr; margin:0; }
+  .platform-header--oaca .workspace-switcher select,.platform-header--genesis .workspace-switcher select { width:100%; }
+  .compass-signin__identity { grid-template-columns:1fr; text-align:center; }
+}
+
 /* OACA event operations: dense enough for check-in, calm enough for advising. */
 .event-workspace { --event-border:#d8dce9; }
 .event-bucket-tabs,.event-detail-tabs { display:flex; gap:.4rem; margin:1rem 0; padding:.3rem; overflow-x:auto; border:1px solid var(--event-border); border-radius:14px; background:#f1f4ff; }

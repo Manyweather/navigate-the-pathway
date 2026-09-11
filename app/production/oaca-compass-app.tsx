@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PlatformAccess } from "./platform-access";
+import { CreatorPreviewBanner, useCreatorPreviewTimeTracking, useRememberWorkspace, WorkspaceSwitcher } from "./compass-platform-shell";
+import { StudentAffiliations } from "./student-affiliations";
+import type { SyntheticPersonaKey } from "./synthetic-preview";
 import {
   oacaAdvisingMilestones,
   oacaPolicyDocuments,
@@ -114,8 +117,8 @@ function CompassBrandMark() {
   return <svg viewBox="0 0 96 96" aria-hidden="true" focusable="false"><circle cx="48" cy="48" r="30" /><path d="M58 37 52 52 37 59l7-16 14-6Z" /><circle cx="48" cy="48" r="4" /><path className="compass-brand__detail" d="M48 12v8M48 76v8M12 48h8M76 48h8" /></svg>;
 }
 
-function ExperienceHeader({ context, onSignOut }: { context: AuthorizationContext; onSignOut: () => Promise<void> }) {
-  return <header className="platform-header platform-header--oaca"><a className="rucom-brand" href="/app" aria-label="Navigate account hub"><img src="/assets/brand/rucom-logo-white.svg" alt="Roseman University College of Medicine" /></a><a className="compass-brand" href="/app/oaca" aria-label="Compass home"><span className="compass-brand__mark"><CompassBrandMark /></span><strong>Compass</strong></a><div className="platform-account"><span>{context.displayName}</span><button className="text-button" onClick={() => void onSignOut()}>Sign out</button></div></header>;
+function ExperienceHeader({ api, context, memberships, previewMode, onSignOut }: { api: PilotApiClient; context: AuthorizationContext; memberships: ExperienceMembership[]; previewMode: boolean; onSignOut: () => Promise<void> }) {
+  return <header className="platform-header platform-header--oaca"><a className="rucom-brand" href="/app/compass" aria-label="Compass home"><img src="/assets/brand/rucom-logo-white.svg" alt="Roseman University College of Medicine" /></a><a className="compass-brand" href="/app/compass" aria-label="Compass home"><span className="compass-brand__mark"><CompassBrandMark /></span><strong>Compass</strong></a><WorkspaceSwitcher api={api} memberships={memberships} current="compass" previewMode={previewMode} /><div className="platform-account"><span>{context.displayName}</span><button className="text-button" onClick={() => void onSignOut()}>Sign out</button></div></header>;
 }
 
 function CompassHeroIcon({ kind }: { kind: "appointment" | "notifications" | "events" | "checkin" | "visits" }) {
@@ -378,6 +381,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
       <button onClick={() => setView("policies")}><span>§</span><strong>Policies</strong><small>Current advising and tutoring rules</small></button>
       {isTutor ? <button onClick={() => setView("tutor")}><span>✎</span><strong>Tutor desk</strong><small>Eligibility and session logs</small></button> : null}
     </div>
+    <StudentAffiliations api={api} />
     {data.restrictions.length ? <aside className="configuration-banner configuration-banner--alert"><strong>Peer tutoring scheduling is temporarily restricted.</strong><p>{data.restrictions[0].reason}. Contact the Tutoring Manager for review.</p></aside> : null}
   </section>;
 }
@@ -398,16 +402,18 @@ function OacaStaff({ api, supabase, context, data, mode, reload, view, setView }
   if (view === "imports") return <OacaImportCenter api={api} supabase={supabase} context={context} batches={data.importBatches} reload={reload} onBack={() => setView("home")} />;
   if (view === "outreach") return <OacaEventsAndOutreach api={api} supabase={supabase} context={context} canManageOutreach={data.canManageOutreach} canManageImports={data.canManageImports} events={data.events} campaigns={data.campaigns} nudges={data.nudges} students={data.assignedStudents} providers={data.providers} services={data.services} audienceOptions={data.audienceOptions} reload={reload} onBack={() => setView("home")} />;
   if (view === "settings") return <section className="experience-panel"><button className="workspace-back text-button" onClick={() => setView("home")}>← Staff home</button><p className="kicker">Service configuration</p><h1>Policies received; operations still gated.</h1><div className="record-list">{(data.services.length ? data.services : fallbackServices).map((service) => <article key={service.key}><span className={`status-chip status-chip--${service.policyStatus === "live_approved" ? "confirmed" : "pending"}`}>{service.policyStatus.replaceAll("_", " ")}</span><h2>{service.name}</h2><p>{service.key === "peer_tutoring" ? "The 60-minute maximum, seven-day booking horizon, weekly and exam-block limits, 24-hour cancellation rule, capacity ranges, and no-show review are mapped." : "Required milestones and provider routing are mapped."}</p><small>Live activation still requires office hours, Outlook free/busy, remaining service values, and administrator approval.</small></article>)}</div><button className="secondary-button" onClick={() => setView("policies")}>Review mapped policies</button></section>;
-  return <section className="experience-panel"><div className="experience-hero experience-hero--oaca"><div><p className="kicker">OACA staff workspace</p><h1>Today’s advising work.</h1><p>See only assigned students, service workload, and the records your capability bundle permits.</p></div><div className="hero-status"><strong>{data.appointments.length}</strong><p>appointments in your authorized scope</p></div></div>{mode === "creator" ? <CreatorTimePanel /> : null}<div className="home-action-grid home-action-grid--experience"><button onClick={() => setView("outreach")}><span>◉</span><strong>{data.canManageOutreach ? "Events and outreach" : "Appointment nudges"}</strong><small>{data.canManageOutreach ? "Events, rich email, forms, and insights" : "Remind assigned students to schedule"}</small></button>{!["administrator","creator"].includes(mode) ? <><button onClick={() => setView("schedule_student")}><span>＋</span><strong>Schedule for a student</strong><small>Assigned or explicitly authorized students</small></button><button onClick={() => setView("records")}><span>✎</span><strong>Visit records</strong><small>Working notes, structure, and recap</small></button></> : null}{data.canViewAnalytics ? <button onClick={() => setView("analytics")}><span>▥</span><strong>Service analytics</strong><small>Aggregate workload and cohort trends</small></button> : null}{data.canManageImports ? <button onClick={() => setView("imports")}><span>⇧</span><strong>Secure data imports</strong><small>Penji history and student metadata</small></button> : null}<button onClick={() => setView("settings")}><span>⚙</span><strong>Service configuration</strong><small>Policy mapping and live gates</small></button><button onClick={() => setView("policies")}><span>§</span><strong>Policy library</strong><small>Source versions and operational rules</small></button></div></section>;
+  return <section className="experience-panel"><div className="experience-hero experience-hero--oaca"><div><p className="kicker">Compass staff workspace</p><h1>Today’s advising work.</h1><p>See only assigned students, service workload, and the records your capability bundle permits.</p></div><div className="hero-status"><strong>{data.appointments.length}</strong><p>appointments in your authorized scope</p></div></div>{mode === "creator" ? <CreatorTimePanel /> : null}<div className="home-action-grid home-action-grid--experience"><button onClick={() => setView("outreach")}><span>◉</span><strong>{data.canManageOutreach ? "Events and outreach" : "Appointment nudges"}</strong><small>{data.canManageOutreach ? "Events, rich email, forms, and insights" : "Remind assigned students to schedule"}</small></button>{!["administrator","creator"].includes(mode) ? <><button onClick={() => setView("schedule_student")}><span>＋</span><strong>Schedule for a student</strong><small>Assigned or explicitly authorized students</small></button><button onClick={() => setView("records")}><span>✎</span><strong>Visit records</strong><small>Working notes, structure, and recap</small></button></> : null}{data.canViewAnalytics ? <button onClick={() => setView("analytics")}><span>▥</span><strong>Service analytics</strong><small>Aggregate workload and cohort trends</small></button> : null}{data.canManageImports ? <button onClick={() => setView("imports")}><span>⇧</span><strong>Secure data imports</strong><small>Penji history and student metadata</small></button> : null}<button onClick={() => setView("settings")}><span>⚙</span><strong>Service configuration</strong><small>Policy mapping and live gates</small></button><button onClick={() => setView("policies")}><span>§</span><strong>Policy library</strong><small>Source versions and operational rules</small></button></div></section>;
 }
 
-function OacaWorkspace({ api, supabase, context, membership, signOut }: { api: PilotApiClient; supabase: SupabaseClient; context: AuthorizationContext; membership: ExperienceMembership; signOut: () => Promise<void> }) {
+function OacaWorkspace({ api, supabase, context, membership, memberships, previewMode, previewPersona, setPreviewPersona, signOut }: { api: PilotApiClient; supabase: SupabaseClient; context: AuthorizationContext; membership: ExperienceMembership; memberships: ExperienceMembership[]; previewMode: boolean; previewPersona: SyntheticPersonaKey | null; setPreviewPersona: (persona: SyntheticPersonaKey) => void; signOut: () => Promise<void> }) {
   const [data, setData] = useState<Bootstrap>(emptyBootstrap);
   const [message, setMessage] = useState("Loading Compass…");
   const [view, setView] = useState<OacaView>("home");
   const [mode, setMode] = useState<string>(membership.roles.includes("creator") ? "creator" : membership.roles.includes("student") ? "student" : membership.roles[0] || "staff");
   const load = useCallback(async () => { try { setData(await api.request<Bootstrap>("/api/oaca/bootstrap")); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "Compass could not be loaded."); } }, [api]);
   useEffect(() => { const task = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(task); }, [load]);
+  useRememberWorkspace(api, "compass", previewMode);
+  useCreatorPreviewTimeTracking(previewMode, previewPersona, "compass", `${mode}:${view}`);
   useCreatorTimeTracking(membership.roles.includes("creator"), `Compass · ${oacaRoleLabels[mode] || mode} · ${oacaViewLabels[view]}`);
   const staff = mode !== "student";
   const studentData: Bootstrap = staff ? data : {
@@ -425,7 +431,8 @@ function OacaWorkspace({ api, supabase, context, membership, signOut }: { api: P
     nudges: data.nudges.filter((nudge) => nudge.studentId === context.userId),
   };
   return <div className="navigate-platform navigate-platform--oaca">
-    <ExperienceHeader context={context} onSignOut={signOut} />
+    <CreatorPreviewBanner persona={previewPersona} onPersona={setPreviewPersona} onExit={() => void signOut()} />
+    <ExperienceHeader api={api} context={context} memberships={memberships} previewMode={previewMode} onSignOut={signOut} />
     <main className="platform-main">
       <nav className="experience-nav compass-role-nav" aria-label="Compass dashboard role">
         {membership.roles.length > 1 ? <label><span>Viewing dashboard as</span><select value={mode} onChange={(event) => { setMode(event.target.value); setView("home"); }}>{membership.roles.map((role) => <option key={role} value={role}>{oacaRoleLabels[role] || role.replaceAll("_", " ")}</option>)}</select></label> : <span className="status-chip">{oacaRoleLabels[mode] || mode.replaceAll("_", " ")} dashboard</span>}
@@ -437,8 +444,8 @@ function OacaWorkspace({ api, supabase, context, membership, signOut }: { api: P
 }
 
 export function OacaCompassApp() {
-  return <PlatformAccess experience="oaca">{({ api, supabase, context, memberships, signOut }) => {
+  return <PlatformAccess experience="oaca">{({ api, supabase, context, memberships, previewMode, previewPersona, setPreviewPersona, signOut }) => {
     const membership = memberships.find((item) => item.experienceKey === "oaca")!;
-    return <OacaWorkspace api={api} supabase={supabase} context={context} membership={membership} signOut={signOut} />;
+    return <OacaWorkspace key={previewPersona || context.userId} api={api} supabase={supabase} context={context} membership={membership} memberships={memberships} previewMode={previewMode} previewPersona={previewPersona} setPreviewPersona={setPreviewPersona} signOut={signOut} />;
   }}</PlatformAccess>;
 }

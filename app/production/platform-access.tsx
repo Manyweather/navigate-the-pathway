@@ -9,12 +9,16 @@ import { getSupabaseBrowserClient, loadProductionConfiguration } from "./supabas
 import { staffMfaRoles, type ExperienceKey, type ExperienceMembership } from "./platform-model";
 import type { AuthorizationContext } from "./types";
 import {
+  getSyntheticPreviewPersona,
+  setSyntheticPreviewPersona,
   SYNTHETIC_PREVIEW_KEY,
+  SYNTHETIC_PERSONA_KEY,
   syntheticPreviewApi,
-  syntheticPreviewContext,
-  syntheticPreviewMemberships,
+  syntheticContextForPersona,
+  syntheticMembershipsForPersona,
   syntheticPreviewSession,
   syntheticPreviewSupabase,
+  type SyntheticPersonaKey,
 } from "./synthetic-preview";
 
 export type PlatformAccessValue = {
@@ -24,6 +28,8 @@ export type PlatformAccessValue = {
   context: AuthorizationContext;
   memberships: ExperienceMembership[];
   previewMode: boolean;
+  previewPersona: SyntheticPersonaKey | null;
+  setPreviewPersona: (persona: SyntheticPersonaKey) => void;
   signOut: () => Promise<void>;
 };
 
@@ -31,26 +37,34 @@ export function PlatformAccess({ experience, children }: {
   experience?: ExperienceKey;
   children: (value: PlatformAccessValue) => React.ReactNode;
 }) {
-  const [previewMode] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const query = new URLSearchParams(window.location.search);
-    return query.get("preview") === "creator" || window.localStorage.getItem(SYNTHETIC_PREVIEW_KEY) === "true";
-  });
+  const [clientReady, setClientReady] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewPersona, updatePreviewPersona] = useState<SyntheticPersonaKey>(() => getSyntheticPreviewPersona());
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [configured, setConfigured] = useState<"loading" | "ready" | "preview" | "error">(() => previewMode ? "preview" : "loading");
+  const [configured, setConfigured] = useState<"loading" | "ready" | "preview" | "error">("loading");
   const [context, setContext] = useState<AuthorizationContext | null>(null);
   const [memberships, setMemberships] = useState<ExperienceMembership[]>([]);
   const [message, setMessage] = useState("Opening your Navigate account…");
   const [accountLoadFailed, setAccountLoadFailed] = useState(false);
-  const [recoveryMode, setRecoveryMode] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return /(?:^|[?#&])type=recovery(?:&|$)/.test(`${window.location.search}${window.location.hash}`);
-  });
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [mfaVerified, setMfaVerified] = useState(false);
   const api = useMemo(() => previewMode ? syntheticPreviewApi : supabase ? new PilotApiClient(supabase, undefined, experience) : null, [experience, previewMode, supabase]);
 
   useEffect(() => {
+    const task = window.setTimeout(() => {
+      const query = new URLSearchParams(window.location.search);
+      const preview = query.get("preview") === "creator" || window.localStorage.getItem(SYNTHETIC_PREVIEW_KEY) === "true";
+      setPreviewMode(preview);
+      setConfigured(preview ? "preview" : "loading");
+      setRecoveryMode(/(?:^|[?#&])type=recovery(?:&|$)/.test(`${window.location.search}${window.location.hash}`));
+      setClientReady(true);
+    }, 0);
+    return () => window.clearTimeout(task);
+  }, []);
+
+  useEffect(() => {
+    if (!clientReady) return;
     if (previewMode) {
       const requestedPreview = new URLSearchParams(window.location.search).get("preview") === "creator";
       window.localStorage.setItem(SYNTHETIC_PREVIEW_KEY, "true");
@@ -62,6 +76,13 @@ export function PlatformAccess({ experience, children }: {
       if (!client) throw new Error("Secure setup is not connected yet.");
       setSupabase(client); setConfigured("ready");
     }).catch(() => setConfigured("error"));
+  }, [clientReady, previewMode]);
+
+  useEffect(() => {
+    if (!previewMode) return;
+    const update = (event: Event) => updatePreviewPersona((event as CustomEvent<SyntheticPersonaKey>).detail || getSyntheticPreviewPersona());
+    window.addEventListener("navigate:preview-persona", update);
+    return () => window.removeEventListener("navigate:preview-persona", update);
   }, [previewMode]);
 
   useEffect(() => {
@@ -93,13 +114,16 @@ export function PlatformAccess({ experience, children }: {
   }, [load]);
 
   if (previewMode && configured === "preview") {
-    const membership = experience ? syntheticPreviewMemberships.find((item) => item.experienceKey === experience) : null;
+    const previewMemberships = syntheticMembershipsForPersona(previewPersona);
+    const previewContext = syntheticContextForPersona(previewPersona);
+    const membership = experience ? previewMemberships.find((item) => item.experienceKey === experience) : null;
     if (experience && !membership) return <main className="production-auth"><section className="production-auth-card"><h1>Preview unavailable</h1><a className="secondary-button" href="/app">Return to Navigate</a></section></main>;
     const exitPreview = async () => {
       window.localStorage.removeItem(SYNTHETIC_PREVIEW_KEY);
+      window.localStorage.removeItem(SYNTHETIC_PERSONA_KEY);
       window.location.assign("/app");
     };
-    return <>{children({ session: syntheticPreviewSession, supabase: syntheticPreviewSupabase, api: syntheticPreviewApi, context: syntheticPreviewContext, memberships: syntheticPreviewMemberships, previewMode: true, signOut: exitPreview })}</>;
+    return <>{children({ session: syntheticPreviewSession, supabase: syntheticPreviewSupabase, api: syntheticPreviewApi, context: previewContext, memberships: previewMemberships, previewMode: true, previewPersona, setPreviewPersona: setSyntheticPreviewPersona, signOut: exitPreview })}</>;
   }
 
   if (configured === "error") return <ConfigurationRequired />;
@@ -125,5 +149,5 @@ export function PlatformAccess({ experience, children }: {
   if (needsMfa) return <MfaGate supabase={supabase} onVerified={() => { setMfaVerified(true); void load(); }} />;
 
   const signOut = async () => { try { await api.request("/api/activity/signout", { method: "POST", body: {} }); } finally { await supabase.auth.signOut(); } };
-  return <>{children({ session, supabase, api, context, memberships, previewMode: false, signOut })}</>;
+  return <>{children({ session, supabase, api, context, memberships, previewMode: false, previewPersona: null, setPreviewPersona: () => undefined, signOut })}</>;
 }

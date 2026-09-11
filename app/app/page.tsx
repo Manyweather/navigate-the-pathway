@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { NavigateHubApp } from "../production/navigate-hub-app";
 
 export const metadata: Metadata = {
-  title: "Navigate",
-  description: "One secure account hub for Navigate the Pathway, OACA Compass, and GENESIS Impact Studio.",
+  title: { absolute: "Compass" },
+  description: "The secure Compass gateway for student support, Pathway, and verified Impact access.",
 };
 
 export default function PilotApplicationPage() {

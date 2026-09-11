@@ -30,6 +30,9 @@ import type {
 
 import { assignedModes, modeContext, modeLabels, principalMode, surveysForAudience, type DashboardMode } from "./dashboard-mode";
 import { RolePrivileges } from "./role-privileges";
+import { CreatorPreviewBanner, rememberWorkspace, useCreatorPreviewTimeTracking, WorkspaceSwitcher } from "./compass-platform-shell";
+import type { ExperienceMembership } from "./platform-model";
+import { clearSyntheticPreview, getSyntheticPreviewPersona, isSyntheticPreviewActive, setSyntheticPreviewPersona, SYNTHETIC_PERSONAS, syntheticContextForPersona, syntheticMembershipsForPersona, syntheticPreviewApi, type SyntheticPersonaKey } from "./synthetic-preview";
 
 type AuthState = "loading" | "signed_out" | "signed_in";
 type AdvisorView = "home" | "students" | "survey";
@@ -43,20 +46,14 @@ const statusLabels: Record<SurveyAssignmentStatus, string> = {
   closed: "Closed",
 };
 
-export function AppHeader({ context, role, onRole, onSignOut, onReview, api }: { context: AuthorizationContext; role: DashboardMode; onRole: (role: DashboardMode) => void; onSignOut: () => void; onReview:()=>void; api:PilotApiClient }) {
+export function AppHeader({ context, memberships = context.experienceMemberships || [], role, onRole, onSignOut, onReview, api }: { context: AuthorizationContext; memberships?: ExperienceMembership[]; role: DashboardMode; onRole: (role: DashboardMode) => void; onSignOut: () => void; onReview:()=>void; api:PilotApiClient }) {
   const modes = assignedModes(context);
   const [,setView] = usePathwayView("workspace","home");
-  return <header className="production-header"><a className="hub-return" href="/app">All experiences</a><button className="production-brand" onClick={()=>setView("home")}><img src={assetUrl("/assets/navigate-pathway-mark.svg")} alt="" /><span>Navigate The Pathway</span></button><WorkspaceTopTools context={modeContext(context,role)} api={api} /><div className="production-account"><span>{context.displayName}</span><button className="principal-badge" onClick={onReview}><span>{modeLabels[role]}</span><small>My privileges</small></button>{modes.length > 1 ? <label><span className="sr-only">Dashboard mode</span><select value={role} onChange={(event) => onRole(event.target.value as DashboardMode)}>{modes.map(item=><option key={item} value={item}>{modeLabels[item]}</option>)}</select></label> : null}<button className="text-button" onClick={onSignOut}>Sign out</button></div></header>;
+  return <header className="production-header"><button className="production-brand" onClick={()=>setView("home")}><img src={assetUrl("/assets/navigate-pathway-mark.svg")} alt="" /><span>Navigate The Pathway</span></button><WorkspaceSwitcher api={api} memberships={memberships} current="pathway" previewMode={false} /><WorkspaceTopTools context={modeContext(context,role)} api={api} /><div className="production-account"><span>{context.displayName}</span><button className="principal-badge" onClick={onReview}><span>{modeLabels[role]}</span><small>My privileges</small></button>{modes.length > 1 ? <label><span className="sr-only">Dashboard mode</span><select value={role} onChange={(event) => onRole(event.target.value as DashboardMode)}>{modes.map(item=><option key={item} value={item}>{modeLabels[item]}</option>)}</select></label> : null}<button className="text-button" onClick={onSignOut}>Sign out</button></div></header>;
 }
 
 export function ConfigurationRequired() {
   return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Production pilot" title="Secure setup is not connected yet." body="The application shell is ready. Supabase and the pilot API must be configured before invitations can be sent." priority /><div className="production-checklist"><p><strong>Public demonstration:</strong> remains separate and fictional.</p><p><strong>Production records:</strong> will be stored only in Supabase.</p><p><strong>Survey wording:</strong> stays protected until permissions and PI approval are documented.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the synthetic pilot</strong><small>Open every workspace with fictional records. No sign-in required.</small></span><span aria-hidden="true">→</span></a></section></main>;
-}
-
-function ExperienceGraphic({ experience }: { experience: "compass" | "pathway" | "impact" }) {
-  if (experience === "compass") return <svg viewBox="0 0 96 96" aria-hidden="true" focusable="false"><circle cx="48" cy="48" r="30" /><path d="M58 37 52 52 37 59l7-16 14-6Z" /><circle cx="48" cy="48" r="4" /><path className="experience-graphic-detail" d="M48 12v8M48 76v8M12 48h8M76 48h8" /></svg>;
-  if (experience === "pathway") return <svg viewBox="0 0 96 96" aria-hidden="true" focusable="false"><path d="M22 76c0-18 19-16 19-33 0-11 8-18 22-23" /><circle cx="22" cy="76" r="7" /><circle cx="41" cy="43" r="7" /><circle cx="67" cy="18" r="7" /><path className="experience-graphic-detail" d="m62 74 9-9 9 9M71 65v17" /></svg>;
-  return <svg viewBox="0 0 96 96" aria-hidden="true" focusable="false"><path d="m48 14 26 15v30L48 74 22 59V29l26-15Z" /><path className="experience-graphic-solid" d="m48 27 4.7 10.3L63 42l-10.3 4.7L48 57l-4.7-10.3L33 42l10.3-4.7L48 27Z" /><path className="experience-graphic-detail" d="m29 21 4 7M67 21l-4 7M29 65l7-4M67 65l-7-4" /></svg>;
 }
 
 export function SignIn({ supabase }: { supabase: SupabaseClient }) {
@@ -82,7 +79,7 @@ export function SignIn({ supabase }: { supabase: SupabaseClient }) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/app` });
     setBusy(false); setMessage(error ? "The reset message could not be sent." : "Check your email for a secure password link.");
   };
-  return <main className="production-auth"><section className="production-auth-card"><h1 className="sr-only">Compass, Pathway, and Impact Studio sign in</h1><ul className="auth-experience-list" aria-label="Available Roseman experiences"><li className="auth-experience-card auth-experience-card--compass"><div className="auth-experience-graphic"><ExperienceGraphic experience="compass" /></div><div><strong>Compass</strong><span>Advising, tutoring, events, and student support.</span></div></li><li className="auth-experience-card auth-experience-card--pathway"><div className="auth-experience-graphic"><ExperienceGraphic experience="pathway" /></div><div><strong>Navigate the Pathway</strong><span>Premed reflection, preparation, and portfolio.</span></div></li><li className="auth-experience-card auth-experience-card--impact"><div className="auth-experience-graphic"><ExperienceGraphic experience="impact" /></div><div><strong>Impact Studio</strong><span>Community initiative design, coaching, and handoff.</span></div></li></ul><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the synthetic pilot</strong><small>Open all workspaces as a creator using fictional records. Nothing here reads or changes student data.</small></span><span aria-hidden="true">→</span></a><RosieGuide pose="idle" compact eyebrow="Account hub" title="Use your approved email invitation today." body="Roseman Microsoft SSO is coming soon. Calendar access remains a separate choice, and staff verify a second factor before protected records open." /><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Coming soon</span></div><div className="auth-divider" aria-hidden="true"><span>sign in with invited email</span></div><form className="production-form" onSubmit={signIn}><label><span>Email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="primary-button" disabled={busy}>{busy ? "Checking..." : "Sign in with email"}</button><button type="button" className="text-button" onClick={reset} disabled={busy}>Set or reset password</button><p className="form-message" aria-live="polite">{message}</p></form><p className="privacy-note">Sign-in consent never grants calendar access. Access is limited to active memberships and approved invitations.</p></section></main>;
+  return <main className="production-auth"><section className="production-auth-card compass-signin"><div className="compass-signin__identity"><div className="compass-signin__mark" aria-hidden="true">⌁</div><div><p className="kicker">Compass</p><h1>Your secure starting point.</h1><p>Sign in once for advising, tutoring, events, and any additional workspace assigned to your account.</p></div></div><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Coming soon</span><small>Authentication and calendar permission will remain separate choices.</small></div><div className="auth-divider" aria-hidden="true"><span>sign in with invited email</span></div><form className="production-form" onSubmit={signIn}><label><span>Email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="primary-button" disabled={busy}>{busy ? "Checking..." : "Sign in with email"}</button><button type="button" className="text-button" onClick={reset} disabled={busy}>Set or reset password</button><p className="form-message" aria-live="polite">{message}</p></form><div className="pathway-invite-note"><strong>Joining from another university?</strong><p>External pre-med students enter through an approved Pathway invitation. An email domain never creates access automatically.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Creator Preview</strong><small>Use fictional, role-scoped records while live integrations remain inactive.</small></span><span aria-hidden="true">→</span></a><p className="privacy-note">Signing in does not grant a workspace, calendar access, or a staff role. Those permissions are approved separately.</p></section></main>;
 }
 
 export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseClient; onComplete: () => void }) {
@@ -354,7 +351,9 @@ function Dashboard({ session, supabase }: { session: Session; supabase: Supabase
         if (refreshed.error || !refreshed.data.session) throw initialError;
         value = await baseApi.request<AuthorizationContext>("/api/me");
       }
-      setContext(value);
+      const platform = await baseApi.request<{ memberships: ExperienceMembership[] }>("/api/platform/experiences");
+      if (!platform.memberships.some((item) => item.experienceKey === "pathway" && item.status === "active" && item.featureEnabled)) throw new Error("Pathway membership required");
+      setContext({ ...value, experienceMemberships: platform.memberships });
       setRole((current) => current && assignedModes(value).includes(current) ? current : assignedModes(value)[0] || null);
       setMessage("");
     } catch {
@@ -394,24 +393,52 @@ function Dashboard({ session, supabase }: { session: Session; supabase: Supabase
   return <div className="production-shell"><AppHeader context={context} role={role} api={api} onReview={()=>setAcknowledgedRole(null)} onRole={(next) => { requestSequence.current++; resetNavigation(); setRole(next); setDashboard(null); }} onSignOut={() => void signOut()} /><main className="production-main"><WorkspaceBack /><div className="production-welcome"><p className="kicker">{modeLabels[role]} dashboard</p><h1>{role === "student" ? "Your pathway home." : role === "advisor" ? "Your advising home." : principalMode(role) ? "Govern your program." : "Your program home."}</h1></div>{message ? <p className="form-message" aria-live="polite">{message}</p> : null}<WorkspaceHub key={role} api={api} context={effectiveContext} activeRole={role}>{dashboard && role === "student" ? <StudentDashboardView dashboard={dashboard as StudentDashboard} api={api} supabase={supabase} userId={context.userId} reload={loadDashboard} /> : dashboard && role === "advisor" ? <AdvisorDashboardView dashboard={dashboard as AdvisorDashboard} api={api} reload={loadDashboard} /> : principalMode(role) && adminView === "home" ? <CreatorControls api={api} context={effectiveContext} /> : dashboard && (role === "administrator" || principalMode(role)) ? <AdminDashboardView dashboard={dashboard as AdminDashboard} api={api} context={effectiveContext} reload={loadDashboard} /> : null}</WorkspaceHub></main>{acknowledgedRole !== role ? <RolePrivileges mode={role} context={effectiveContext} onDone={()=>setAcknowledgedRole(role)} /> : null}</div>;
 }
 
+function PathwaySyntheticPreview() {
+  const [persona, setPersonaState] = useState<SyntheticPersonaKey>(() => getSyntheticPreviewPersona());
+  const context = syntheticContextForPersona(persona);
+  const memberships = syntheticMembershipsForPersona(persona);
+  const pathway = memberships.find((item) => item.experienceKey === "pathway");
+  useCreatorPreviewTimeTracking(true, persona, "pathway", "home");
+  useEffect(() => {
+    const update = (event: Event) => setPersonaState((event as CustomEvent<SyntheticPersonaKey>).detail || getSyntheticPreviewPersona());
+    window.addEventListener("navigate:preview-persona", update);
+    return () => window.removeEventListener("navigate:preview-persona", update);
+  }, []);
+  useEffect(() => {
+    if (!pathway) {
+      const target = SYNTHETIC_PERSONAS.find((item) => item.key === persona)?.defaultPath || "/app/compass";
+      window.location.replace(target);
+      return;
+    }
+    rememberWorkspace(syntheticPreviewApi, "pathway", true);
+  }, [pathway, persona]);
+  const exit = () => { clearSyntheticPreview(); window.location.assign("/app"); };
+  if (!pathway) return null;
+  const student = persona === "pathway_student";
+  return <div className="production-shell"><CreatorPreviewBanner persona={persona} onPersona={setSyntheticPreviewPersona} onExit={exit} /><header className="production-header"><div className="production-brand"><img src={assetUrl("/assets/navigate-pathway-mark.svg")} alt="" /><span>Navigate The Pathway</span></div><WorkspaceSwitcher api={syntheticPreviewApi} memberships={memberships} current="pathway" previewMode /><div className="production-account"><span>{context.displayName}</span><button className="text-button" onClick={exit}>Exit preview</button></div></header><main className="production-main"><div className="production-welcome"><p className="kicker">{student ? "Pre-med student · Pathway only" : "Platform Creator"}</p><h1>{student ? "Your pathway home." : "Pathway governance preview."}</h1><p>{student ? "Only your sessions, portfolio, cohort spaces, and advising activity appear in this role." : "Creator access spans the platform while every workspace keeps its own records and authorization checks."}</p></div><div className="production-grid">{student ? <><section className="production-card"><h2>Next session</h2><p><strong>Application Story Lab</strong></p><p>September 18 · 5:30 PM · Online</p><button className="primary-button">Open session</button></section><section className="production-card"><h2>Your portfolio</h2><p>Three private artifacts and one advisor-shared reflection.</p><button className="secondary-button">Open my portfolio</button></section></> : <><section className="production-card"><h2>Creator controls</h2><p>Review configuration and synthetic reporting without granting the simulated user additional workspace roles.</p></section><section className="production-card"><h2>Permission boundary</h2><p>Use the Creator Preview selector above to enter a student role. Staff data is removed before that dashboard receives a response.</p></section></>}</div></main></div>;
+}
+
 export function ProductionPilotApp() {
+  const [previewMode] = useState(() => isSyntheticPreviewActive());
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [configurationError, setConfigurationError] = useState(false);
   const [authState, setAuthState] = useState<AuthState>("loading");
   const [session, setSession] = useState<Session | null>(null);
   useEffect(() => {
+    if (previewMode) return;
     loadProductionConfiguration().then(() => {
       const configuredClient = getSupabaseBrowserClient();
       if (!configuredClient) throw new Error("Secure setup is not connected yet.");
       setSupabase(configuredClient);
     }).catch(() => setConfigurationError(true));
-  }, []);
+  }, [previewMode]);
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase || previewMode) return;
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setAuthState(data.session ? "signed_in" : "signed_out"); });
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => { setSession(nextSession); setAuthState(nextSession ? "signed_in" : "signed_out"); });
     return () => data.subscription.unsubscribe();
-  }, [supabase]);
+  }, [previewMode, supabase]);
+  if (previewMode) return <PathwaySyntheticPreview />;
   if (configurationError) return <ConfigurationRequired />;
   if (!supabase) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate The Pathway" title="Connecting your secure pathway..." /></section></main>;
   if (authState === "loading") return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate The Pathway" title="Opening your secure pathway..." /></section></main>;

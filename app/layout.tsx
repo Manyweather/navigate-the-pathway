@@ -3,21 +3,22 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://navigate-pathways.roseman-coll-6465.chatgpt.site"),
+  applicationName: "Compass",
   title: {
-    default: "Navigate",
-    template: "%s | Navigate",
+    default: "Compass",
+    template: "%s | Compass",
   },
-  description: "A phone-first visual pathway for premedical students to capture evidence, reflect, connect, and prepare.",
+  description: "The secure Compass home for advising, tutoring, events, Navigate the Pathway, and verified Impact access.",
   manifest: "/manifest.webmanifest",
   openGraph: {
-    title: "Navigate the Pathway",
-    description: "Explore a visual premed district and complete one useful next move.",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Navigate pathway map with connected premed learning stations." }],
+    title: "Compass",
+    description: "One secure starting point for student support and authorized workspaces.",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Compass student support platform." }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Navigate the Pathway",
-    description: "Explore a visual premed district and complete one useful next move.",
+    title: "Compass",
+    description: "One secure starting point for student support and authorized workspaces.",
     images: ["/og.png"],
   },
 };
