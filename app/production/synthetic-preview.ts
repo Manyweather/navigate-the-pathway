@@ -179,6 +179,21 @@ type SyntheticAppointment = {
   studentRecap?: string;
 };
 
+type SyntheticEncounterRecord = {
+  appointmentId: string;
+  workingNotes: string;
+  studentRecap: string;
+  structuredData: {
+    categories: string[];
+    interventions: string[];
+    referrals: string[];
+    followUp: string[];
+  };
+  revision: number;
+  updatedAt: string;
+  publishedAt: string | null;
+};
+
 const penjiOccurrenceRows = [
   ["Notetaking for Retention with Dr. van Tonder","2026-09-03","12:00","13:00","Innovation Hall Room 210",10,8,0],
   ["Bring Your Reset: Board Games","2026-09-02","12:00","13:00","Roadrunner Communities",18,18,0],
@@ -273,6 +288,7 @@ type SyntheticEventState = {
 
 const syntheticEventStorageKey="navigate.compass.synthetic-events.v3";
 const syntheticImpactStorageKey="navigate.compass.synthetic-impact.v1";
+const syntheticEncounterStorageKey="navigate.compass.synthetic-encounters.v1";
 
 function defaultSyntheticEventState():SyntheticEventState {
   const events=[...oacaEvents(),...penjiHistoryEvents()].map((event)=>({
@@ -325,9 +341,26 @@ function oacaBootstrap() {
       { id: "provider-tutor", displayName: "Fictional peer tutor", classification: "peer_tutor", subjects: ["General", "Clinical skills"], modalities: ["in_person", "teams"], serviceKeys: ["peer_tutoring"] },
     ],
     appointments: [
-      { id: "appointment-1", studentId: "synthetic-creator", studentName: "Creator preview", serviceName: "Academic advising", providerName: "Bucket L. Manyweather, Ph.D.", subject: "Foundations 3 check-in", startsAt: isoAt(1, 10), endsAt: isoAt(1, 10, 30), modality: "teams", status: "confirmed", sandbox: true, requestOrigin: "student", studentRecap: "Review the weekly study plan and return with two questions." },
+      { id: "appointment-completed-1", studentId: "student-1", studentName: "Taylor Morgan", serviceName: "Academic advising", providerName: "Bucket L. Manyweather, Ph.D.", subject: "Study strategy and weekly planning", startsAt: isoAt(-4, 11), endsAt: isoAt(-4, 11, 30), modality: "in_person", status: "completed", sandbox: true, requestOrigin: "student", studentRecap: "For the next seven days, use a short retrieval-practice block before reviewing notes, protect two focused study periods, and bring the updated weekly plan to the next check-in." },
+      { id: "appointment-1", studentId: "student-1", studentName: "Taylor Morgan", serviceName: "Academic advising", providerName: "Bucket L. Manyweather, Ph.D.", subject: "Foundations 3 check-in", startsAt: isoAt(1, 10), endsAt: isoAt(1, 10, 30), modality: "teams", status: "confirmed", sandbox: true, requestOrigin: "student", studentRecap: "Review the weekly study plan and return with two questions." },
       { id: "appointment-2", studentId: "student-2", studentName: "Riley Thompson", serviceName: "Peer tutoring", providerName: "Fictional peer tutor", subject: "General", format: "individual", startsAt: isoAt(2, 13), endsAt: isoAt(2, 14), modality: "in_person", status: "pending_approval", sandbox: true, requestOrigin: "student" },
     ],
+    encounterRecords: [
+      {
+        appointmentId: "appointment-completed-1",
+        workingNotes: "Reviewed the student's weekly study schedule and recent use of practice questions. The student identified that review was crowding out retrieval practice. We reorganized the week around two protected study blocks and a brief daily question set. Student was engaged and selected the next actions.",
+        studentRecap: "For the next seven days, use a short retrieval-practice block before reviewing notes, protect two focused study periods, and bring the updated weekly plan to the next check-in.",
+        structuredData: {
+          categories: ["learning_strategy"],
+          interventions: ["Weekly schedule review", "Retrieval-practice planning"],
+          referrals: [],
+          followUp: ["Review the updated weekly plan at the next advising visit"],
+        },
+        revision: 1,
+        updatedAt: isoAt(-4, 11, 45),
+        publishedAt: isoAt(-4, 11, 45),
+      },
+    ] satisfies SyntheticEncounterRecord[],
     assignedAdvisor: { id: "provider-academic", displayName: "Bucket L. Manyweather, Ph.D.", classification: "staff", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
     assignedStudents: [
       { id: "student-1", displayName: "Taylor Morgan" },
@@ -339,7 +372,7 @@ function oacaBootstrap() {
     policyRules: [],
     acknowledgments: [],
     obligations: [
-      { id: "obligation-1", studentId: "synthetic-creator", studentName: "Creator preview", ruleKey: "foundations_year_2_check_in", title: "Foundations 3 check-in", serviceKey: "academic_advising", requiredProvider: "assigned_advisor", triggeredAt: isoAt(-14, 9), dueAt: isoAt(21, 17), status: "open" },
+      { id: "obligation-1", studentId: "student-1", studentName: "Taylor Morgan", ruleKey: "foundations_year_2_check_in", title: "Foundations 3 check-in", serviceKey: "academic_advising", requiredProvider: "assigned_advisor", triggeredAt: isoAt(-14, 9), dueAt: isoAt(21, 17), status: "open" },
     ],
     restrictions: [],
     tutorCompliance: { application_approved_at: isoAt(-90, 9), faculty_recommendation_at: isoAt(-84, 9), interview_completed_at: isoAt(-77, 9), workday_onboarding_at: isoAt(-70, 9), training_completed_at: isoAt(-63, 9), handbook_acknowledgment_id: "synthetic-ack", eligible_at: isoAt(-60, 9), suspended_at: null },
@@ -368,7 +401,7 @@ function oacaBootstrap() {
     campaigns: [
       { id: "campaign-1", name: "Research identity invitation", subject: "Develop your research identity", previewText: "Reserve a place and bring your questions.", status: "sent", audience: { cohortLabels: ["Class of 2029"] }, scheduledFor: null, sentAt: isoAt(-4, 9), content: { heading: "Develop your research identity" }, recipientCount: 76, deliveredCount: 73, openedCount: 52, clickedCount: 34, formSubmittedCount: 18, eventRegisteredCount: 24, appointmentRequestedCount: 11, minimumGroupSize: 10 },
     ],
-    nudges: [{ id: "nudge-1", studentId: "synthetic-creator", studentName: "Creator preview", serviceKey: "career_advising", providerName: "Art Avila, M.Ed.", dueBy: isoAt(14, 17), status: "delivered", createdAt: isoAt(-2, 10) }],
+    nudges: [{ id: "nudge-1", studentId: "student-1", studentName: "Taylor Morgan", serviceKey: "career_advising", providerName: "Art Avila, M.Ed.", dueBy: isoAt(14, 17), status: "delivered", createdAt: isoAt(-2, 10) }],
     communications: [],
     forms: [],
     audienceOptions: { cohorts: ["Class of 2029"], phases: ["Foundations", "Clerkship", "Advanced"], years: ["M1", "M2", "M3", "M4"], campuses: ["Summerlin", "Henderson"] },
@@ -489,8 +522,25 @@ class SyntheticPilotApi {
   private impactNotifications: SyntheticImpactNotification[] = [{ id: "impact-notice-1", title: "Impact event needs a Liaison decision", body: "Community listening circle completed mentor review.", eventId: "impact-event-1", readAt: null, createdAt: isoAt(-1, 13) }];
   private impactLoaded = false;
   private appointments:SyntheticAppointment[] = oacaBootstrap().appointments;
+  private encounterRecords:SyntheticEncounterRecord[] = oacaBootstrap().encounterRecords;
+  private encountersLoaded=false;
   private eventState:SyntheticEventState=defaultSyntheticEventState();
   private eventsLoaded=false;
+
+  private ensureEncountersLoaded() {
+    if(this.encountersLoaded)return;
+    this.encountersLoaded=true;
+    if(typeof window==="undefined")return;
+    try {
+      const saved=JSON.parse(window.localStorage.getItem(syntheticEncounterStorageKey)||"null") as SyntheticEncounterRecord[]|null;
+      if(Array.isArray(saved))this.encounterRecords=saved;
+    }
+    catch { this.encounterRecords=oacaBootstrap().encounterRecords; }
+  }
+
+  private saveEncounters() {
+    if(typeof window!=="undefined")window.localStorage.setItem(syntheticEncounterStorageKey,JSON.stringify(this.encounterRecords));
+  }
 
   private ensureEventsLoaded() {
     if(this.eventsLoaded)return;
@@ -590,16 +640,19 @@ class SyntheticPilotApi {
       return clone({ isStudent: true, organizations: organizations.map(({ id, key, name, college, campus, aliases }) => ({ id, key, name, college, campus, aliases })), affiliations: own, studentCouncil: Boolean(this.studentCouncilByPersona[persona]), impactAccessStatus: hasApproved ? "active" : hasEndedApproval ? "read_only" : "locked", impactHref: hasApproved || hasEndedApproval ? "/app/compass/impact" : null }) as T;
     }
     if (path === "/api/oaca/bootstrap") {
+      this.ensureEncountersLoaded();
       const source = oacaBootstrap();
+      const isStudent = personaMemberships.find((item) => item.experienceKey === "oaca")?.roles.includes("student");
+      const ownStudentRecord = (studentId:string) => studentId === "student-1";
       const base = {
         ...source,
-        appointments: this.appointments.map((item, index) => index === 0 ? { ...item, studentId: context.userId, studentName: context.displayName } : item),
-        obligations: source.obligations.map((item, index) => index === 0 ? { ...item, studentId: context.userId, studentName: context.displayName } : item),
-        nudges: source.nudges.map((item, index) => index === 0 ? { ...item, studentId: context.userId, studentName: context.displayName } : item),
+        appointments: this.appointments.map((item) => isStudent && ownStudentRecord(item.studentId) ? { ...item, studentId: context.userId, studentName: context.displayName } : item),
+        obligations: source.obligations.map((item) => isStudent && ownStudentRecord(item.studentId) ? { ...item, studentId: context.userId, studentName: context.displayName } : item),
+        nudges: source.nudges.map((item) => isStudent && ownStudentRecord(item.studentId) ? { ...item, studentId: context.userId, studentName: context.displayName } : item),
+        encounterRecords:this.encounterRecords,
         events:this.eventState.events,
       };
-      const isStudent = personaMemberships.find((item) => item.experienceKey === "oaca")?.roles.includes("student");
-      return clone(isStudent ? { ...base, appointments: base.appointments.filter((item) => item.studentId === context.userId), assignedStudents: [], currentProvider: null, canManageImports: false, canViewAnalytics: false, importBatches: [], analytics: null, canManageOutreach: false, canViewOutreachInsights: false, campaigns: [], nudges: base.nudges.filter((item) => item.studentId === context.userId) } : base) as T;
+      return clone(isStudent ? { ...base, appointments: base.appointments.filter((item) => item.studentId === context.userId), encounterRecords: [], assignedStudents: [], currentProvider: null, canManageImports: false, canViewAnalytics: false, importBatches: [], analytics: null, canManageOutreach: false, canViewOutreachInsights: false, campaigns: [], nudges: base.nudges.filter((item) => item.studentId === context.userId) } : base) as T;
     }
     if (route === "/api/oaca/events/workspace") {
       const eventId=new URL(path,"https://preview.local").searchParams.get("eventId")||"";
@@ -642,7 +695,7 @@ class SyntheticPilotApi {
     if(route==="/api/oaca/event-notification-rules"&&method==="POST") {const body=options.body as {eventId:string;type:string;offsetMinutes:number|null;enabled:boolean;channels:string[]};const rules=this.eventState.attendeeRules[body.eventId]||[];const index=rules.findIndex((item)=>item.type===body.type&&item.offsetMinutes===body.offsetMinutes);const next={id:index>=0?rules[index].id:`rule-${crypto.randomUUID()}`,type:body.type,offsetMinutes:body.offsetMinutes,enabled:body.enabled,channels:body.channels,scheduledFor:null,generation:index>=0?rules[index].generation+1:1};if(index>=0)rules[index]=next;else rules.push(next);this.eventState.attendeeRules[body.eventId]=rules;this.saveEvents();return clone(next) as T;}
     if(route==="/api/oaca/event-coordinator-alert-rules"&&method==="POST") {const body=options.body as {eventId:string;rules:SyntheticEventState["coordinatorRules"][string]};this.eventState.coordinatorRules[body.eventId]=body.rules;this.saveEvents();return {ok:true} as T;}
     if(route==="/api/platform/notifications/action"&&method==="POST") {const body=options.body as {notificationId:string;action:"read"|"dismiss"};const notice=this.eventState.notices.find((item)=>item.id===body.notificationId);if(notice){if(body.action==="read")notice.readAt=new Date().toISOString();else notice.dismissedAt=new Date().toISOString();this.saveEvents();}return {ok:true} as T;}
-    if(route==="/api/oaca/synthetic/reset"&&method==="POST") {this.eventState=defaultSyntheticEventState();this.affiliations=defaultSyntheticAffiliations();this.impactEvents=defaultSyntheticImpactEvents();this.impactNotifications=[{ id: "impact-notice-1", title: "Impact event needs a Liaison decision", body: "Community listening circle completed mentor review.", eventId: "impact-event-1", readAt: null, createdAt: isoAt(-1, 13) }];this.saveEvents();this.saveImpact();return {ok:true} as T;}
+    if(route==="/api/oaca/synthetic/reset"&&method==="POST") {const compass=oacaBootstrap();this.eventState=defaultSyntheticEventState();this.appointments=compass.appointments;this.encounterRecords=compass.encounterRecords;this.affiliations=defaultSyntheticAffiliations();this.impactEvents=defaultSyntheticImpactEvents();this.impactNotifications=[{ id: "impact-notice-1", title: "Impact event needs a Liaison decision", body: "Community listening circle completed mentor review.", eventId: "impact-event-1", readAt: null, createdAt: isoAt(-1, 13) }];this.saveEvents();this.saveEncounters();this.saveImpact();return {ok:true} as T;}
     if (path === "/api/oaca/event-imports" && (!options.method || options.method === "GET")) return clone([{ id: "event-import-1", status: "completed", source_event_rows: 48, source_attendance_rows: 178, occurrence_count: 22, matched_students: 76, merged_duplicates: 3, quality_summary: { note: "Illustrative aggregate only" }, requested_by: "synthetic-creator", reviewed_by: "synthetic-reviewer", reviewed_at: isoAt(-2, 11), completed_at: isoAt(-2, 12), created_at: isoAt(-3, 11) }]) as T;
     if (path === "/api/genesis/bootstrap") return clone(genesisBootstrap(persona, this.affiliations, this.impactEvents, this.impactNotifications)) as T;
     if (path === "/api/genesis/access-requests/decide" && method === "POST") {
@@ -699,6 +752,28 @@ class SyntheticPilotApi {
       const appointment:SyntheticAppointment = { id: `appointment-${crypto.randomUUID()}`, studentId: context.userId, studentName: context.displayName, serviceName: service?.name || "Compass appointment", providerName: provider?.displayName || (service?.key === "academic_advising" ? seed.assignedAdvisor.displayName : null), subject: body?.topic || null, format: body?.format || "individual", startsAt: body?.startsAt || null, endsAt: null, modality: body?.modality || "teams", status: "pending_approval", sandbox: true, requestOrigin: "student" };
       this.appointments = [appointment, ...this.appointments];
       return clone({ id: appointment.id, status: appointment.status, sandbox: true }) as T;
+    }
+    if (path === "/api/oaca/records" && method === "POST") {
+      this.ensureEncountersLoaded();
+      const body = options.body as { appointmentId?: string; workingNotes?: string; studentRecap?: string; structuredData?: SyntheticEncounterRecord["structuredData"]; publishRecap?: boolean };
+      const appointment = this.appointments.find((item) => item.id === body.appointmentId);
+      if (!appointment) throw new Error("Choose an appointment in your authorized scope.");
+      const index = this.encounterRecords.findIndex((item) => item.appointmentId === appointment.id);
+      const previous = index >= 0 ? this.encounterRecords[index] : null;
+      const now = new Date().toISOString();
+      const record:SyntheticEncounterRecord = {
+        appointmentId: appointment.id,
+        workingNotes: body.workingNotes || "",
+        studentRecap: body.studentRecap || "",
+        structuredData: body.structuredData || { categories: [], interventions: [], referrals: [], followUp: [] },
+        revision: (previous?.revision || 0) + 1,
+        updatedAt: now,
+        publishedAt: body.publishRecap ? now : previous?.publishedAt || null,
+      };
+      if(index >= 0)this.encounterRecords[index]=record;else this.encounterRecords.unshift(record);
+      if(body.publishRecap)appointment.studentRecap=record.studentRecap;
+      this.saveEncounters();
+      return clone(record) as T;
     }
     if (path === "/api/oaca/campaigns") return { id: "synthetic-campaign" } as T;
     return { id: "synthetic-record", ok: true } as T;

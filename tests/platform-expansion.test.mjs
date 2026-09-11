@@ -45,6 +45,22 @@ test("synthetic creator preview exposes all workspaces without production identi
   assert.equal(updatedCompass.appointments.find((appointment) => appointment.id === "appointment-1")?.status, "cancelled");
 });
 
+test("completed Compass sessions reopen with editable, revisioned staff notes", async () => {
+  await syntheticPreviewApi.request("/api/oaca/synthetic/reset", { method: "POST", body: {} });
+  const before = await syntheticPreviewApi.request("/api/oaca/bootstrap");
+  const completed = before.appointments.find((appointment) => appointment.status === "completed");
+  assert.ok(completed);
+  const original = before.encounterRecords.find((record) => record.appointmentId === completed.id);
+  assert.equal(original.revision, 1);
+  assert.match(original.workingNotes, /retrieval practice/i);
+  await syntheticPreviewApi.request("/api/oaca/records", { method: "POST", body: { appointmentId: completed.id, workingNotes: `${original.workingNotes} Added a follow-up note.`, studentRecap: original.studentRecap, structuredData: original.structuredData, publishRecap: false } });
+  const after = await syntheticPreviewApi.request("/api/oaca/bootstrap");
+  const revised = after.encounterRecords.find((record) => record.appointmentId === completed.id);
+  assert.equal(revised.revision, 2);
+  assert.match(revised.workingNotes, /Added a follow-up note/);
+  await syntheticPreviewApi.request("/api/oaca/synthetic/reset", { method: "POST", body: {} });
+});
+
 test("Creator Preview personas are scoped before dashboard data is returned", async () => {
   const values = new Map();
   const previousWindow = globalThis.window;

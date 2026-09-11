@@ -1089,6 +1089,14 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .record-list dt { color:#6d6967; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
 .record-list dd { margin:.15rem 0; }
 .student-recap { margin-top:1rem; padding:1rem; border-left:4px solid var(--experience-accent); background:var(--experience-soft); }
+.completed-session-summary { display:grid; gap:1rem; padding:clamp(1rem,3vw,1.5rem); border:1px solid rgba(21,88,64,.24); border-radius:18px; background:linear-gradient(135deg,#f4fbf7 0%,#fff 72%); box-shadow:0 12px 28px rgba(21,88,64,.07); }
+.completed-session-summary h2 { margin:.45rem 0 .25rem; font-size:clamp(1.25rem,3vw,1.65rem); }
+.completed-session-summary p { margin:0; color:#595854; line-height:1.55; }
+.completed-session-summary dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; margin:0; }
+.completed-session-summary dl div { display:grid; gap:.25rem; padding:.75rem; border-radius:12px; background:#fff; }
+.completed-session-summary dt { color:#68635f; font-size:.82rem; font-weight:750; text-transform:uppercase; letter-spacing:.06em; }
+.completed-session-summary dd { margin:0; color:#252323; font-weight:750; text-transform:capitalize; }
+@media (max-width:640px) { .completed-session-summary dl { grid-template-columns:1fr; } }
 .file-drop { min-height:150px; display:grid; place-items:center; border:2px dashed #aaa5a2; border-radius:16px; background:#faf9f7; cursor:pointer; }
 .file-drop input { position:absolute; width:1px; height:1px; opacity:0; }
 .metric-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
