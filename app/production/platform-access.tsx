@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { RosieGuide } from "../components/rosie-guide";
 import { PilotApiClient } from "./api-client";
-import { ConfigurationRequired, MfaGate, PasswordRecovery, SignIn } from "./production-pilot-app";
+import { ConfigurationRequired, MfaGate, PasswordRecovery, PasswordRecoveryProblem, SignIn } from "./production-pilot-app";
+import { parseRecoveryCallback } from "./auth-recovery";
 import { getSupabaseBrowserClient, loadProductionConfiguration } from "./supabase-client";
 import { staffMfaRoles, type ExperienceKey, type ExperienceMembership } from "./platform-model";
 import type { AuthorizationContext } from "./types";
@@ -48,6 +49,8 @@ export function PlatformAccess({ experience, children }: {
   const [message, setMessage] = useState("Opening your Navigate account…");
   const [accountLoadFailed, setAccountLoadFailed] = useState(false);
   const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [mfaVerified, setMfaVerified] = useState(false);
   const api = useMemo(() => previewMode ? syntheticPreviewApi : supabase ? new PilotApiClient(supabase, undefined, experience) : null, [experience, previewMode, supabase]);
 
@@ -55,9 +58,11 @@ export function PlatformAccess({ experience, children }: {
     const task = window.setTimeout(() => {
       const query = new URLSearchParams(window.location.search);
       const preview = query.get("preview") === "creator" || window.localStorage.getItem(SYNTHETIC_PREVIEW_KEY) === "true";
+      const recovery = parseRecoveryCallback(window.location.search, window.location.hash);
       setPreviewMode(preview);
       setConfigured(preview ? "preview" : "loading");
-      setRecoveryMode(/(?:^|[?#&])type=recovery(?:&|$)/.test(`${window.location.search}${window.location.hash}`));
+      setRecoveryMode(recovery.requested && !recovery.errorMessage);
+      setRecoveryError(recovery.errorMessage);
       setClientReady(true);
     }, 0);
     return () => window.clearTimeout(task);
@@ -87,13 +92,36 @@ export function PlatformAccess({ experience, children }: {
 
   useEffect(() => {
     if (!supabase || previewMode) return;
-    void supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    let active = true;
+    setAuthReady(false);
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!active) return;
       setSession(nextSession);
-      if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
+      setAuthReady(true);
+      if (event === "PASSWORD_RECOVERY") {
+        setRecoveryError(null);
+        setRecoveryMode(true);
+      }
     });
-    return () => data.subscription.unsubscribe();
-  }, [previewMode, supabase]);
+    void (async () => {
+      if (recoveryError) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+        if (active) { setSession(null); setAuthReady(true); }
+        return;
+      }
+      const initialized = await supabase.auth.initialize();
+      const current = await supabase.auth.getSession();
+      if (!active) return;
+      const nextSession = current.data.session;
+      setSession(nextSession);
+      setAuthReady(true);
+      if (recoveryMode && (initialized.error || current.error || !nextSession)) {
+        setRecoveryMode(false);
+        setRecoveryError("Compass could not validate a recovery session from that link. This does not necessarily mean the email was old; request one new email and use only its latest reset link.");
+      }
+    })();
+    return () => { active = false; data.subscription.unsubscribe(); };
+  }, [previewMode, recoveryError, recoveryMode, supabase]);
 
   const load = useCallback(async () => {
     if (!api || !session || recoveryMode) return;
@@ -128,10 +156,13 @@ export function PlatformAccess({ experience, children }: {
 
   if (configured === "error") return <ConfigurationRequired />;
   if (!supabase || configured === "loading") return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate" title="Connecting your secure account…" /></section></main>;
+  if (recoveryError) return <PasswordRecoveryProblem supabase={supabase} detail={recoveryError} />;
+  if (!authReady) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Compass" title="Validating your secure link…" /></section></main>;
   if (!session) return <SignIn supabase={supabase} />;
   if (recoveryMode) return <PasswordRecovery supabase={supabase} onComplete={() => {
     window.history.replaceState({}, "", window.location.pathname);
     setRecoveryMode(false);
+    setRecoveryError(null);
     setContext(null);
     setMessage("Opening your Navigate account…");
   }} />;

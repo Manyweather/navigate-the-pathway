@@ -17,6 +17,7 @@ import {
 } from "../app/production/platform-model.ts";
 import { organizationCollegeOrder, organizationsForSelect, studentOrganizations } from "../app/production/student-organizations.ts";
 import { SYNTHETIC_PERSONA_KEY, syntheticPreviewApi, syntheticPreviewContext, syntheticPreviewMemberships } from "../app/production/synthetic-preview.ts";
+import { parseRecoveryCallback } from "../app/production/auth-recovery.ts";
 
 test("Compass is the parent for three isolated workspace destinations", () => {
   assert.deepEqual(Object.keys(experiences), ["pathway", "oaca", "genesis"]);
@@ -85,12 +86,29 @@ test("password recovery takes priority over account loading and offers a safe pr
   const signIn = await readFile(new URL("../app/production/production-pilot-app.tsx", import.meta.url), "utf8");
   assert.match(access, /PASSWORD_RECOVERY/);
   assert.match(access, /recoveryMode/);
+  assert.match(access, /recoveryError/);
+  assert.match(access, /authReady/);
+  assert.match(access, /signOut\(\{ scope: "local" \}\)/);
   assert.match(access, /Open the Creator preview/);
   assert.match(signIn, /supabase\.auth\.updateUser\(\{ password \}\)/);
   assert.match(signIn, /Set new password/);
   assert.match(signIn, /same_password/);
   assert.match(signIn, /Send me a fresh reset link/);
+  assert.match(signIn, /Supabase verified this recovery session/);
+  assert.match(signIn, /email security scanning/);
+  assert.match(signIn, /PasswordRecoveryProblem/);
   assert.match(access, /window\.history\.replaceState/);
+});
+
+test("password recovery callbacks reject Supabase errors before showing the password form", () => {
+  const valid = parseRecoveryCallback("", "#access_token=valid&refresh_token=valid&type=recovery");
+  assert.deepEqual(valid, { requested: true, errorCode: null, errorMessage: null });
+  const rejected = parseRecoveryCallback("", "#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid&type=recovery");
+  assert.equal(rejected.requested, true);
+  assert.equal(rejected.errorCode, "otp_expired");
+  assert.match(rejected.errorMessage, /email security scan/);
+  const ordinary = parseRecoveryCallback("?preview=creator", "");
+  assert.deepEqual(ordinary, { requested: false, errorCode: null, errorMessage: null });
 });
 
 test("OACA state transitions preserve explicit approval and counterproposal semantics", () => {
@@ -255,6 +273,9 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.match(signIn, /Coming soon/);
   assert.match(signIn, /Sign-in is taking too long/);
   assert.doesNotMatch(signIn, /navigate-pathway-mark/);
+  assert.match(signIn, /compass-emblem-v2\.png/);
+  assert.match(signIn, /Roseman University student support/);
+  assert.match(signIn, /Advising <span>·<\/span> Tutoring <span>·<\/span> Events/);
   assert.match(hub, /Opening your authorized workspace/);
   assert.match(hub, /defaultWorkspaceFor/);
   assert.match(hub, /access is pending administrator approval/i);

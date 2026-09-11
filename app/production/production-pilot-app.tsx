@@ -79,15 +79,20 @@ export function SignIn({ supabase }: { supabase: SupabaseClient }) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/app` });
     setBusy(false); setMessage(error ? "The reset message could not be sent." : "Check your email for a secure password link.");
   };
-  return <main className="production-auth"><section className="production-auth-card compass-signin"><div className="compass-signin__identity"><div className="compass-signin__mark" aria-hidden="true">⌁</div><div><p className="kicker">Compass</p><h1>Your secure starting point.</h1><p>Sign in once for advising, tutoring, events, and any additional workspace assigned to your account.</p></div></div><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Coming soon</span><small>Authentication and calendar permission will remain separate choices.</small></div><div className="auth-divider" aria-hidden="true"><span>sign in with invited email</span></div><form className="production-form" onSubmit={signIn}><label><span>Email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="primary-button" disabled={busy}>{busy ? "Checking..." : "Sign in with email"}</button><button type="button" className="text-button" onClick={reset} disabled={busy}>Set or reset password</button><p className="form-message" aria-live="polite">{message}</p></form><div className="pathway-invite-note"><strong>Joining from another university?</strong><p>External pre-med students enter through an approved Pathway invitation. An email domain never creates access automatically.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Creator Preview</strong><small>Use fictional, role-scoped records while live integrations remain inactive.</small></span><span aria-hidden="true">→</span></a><p className="privacy-note">Signing in does not grant a workspace, calendar access, or a staff role. Those permissions are approved separately.</p></section></main>;
+  return <main className="production-auth"><section className="production-auth-card compass-signin"><div className="compass-signin__identity"><div className="compass-signin__emblem" aria-hidden="true"><img src={assetUrl("/assets/brand/compass-emblem-v2.png")} alt="" /></div><div className="compass-signin__hero-copy"><p className="compass-signin__eyebrow">Roseman University student support</p><h1>Compass</h1><p className="compass-signin__services">Advising <span>·</span> Tutoring <span>·</span> Events</p><p className="compass-signin__introduction">Sign in once to reach your assigned support and workspaces.</p></div></div><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Coming soon</span><small>Authentication and calendar permission will remain separate choices.</small></div><div className="auth-divider" aria-hidden="true"><span>sign in with invited email</span></div><form className="production-form" onSubmit={signIn}><label><span>Email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="primary-button" disabled={busy}>{busy ? "Checking..." : "Sign in with email"}</button><button type="button" className="text-button" onClick={reset} disabled={busy}>Set or reset password</button><p className="form-message" aria-live="polite">{message}</p></form><div className="pathway-invite-note"><strong>Joining from another university?</strong><p>External pre-med students enter through an approved Pathway invitation. An email domain never creates access automatically.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Creator Preview</strong><small>Use fictional, role-scoped records while live integrations remain inactive.</small></span><span aria-hidden="true">→</span></a><p className="privacy-note">Signing in does not grant a workspace, calendar access, or a staff role. Those permissions are approved separately.</p></section></main>;
 }
 
 export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseClient; onComplete: () => void }) {
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [canRequestAnotherLink, setCanRequestAnotherLink] = useState(false);
+
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email || ""));
+  }, [supabase]);
 
   const recoveryErrorMessage = (error: { code?: string; message: string }) => {
     const detail = `${error.code || ""} ${error.message}`.toLowerCase();
@@ -98,7 +103,7 @@ export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseC
       return "That password does not meet the security requirements. Try a longer passphrase you have not used before.";
     }
     if (["expired", "session", "token", "jwt", "reauthentication"].some((term) => detail.includes(term))) {
-      return "This secure link has expired or was already used. Request a fresh password-reset email below.";
+      return "Compass did not receive a verified recovery session. The email may still be new; one-time links can also be opened by email security scanning or superseded by a newer request.";
     }
     return `Supabase could not accept that password: ${error.message}`;
   };
@@ -108,39 +113,71 @@ export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseC
     if (password.length < 12) { setMessage("Use at least 12 characters for your new password."); return; }
     if (password !== confirmation) { setMessage("The passwords do not match."); return; }
     setBusy(true); setMessage(""); setCanRequestAnotherLink(false);
-    const { error } = await supabase.auth.updateUser({ password });
-    setBusy(false);
-    if (error) {
-      setMessage(recoveryErrorMessage(error));
+    const verified = await supabase.auth.getUser();
+    if (verified.error || !verified.data.user) {
+      setBusy(false);
+      setMessage("Compass could not verify this recovery session. Request one new email and use only its latest reset link.");
       setCanRequestAnotherLink(true);
       return;
     }
-    onComplete();
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        setMessage(recoveryErrorMessage(error));
+        setCanRequestAnotherLink(true);
+        return;
+      }
+      onComplete();
+    } catch {
+      setMessage("Compass could not reach the password service. Check your connection and try again without requesting another email.");
+    } finally { setBusy(false); }
   };
 
   const requestAnotherLink = async () => {
     setBusy(true); setMessage("");
-    const { data } = await supabase.auth.getUser();
-    const email = data.user?.email;
-    if (!email) {
+    if (!email.trim()) {
       setBusy(false);
-      setMessage("Return to sign in, enter your email address, and choose Set or reset password.");
+      setMessage("Enter the email address for your Compass account.");
       return;
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/app` });
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/app` });
     setBusy(false);
-    setMessage(error ? `A new link could not be sent: ${error.message}` : `A fresh password-reset link was sent to ${email}. Use only the newest email.`);
+    setMessage(error ? `A new link could not be sent: ${error.message}` : `A fresh password-reset link was sent to ${email.trim()}. Use only the newest email.`);
   };
 
   return <main className="production-auth"><section className="production-auth-card production-auth-card--recovery">
-    <RosieGuide pose="idle" compact eyebrow="Secure password reset" title="Choose your new password." body="Your email link was accepted. Set a new password below, then Navigate will open your account." priority />
+    <RosieGuide pose="idle" compact eyebrow="Secure password reset" title="Choose your new password." body="Supabase verified this recovery session. Set a new password below, then Compass will open your account." priority />
     <form className="production-form" onSubmit={updatePassword}>
       <label><span>New password</span><input type="password" autoComplete="new-password" minLength={12} required value={password} onChange={(event) => setPassword(event.target.value)} /><small>Use at least 12 characters.</small></label>
       <label><span>Confirm new password</span><input type="password" autoComplete="new-password" minLength={12} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
       <button className="primary-button" disabled={busy}>{busy ? "Updating…" : "Set new password"}</button>
-      {canRequestAnotherLink ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void requestAnotherLink()}>{busy ? "Sending…" : "Send me a fresh reset link"}</button> : null}
+      {canRequestAnotherLink ? <><label><span>Account email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><button type="button" className="secondary-button" disabled={busy} onClick={() => void requestAnotherLink()}>{busy ? "Sending…" : "Send me a fresh reset link"}</button></> : null}
       <p className="form-message" aria-live="polite">{message}</p>
     </form>
+  </section></main>;
+}
+
+export function PasswordRecoveryProblem({ supabase, detail }: { supabase: SupabaseClient; detail: string }) {
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const requestLink = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true); setMessage("");
+    await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/app` });
+    setBusy(false);
+    setMessage(error ? `A new reset email could not be sent: ${error.message}` : "A new reset email was requested. Use only the newest message; earlier links stop working.");
+  };
+  return <main className="production-auth"><section className="production-auth-card production-auth-card--recovery">
+    <RosieGuide pose="idle" compact eyebrow="Password reset" title="That link did not create a secure session." body={detail} priority />
+    <form className="production-form" onSubmit={requestLink}>
+      <label><span>Account email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+      <button className="primary-button" disabled={busy}>{busy ? "Requesting…" : "Request one new reset email"}</button>
+      <p className="form-message" aria-live="polite">{message}</p>
+    </form>
+    <a className="preview-entry" href="/app?preview=creator"><span><strong>Open the Creator Preview</strong><small>Continue exploring Compass with fictional records while account access is repaired.</small></span><span aria-hidden="true">→</span></a>
+    <a className="text-button" href="/app">Return to sign in</a>
   </section></main>;
 }
 
