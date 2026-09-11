@@ -21,6 +21,7 @@ test("Navigate exposes three isolated experience destinations", () => {
   assert.deepEqual(Object.keys(experiences), ["pathway", "oaca", "genesis"]);
   assert.equal(experiences.pathway.href, "/app/pathway");
   assert.equal(experiences.oaca.href, "/app/oaca");
+  assert.equal(experiences.oaca.name, "Compass");
   assert.equal(experiences.genesis.href, "/app/genesis");
   for (const role of ["faculty", "staff", "administrator", "creator", "principal_investigator", "mentor", "community_liaison"]) assert.equal(staffMfaRoles.has(role), true);
 });
@@ -164,7 +165,8 @@ test("phone-first pilot screens include the required privacy and approval guardr
   ]);
   const signIn = signInSource.slice(signInSource.indexOf("export function SignIn"), signInSource.indexOf("export function MfaGate"));
   assert.doesNotMatch(signIn, /One Roseman account|Three experiences\. One sign-in\.|Your roles determine which separate workspaces appear/);
-  for (const experience of ["OACA Compass", "Navigate the Pathway", "Impact Studio"]) assert.match(signIn, new RegExp(experience));
+  for (const experience of ["Compass", "Navigate the Pathway", "Impact Studio"]) assert.match(signIn, new RegExp(experience));
+  assert.doesNotMatch(signIn, /OACA Compass/);
   assert.doesNotMatch(signIn, /GENESIS/);
   for (const graphic of ["compass", "pathway", "impact"]) assert.match(signIn, new RegExp(`ExperienceGraphic experience="${graphic}"`));
   assert.match(signIn, /Roseman Microsoft SSO is coming soon/);
@@ -193,6 +195,9 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.match(oaca, />Later</);
   assert.match(oaca, /Creator pilot activity/);
   assert.match(oaca, /navigate\.creator\.compass-time\.v1/);
+  assert.match(oaca, /rucom-logo-white\.svg/);
+  assert.match(oaca, /<strong>Compass<\/strong>/);
+  assert.doesNotMatch(oaca, /<strong>OACA Compass<\/strong>/);
   assert.doesNotMatch(oaca, /Policies are mapped for sandbox validation/);
   assert.doesNotMatch(oaca, /<a href="\/app">All experiences<\/a>/);
   assert.match(oaca, /Appointment nudges/);

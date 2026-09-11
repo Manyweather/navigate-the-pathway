@@ -35,7 +35,7 @@ export const experiences: Record<ExperienceKey, {
     accent: "pathway",
   },
   oaca: {
-    name: "OACA Compass",
+    name: "Compass",
     shortName: "Compass",
     href: "/app/oaca",
     description: "Schedule advising and tutoring, prepare for visits, and follow through on your goals.",

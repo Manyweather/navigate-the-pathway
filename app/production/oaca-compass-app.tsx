@@ -110,8 +110,12 @@ function CreatorTimePanel() {
 const fallbackServices: Service[] = oacaServiceLines.map((service) => ({ id: "", key: service.key, name: service.name, providerRule: service.providerRule, policyStatus: "sandbox_approved", modalities: ["in_person", "phone", "teams"], durationMinutes: service.key === "peer_tutoring" ? 60 : 30 }));
 const emptyBootstrap: Bootstrap = { services: [], providers: [], appointments: [], assignedAdvisor: null, assignedStudents: [], currentProvider: null, policyDocuments: [], policyRules: [], acknowledgments: [], obligations: [], restrictions: [], tutorCompliance: null, liveScheduling: false, calendarConnected: false, canManageImports: false, canViewAnalytics: false, importBatches: [], analytics: null, canManageOutreach: false, canViewOutreachInsights: false, events: [], campaigns: [], nudges: [], communications: [], forms: [], audienceOptions: { cohorts: [], phases: [], years: [], campuses: [] }, eventNotificationUnreadCount: 0 };
 
+function CompassBrandMark() {
+  return <svg viewBox="0 0 96 96" aria-hidden="true" focusable="false"><circle cx="48" cy="48" r="30" /><path d="M58 37 52 52 37 59l7-16 14-6Z" /><circle cx="48" cy="48" r="4" /><path className="compass-brand__detail" d="M48 12v8M48 76v8M12 48h8M76 48h8" /></svg>;
+}
+
 function ExperienceHeader({ context, onSignOut }: { context: AuthorizationContext; onSignOut: () => Promise<void> }) {
-  return <header className="platform-header platform-header--oaca"><a className="platform-wordmark" href="/app/oaca"><span aria-hidden="true">N</span><strong>Navigate</strong></a><div className="experience-title"><span>OACA</span><strong>OACA Compass</strong></div><div className="platform-account"><span>{context.displayName}</span><button className="text-button" onClick={() => void onSignOut()}>Sign out</button></div></header>;
+  return <header className="platform-header platform-header--oaca"><a className="rucom-brand" href="/app" aria-label="Navigate account hub"><img src="/assets/brand/rucom-logo-white.svg" alt="Roseman University College of Medicine" /></a><a className="compass-brand" href="/app/oaca" aria-label="Compass home"><span className="compass-brand__mark"><CompassBrandMark /></span><strong>Compass</strong></a><div className="platform-account"><span>{context.displayName}</span><button className="text-button" onClick={() => void onSignOut()}>Sign out</button></div></header>;
 }
 
 function CompassHeroIcon({ kind }: { kind: "appointment" | "notifications" | "events" | "checkin" | "visits" }) {
@@ -398,10 +402,10 @@ function OacaStaff({ api, supabase, context, data, mode, reload, view, setView }
 
 function OacaWorkspace({ api, supabase, context, membership, signOut }: { api: PilotApiClient; supabase: SupabaseClient; context: AuthorizationContext; membership: ExperienceMembership; signOut: () => Promise<void> }) {
   const [data, setData] = useState<Bootstrap>(emptyBootstrap);
-  const [message, setMessage] = useState("Loading OACA Compass…");
+  const [message, setMessage] = useState("Loading Compass…");
   const [view, setView] = useState<OacaView>("home");
   const [mode, setMode] = useState<string>(membership.roles.includes("creator") ? "creator" : membership.roles.includes("student") ? "student" : membership.roles[0] || "staff");
-  const load = useCallback(async () => { try { setData(await api.request<Bootstrap>("/api/oaca/bootstrap")); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "OACA Compass could not be loaded."); } }, [api]);
+  const load = useCallback(async () => { try { setData(await api.request<Bootstrap>("/api/oaca/bootstrap")); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "Compass could not be loaded."); } }, [api]);
   useEffect(() => { const task = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(task); }, [load]);
   useCreatorTimeTracking(membership.roles.includes("creator"), `Compass · ${oacaRoleLabels[mode] || mode} · ${oacaViewLabels[view]}`);
   const staff = mode !== "student";
