@@ -60,6 +60,13 @@ test("Creator Preview personas are scoped before dashboard data is returned", as
     assert.deepEqual(studentCompass.assignedStudents, []);
     assert.equal(studentCompass.analytics, null);
     assert.equal(studentCompass.canManageImports, false);
+    assert.ok(studentCompass.events.some((event) => event.title === "Practical Practice Testing"));
+    assert.ok(studentCompass.providers.some((provider) => provider.displayName.includes("Bucket L. Manyweather")));
+    assert.equal(studentCompass.nudges[0]?.studentName, "Taylor Morgan");
+    const studentEventWorkspace = await syntheticPreviewApi.request("/api/oaca/events/workspace");
+    assert.ok(studentEventWorkspace.notifications.length > 0);
+    assert.equal(studentEventWorkspace.notifications.some((notice) => notice.category.startsWith("event_staff_")), false);
+    assert.ok(studentEventWorkspace.notifications.some((notice) => notice.category === "appointment_confirmed"));
     await assert.rejects(() => syntheticPreviewApi.request("/api/oaca/analytics", { method: "POST", body: {} }), /Student preview responses cannot access staff/);
     const affiliations = await syntheticPreviewApi.request("/api/platform/affiliations");
     assert.equal(affiliations.studentCouncil, true);

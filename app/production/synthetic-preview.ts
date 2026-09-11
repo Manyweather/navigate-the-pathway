@@ -87,7 +87,7 @@ export function syntheticContextForPersona(persona: SyntheticPersonaKey): Author
   const context = clone(syntheticPreviewContext);
   context.userId = isStudent ? `synthetic-${persona.replaceAll("_", "-")}` : `synthetic-${persona.replaceAll("_", "-")}`;
   context.authUserId = context.userId;
-  context.displayName = persona === "pathway_student" ? "Jordan Premed" : persona === "impact_student" ? "Taylor Morgan" : persona === "compass_student" ? "Taylor Morgan" : persona === "community_liaison" ? "Cameron Brooks" : persona === "impact_administrator" ? "Avery Chen" : persona === "compass_staff" ? "Dr. Morgan Lee" : "Creator preview";
+  context.displayName = persona === "pathway_student" ? "Jordan Premed" : persona === "impact_student" ? "Taylor Morgan" : persona === "compass_student" ? "Taylor Morgan" : persona === "community_liaison" ? "Community Liaison preview" : persona === "impact_administrator" ? "Impact Administrator preview" : persona === "compass_staff" ? "Bucket L. Manyweather, Ph.D." : "Creator preview";
   context.principalType = persona === "platform_creator" ? "creator" : null;
   context.capabilities = syntheticMembershipsForPersona(persona).flatMap((item) => item.capabilities);
   context.experienceMemberships = syntheticMembershipsForPersona(persona);
@@ -235,19 +235,25 @@ function penjiHistoryEvents(): SyntheticEvent[] {
 
 function oacaEvents(): SyntheticEvent[] {
   return [
-    { id: "event-today", title: "Learning Strategies Lab", description: "A practical, facilitated workshop for planning the next exam block. Bring your current study plan and leave with a focused weekly rhythm, accountability checkpoints, and a short list of questions for your advisor.", imageUrl: "/media/cohort-commons-poster.jpg", imageAlt: "Abstract Roseman event artwork with maroon points", hostName: "OACA Learning Support", startsAt: isoAt(0, 14), endsAt: isoAt(0, 15), modality: "in_person", location: "Discovery Room 214", capacity: 40, registrationCount: 24, registered: true, status: "published", audience: { includeAllStudents: true }, formId: null },
-    { id: "event-upcoming", title: "Specialty Exploration Forum", description: "Meet clinicians representing several specialties, hear how they approached career decisions, and prepare useful questions for future career-advising conversations. Students may attend in person or through Teams.", imageUrl: "/media/reflection-studio-poster.jpg", imageAlt: "Abstract Roseman event artwork with a maroon letterform and grid", hostName: "OACA Career Advising", startsAt: isoAt(3, 16), endsAt: isoAt(3, 17, 30), modality: "hybrid", location: "Flagship Auditorium + Teams", capacity: null, registrationCount: 58, registered: true, status: "published", audience: { cohortLabels: ["Class of 2029"] }, formId: null },
-    { id: "event-past", title: "Foundations Planning Session", description: "An interactive planning session focused on upcoming academic milestones, time management, and choosing the right advising support. This completed synthetic event demonstrates attendance history and follow-up.", imageUrl: "/assets/brand/oaca-emblem.png", imageAlt: "OACA emblem", hostName: "Office of Academic and Career Advising", startsAt: isoAt(-7, 12), endsAt: isoAt(-7, 13), modality: "in_person", location: "OACA Collaboration Room", capacity: 32, registrationCount: 21, registered: true, status: "completed", audience: { cohortLabels: ["Class of 2029"] }, formId: null },
+    { id: "event-practical-testing", title: "Practical Practice Testing", description: "Practice retrieval and testing strategies with the Compass academic-support team. This sandbox event uses the supplied Penji event schedule and fictional student participation.", imageUrl: "/media/cohort-commons-poster.jpg", imageAlt: "Abstract Roseman event artwork with maroon points", hostName: "Bucket L. Manyweather, Ph.D.; Cameron Mastin, M.Ed.; Michael O'Leary, M.Ed.", startsAt: zonedLocalIso("2026-09-15", "12:00"), endsAt: zonedLocalIso("2026-09-15", "13:00"), modality: "in_person", location: "Innovation Hall Room 210", capacity: 30, registrationCount: 1, registered: true, status: "published", audience: { cohortLabels: ["Class of 2029"] }, formId: null },
+    { id: "event-research-identity", title: "Developing Your Research Identity", description: "A guided Compass session for students to identify research interests, strengths, and practical next steps.", imageUrl: "/media/reflection-studio-poster.jpg", imageAlt: "Abstract Roseman event artwork with a maroon letterform and grid", hostName: "Compass event team", startsAt: zonedLocalIso("2026-09-23", "12:00"), endsAt: zonedLocalIso("2026-09-23", "13:00"), modality: "in_person", location: "Innovation Hall Room 210", capacity: null, registrationCount: 0, registered: false, status: "published", audience: { includeAllStudents: true }, formId: null },
+    { id: "event-faculty-author", title: "Inside the Specialty: A Faculty Author Conversation", description: "Join a faculty-led conversation about specialty exploration and the professional path behind published work.", imageUrl: null, imageAlt: null, hostName: "Art Avila, M.Ed.; Bucket L. Manyweather, Ph.D.; Cameron Mastin, M.Ed.; Michael O'Leary, M.Ed.", startsAt: zonedLocalIso("2026-10-01", "11:30"), endsAt: zonedLocalIso("2026-10-01", "13:00"), modality: "in_person", location: "Library", capacity: null, registrationCount: 0, registered: false, status: "published", audience: { includeAllStudents: true }, formId: null },
+    { id: "event-reset-coloring", title: "Bring Your Reset: Coloring Utensils", description: "A low-pressure reset session for connection and restoration during the academic week.", imageUrl: null, imageAlt: null, hostName: "Compass event team", startsAt: zonedLocalIso("2026-10-07", "12:00"), endsAt: zonedLocalIso("2026-10-07", "13:00"), modality: "in_person", location: "Student Commons", capacity: 30, registrationCount: 0, registered: false, status: "published", audience: { includeAllStudents: true }, formId: null },
+    { id: "event-reading-skills", title: "Reading Skills for Medical School with Dr. van Tonder", description: "Practice evidence-informed reading strategies for dense medical-school material.", imageUrl: null, imageAlt: null, hostName: "Compass event team", startsAt: zonedLocalIso("2026-10-13", "12:00"), endsAt: zonedLocalIso("2026-10-13", "13:00"), modality: "in_person", location: "Innovation Hall Room 210", capacity: 30, registrationCount: 0, registered: false, status: "published", audience: { phases: ["Foundations"] }, formId: null },
+    { id: "event-level-up-ai", title: "Level Up with AI", description: "Explore practical and responsible uses of AI for learning, planning, and academic work.", imageUrl: null, imageAlt: null, hostName: "Compass event team", startsAt: zonedLocalIso("2026-11-05", "12:00"), endsAt: zonedLocalIso("2026-11-05", "13:00"), modality: "in_person", location: "Innovation Hall Room 210", capacity: 30, registrationCount: 0, registered: false, status: "published", audience: { includeAllStudents: true }, formId: null },
+    { id: "event-clerkship-studying", title: "Clerkship Studying", description: "Build a practical study approach for clerkship learning and shelf preparation.", imageUrl: null, imageAlt: null, hostName: "Compass academic advising", startsAt: zonedLocalIso("2026-11-10", "12:00"), endsAt: zonedLocalIso("2026-11-10", "13:00"), modality: "in_person", location: "Innovation Hall Room 210", capacity: 30, registrationCount: 0, registered: false, status: "published", audience: { phases: ["Clerkship"] }, formId: null },
   ];
 }
 
 const syntheticStaff = [
   { userId:"synthetic-creator",displayName:"Creator preview",groupKey:"administration",groupLabel:"Administration" },
-  { userId:"staff-academic-1",displayName:"Dr. Morgan Lee",groupKey:"academic_advising",groupLabel:"Academic Advisors" },
-  { userId:"staff-academic-2",displayName:"Dr. Morgan Patel",groupKey:"academic_advising",groupLabel:"Academic Advisors" },
-  { userId:"staff-career-1",displayName:"Jordan Rivera",groupKey:"career_advising",groupLabel:"Career Advising" },
-  { userId:"staff-tutoring-1",displayName:"Avery Chen",groupKey:"tutoring",groupLabel:"Tutoring" },
-  { userId:"staff-faculty-1",displayName:"Dr. Cameron Brooks",groupKey:"faculty",groupLabel:"Faculty" },
+  { userId:"staff-director-1",displayName:"Kanee Lerwill, MD, MPH",groupKey:"administration",groupLabel:"OACA Leadership" },
+  { userId:"staff-academic-1",displayName:"Bucket L. Manyweather, Ph.D.",groupKey:"academic_advising",groupLabel:"Academic Advisors" },
+  { userId:"staff-academic-2",displayName:"Cameron Mastin, M.Ed.",groupKey:"academic_advising",groupLabel:"Academic Advisors" },
+  { userId:"staff-academic-3",displayName:"Michael O'Leary, M.Ed.",groupKey:"academic_advising",groupLabel:"Academic Advisors" },
+  { userId:"staff-career-1",displayName:"Art Avila, M.Ed.",groupKey:"career_advising",groupLabel:"Career Advising" },
+  { userId:"staff-tutoring-1",displayName:"Dominique Rich, MAT",groupKey:"tutoring",groupLabel:"Tutoring Management" },
+  { userId:"staff-student-affairs-1",displayName:"Adrian Jones, JD",groupKey:"administration",groupLabel:"Student Affairs Leadership" },
 ];
 
 const syntheticPeople = [
@@ -265,7 +271,7 @@ type SyntheticEventState = {
   coordinatorRules:Record<string,Array<{activityType:string;deliveryMode:"immediate"|"hourly"|"off";channels:string[]}>>;
 };
 
-const syntheticEventStorageKey="navigate.compass.synthetic-events.v2";
+const syntheticEventStorageKey="navigate.compass.synthetic-events.v3";
 const syntheticImpactStorageKey="navigate.compass.synthetic-impact.v1";
 
 function defaultSyntheticEventState():SyntheticEventState {
@@ -276,12 +282,15 @@ function defaultSyntheticEventState():SyntheticEventState {
     notRecordedCount:event.notRecordedCount??(event.id==="event-past"?1:Math.max(0,event.registrationCount-2)),
     attendanceStatus:event.id==="event-past"?"present" as const:null,checkinOpen:false,
   }));
-  const hosts=Object.fromEntries(events.map((event)=>[event.id,[{userId:"synthetic-creator",displayName:"Creator preview",role:"owner"}]]));
+  const hosts=Object.fromEntries(events.map((event)=>[event.id,[{userId:"staff-academic-1",displayName:"Bucket L. Manyweather, Ph.D.",role:"owner"}]]));
   return {
     events,hosts,
     notices:[
-      {id:"staff-notice-message",eventId:"event-today",category:"event_staff_message",title:"New event message",body:"A student asked a question about Learning Strategies Lab.",deepLink:"/app/compass?event=event-today",readAt:null,dismissedAt:null,createdAt:isoAt(0,9)},
-      {id:"staff-notice-rsvp",eventId:"event-upcoming",category:"event_staff_digest",title:"Specialty Exploration Forum activity",body:"12 RSVPs and 2 waitlist updates in the last hour.",deepLink:"/app/compass?event=event-upcoming",readAt:null,dismissedAt:null,createdAt:isoAt(-1,11)},
+      {id:"student-notice-registration",eventId:"event-practical-testing",category:"event_registration",title:"You are registered",body:"Practical Practice Testing is Tuesday, September 15 from 12:00 to 1:00 PM in Innovation Hall Room 210.",deepLink:"/app/compass?event=event-practical-testing",readAt:null,dismissedAt:null,createdAt:isoAt(0,8)},
+      {id:"student-notice-invitation",eventId:"event-research-identity",category:"event_invitation",title:"You are invited",body:"Developing Your Research Identity is open for registration on Wednesday, September 23 at noon.",deepLink:"/app/compass?event=event-research-identity",readAt:null,dismissedAt:null,createdAt:isoAt(-1,15)},
+      {id:"student-notice-appointment",eventId:null,category:"appointment_confirmed",title:"Your appointment is confirmed",body:"Academic advising with Bucket L. Manyweather, Ph.D. is confirmed for tomorrow at 10:00 AM in Teams.",deepLink:"/app/compass",readAt:null,dismissedAt:null,createdAt:isoAt(-1,9)},
+      {id:"staff-notice-message",eventId:"event-practical-testing",category:"event_staff_message",title:"New event message",body:"A student asked a question about Practical Practice Testing.",deepLink:"/app/compass?event=event-practical-testing",readAt:null,dismissedAt:null,createdAt:isoAt(0,9)},
+      {id:"staff-notice-rsvp",eventId:"event-research-identity",category:"event_staff_digest",title:"Developing Your Research Identity activity",body:"Registration and waitlist activity is ready for coordinator review.",deepLink:"/app/compass?event=event-research-identity",readAt:null,dismissedAt:null,createdAt:isoAt(-1,11)},
     ],
     attendeeRules:Object.fromEntries(events.map((event)=>[event.id,[
       {id:`${event.id}-24h`,type:"reminder",offsetMinutes:1440,channels:["in_app","email"],enabled:true,scheduledFor:null,generation:1},
@@ -308,22 +317,24 @@ function oacaBootstrap() {
       { id: "service-tutoring", key: "peer_tutoring", name: "Peer tutoring", providerRule: "choice", policyStatus: "sandbox_approved", modalities: ["in_person", "teams"], durationMinutes: 60 },
     ],
     providers: [
-      { id: "provider-academic", displayName: "Dr. Morgan Lee", classification: "faculty", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
-      { id: "provider-dropin", displayName: "Dr. Morgan Patel", classification: "faculty", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
-      { id: "provider-career", displayName: "Jordan Rivera", classification: "staff", subjects: [], modalities: ["in_person", "teams"], serviceKeys: ["career_advising"] },
-      { id: "provider-tutor", displayName: "Avery Chen", classification: "peer_tutor", subjects: ["Foundations", "Clinical skills"], modalities: ["in_person", "teams"], serviceKeys: ["peer_tutoring"] },
+      { id: "provider-academic", displayName: "Bucket L. Manyweather, Ph.D.", classification: "staff", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
+      { id: "provider-dropin", displayName: "Cameron Mastin, M.Ed.", classification: "staff", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
+      { id: "provider-dropin-2", displayName: "Michael O'Leary, M.Ed.", classification: "staff", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
+      { id: "provider-career", displayName: "Art Avila, M.Ed.", classification: "staff", subjects: [], modalities: ["in_person", "teams"], serviceKeys: ["career_advising"] },
+      { id: "provider-tutoring-manager", displayName: "Dominique Rich, MAT", classification: "staff", subjects: ["Peer tutor program"], modalities: ["in_person", "teams"], serviceKeys: ["peer_tutoring"] },
+      { id: "provider-tutor", displayName: "Fictional peer tutor", classification: "peer_tutor", subjects: ["General", "Clinical skills"], modalities: ["in_person", "teams"], serviceKeys: ["peer_tutoring"] },
     ],
     appointments: [
-      { id: "appointment-1", studentId: "synthetic-creator", studentName: "Creator preview", serviceName: "Academic advising", providerName: "Dr. Morgan Lee", startsAt: isoAt(1, 10), endsAt: isoAt(1, 10, 30), modality: "teams", status: "confirmed", sandbox: true, requestOrigin: "student", studentRecap: "Review the weekly study plan and return with two questions." },
-      { id: "appointment-2", studentId: "student-2", studentName: "Riley Thompson", serviceName: "Peer tutoring", providerName: "Avery Chen", subject: "Foundations", format: "individual", startsAt: isoAt(2, 13), endsAt: isoAt(2, 14), modality: "in_person", status: "pending_approval", sandbox: true, requestOrigin: "student" },
+      { id: "appointment-1", studentId: "synthetic-creator", studentName: "Creator preview", serviceName: "Academic advising", providerName: "Bucket L. Manyweather, Ph.D.", subject: "Foundations 3 check-in", startsAt: isoAt(1, 10), endsAt: isoAt(1, 10, 30), modality: "teams", status: "confirmed", sandbox: true, requestOrigin: "student", studentRecap: "Review the weekly study plan and return with two questions." },
+      { id: "appointment-2", studentId: "student-2", studentName: "Riley Thompson", serviceName: "Peer tutoring", providerName: "Fictional peer tutor", subject: "General", format: "individual", startsAt: isoAt(2, 13), endsAt: isoAt(2, 14), modality: "in_person", status: "pending_approval", sandbox: true, requestOrigin: "student" },
     ],
-    assignedAdvisor: { id: "provider-academic", displayName: "Dr. Morgan Lee", classification: "faculty", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
+    assignedAdvisor: { id: "provider-academic", displayName: "Bucket L. Manyweather, Ph.D.", classification: "staff", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
     assignedStudents: [
       { id: "student-1", displayName: "Taylor Morgan" },
       { id: "student-2", displayName: "Riley Thompson" },
       { id: "student-3", displayName: "Cameron Ellis" },
     ],
-    currentProvider: { id: "provider-academic", displayName: "Dr. Morgan Lee", classification: "faculty", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
+    currentProvider: { id: "provider-academic", displayName: "Bucket L. Manyweather, Ph.D.", classification: "staff", subjects: [], modalities: ["in_person", "phone", "teams"], serviceKeys: ["academic_advising"] },
     policyDocuments: [],
     policyRules: [],
     acknowledgments: [],
@@ -355,13 +366,13 @@ function oacaBootstrap() {
     canViewOutreachInsights: true,
     events,
     campaigns: [
-      { id: "campaign-1", name: "Specialty forum invitation", subject: "Plan your specialty exploration", previewText: "Reserve a place and bring your questions.", status: "sent", audience: { cohortLabels: ["Class of 2029"] }, scheduledFor: null, sentAt: isoAt(-4, 9), content: { heading: "Explore specialties with intention" }, recipientCount: 76, deliveredCount: 73, openedCount: 52, clickedCount: 34, formSubmittedCount: 18, eventRegisteredCount: 24, appointmentRequestedCount: 11, minimumGroupSize: 10 },
+      { id: "campaign-1", name: "Research identity invitation", subject: "Develop your research identity", previewText: "Reserve a place and bring your questions.", status: "sent", audience: { cohortLabels: ["Class of 2029"] }, scheduledFor: null, sentAt: isoAt(-4, 9), content: { heading: "Develop your research identity" }, recipientCount: 76, deliveredCount: 73, openedCount: 52, clickedCount: 34, formSubmittedCount: 18, eventRegisteredCount: 24, appointmentRequestedCount: 11, minimumGroupSize: 10 },
     ],
-    nudges: [{ id: "nudge-1", studentId: "synthetic-creator", studentName: "Creator preview", serviceKey: "career_advising", providerName: "Jordan Rivera", dueBy: isoAt(14, 17), status: "delivered", createdAt: isoAt(-2, 10) }],
+    nudges: [{ id: "nudge-1", studentId: "synthetic-creator", studentName: "Creator preview", serviceKey: "career_advising", providerName: "Art Avila, M.Ed.", dueBy: isoAt(14, 17), status: "delivered", createdAt: isoAt(-2, 10) }],
     communications: [],
     forms: [],
     audienceOptions: { cohorts: ["Class of 2029"], phases: ["Foundations", "Clerkship", "Advanced"], years: ["M1", "M2", "M3", "M4"], campuses: ["Summerlin", "Henderson"] },
-    eventNotificationUnreadCount: 2,
+    eventNotificationUnreadCount: 3,
   };
 }
 
@@ -393,7 +404,7 @@ function eventWorkspace(state:SyntheticEventState,selectedId="") {
       organizations:organizations.slice(0,18).map((item)=>({id:item.id,name:item.name,college:item.college})),
       memberRoles:[{key:"student",label:"Students"},{key:"faculty",label:"Faculty"},{key:"staff",label:"Staff"},{key:"administrator",label:"Administrators"}],
       people:syntheticPeople,
-      providers:[{id:"provider-academic",displayName:"Dr. Morgan Lee"},{id:"provider-dropin",displayName:"Dr. Morgan Patel"}],
+      providers:[{id:"provider-academic",displayName:"Bucket L. Manyweather, Ph.D."},{id:"provider-dropin",displayName:"Cameron Mastin, M.Ed."},{id:"provider-dropin-2",displayName:"Michael O'Leary, M.Ed."}],
     },
     recipientVersion:selected?.status==="published"?1:0,
     recipientCount:selected?.audience?.includeAllMembers?126:selected?.registrationCount||0,
@@ -579,7 +590,14 @@ class SyntheticPilotApi {
       return clone({ isStudent: true, organizations: organizations.map(({ id, key, name, college, campus, aliases }) => ({ id, key, name, college, campus, aliases })), affiliations: own, studentCouncil: Boolean(this.studentCouncilByPersona[persona]), impactAccessStatus: hasApproved ? "active" : hasEndedApproval ? "read_only" : "locked", impactHref: hasApproved || hasEndedApproval ? "/app/compass/impact" : null }) as T;
     }
     if (path === "/api/oaca/bootstrap") {
-      const base = { ...oacaBootstrap(), appointments: this.appointments.map((item, index) => index === 0 ? { ...item, studentId: context.userId, studentName: context.displayName } : item), events:this.eventState.events };
+      const source = oacaBootstrap();
+      const base = {
+        ...source,
+        appointments: this.appointments.map((item, index) => index === 0 ? { ...item, studentId: context.userId, studentName: context.displayName } : item),
+        obligations: source.obligations.map((item, index) => index === 0 ? { ...item, studentId: context.userId, studentName: context.displayName } : item),
+        nudges: source.nudges.map((item, index) => index === 0 ? { ...item, studentId: context.userId, studentName: context.displayName } : item),
+        events:this.eventState.events,
+      };
       const isStudent = personaMemberships.find((item) => item.experienceKey === "oaca")?.roles.includes("student");
       return clone(isStudent ? { ...base, appointments: base.appointments.filter((item) => item.studentId === context.userId), assignedStudents: [], currentProvider: null, canManageImports: false, canViewAnalytics: false, importBatches: [], analytics: null, canManageOutreach: false, canViewOutreachInsights: false, campaigns: [], nudges: base.nudges.filter((item) => item.studentId === context.userId) } : base) as T;
     }
@@ -587,7 +605,11 @@ class SyntheticPilotApi {
       const eventId=new URL(path,"https://preview.local").searchParams.get("eventId")||"";
       const workspace = eventWorkspace(this.eventState,eventId);
       const studentOnly = personaMemberships.find((item) => item.experienceKey === "oaca")?.roles.every((role) => role === "student");
-      return clone(studentOnly ? { ...workspace, roster: [], hosts: [], staffOptions: [], coordinatorAlertRules: [], activity: [], corrections: [], deliveries: null, threads: [] } : workspace) as T;
+      if (studentOnly) {
+        const notifications = workspace.notifications.filter((notice) => !notice.category.startsWith("event_staff_"));
+        return clone({ ...workspace, notifications, unreadCount: notifications.filter((notice) => !notice.readAt && !notice.dismissedAt).length, roster: [], hosts: [], staffOptions: [], coordinatorAlertRules: [], activity: [], corrections: [], deliveries: null, threads: [] }) as T;
+      }
+      return clone(workspace) as T;
     }
     if(route==="/api/oaca/events/audience-preview"&&method==="POST") {
       const body=options.body as {audience?:OacaAudience}|undefined;
@@ -664,7 +686,7 @@ class SyntheticPilotApi {
     if (path === "/api/oaca/events/attendance") return { version: 3 } as T;
     if (path === "/api/oaca/events/check-in") return { open: true, token: "synthetic-event-token", closesAt: isoAt(0, 16), deepLink: "/app/compass?checkin=synthetic-event-token" } as T;
     if (path === "/api/oaca/events/check-in/student-token") return { token: "synthetic-permanent-student-qr", permanent: true } as T;
-    if (path === "/api/oaca/events/check-in/self") return { title: "Learning Strategies Lab" } as T;
+    if (path === "/api/oaca/events/check-in/self") return { title: "Practical Practice Testing" } as T;
     if (path === "/api/oaca/appointments/cancel") {
       const body = options.body as { appointmentId?: string } | undefined;
       const appointment = this.appointments.find((item) => item.id === body?.appointmentId);
