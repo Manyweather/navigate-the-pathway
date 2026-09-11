@@ -2,6 +2,12 @@
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import type { PilotApiClient } from "./api-client";
+import {
+  appointmentDurationOptions,
+  defaultAdvisorAvailabilitySettings,
+  expandAdvisorAvailability,
+  normalizeAdvisorAvailability,
+} from "./advisor-availability";
 import { zonedLocalIso } from "./oaca-event-model";
 import type { OacaAudience } from "./oaca-engagement-model";
 import { experiences, type ExperienceMembership } from "./platform-model";
@@ -339,6 +345,73 @@ const isoAt = (dayOffset: number, hour: number, minute = 0) => {
   value.setHours(hour, minute, 0, 0);
   return value.toISOString();
 };
+
+function upcomingWeekdayOffsets(count = 6) {
+  const offsets: number[] = [];
+  for (let offset = 1; offsets.length < count && offset < 18; offset += 1) {
+    const candidate = new Date();
+    candidate.setDate(candidate.getDate() + offset);
+    if (candidate.getDay() !== 0 && candidate.getDay() !== 6) offsets.push(offset);
+  }
+  return offsets;
+}
+
+function compassStudentAvailability(assignedAvailability?: unknown) {
+  const [first, second, third, fourth, fifth] = upcomingWeekdayOffsets();
+  const slot = (
+    providerId: string,
+    providerName: string,
+    providerRole: string,
+    serviceKey: string,
+    dayOffset: number,
+    hour: number,
+    minute: number,
+    durationMinutes: number,
+    modalities: string[],
+    location: string | null,
+  ) => {
+    const startsAt = isoAt(dayOffset, hour, minute);
+    const endsAt = new Date(new Date(startsAt).getTime() + durationMinutes * 60_000).toISOString();
+    return {
+      id: `${providerId}-${dayOffset}-${hour}-${minute}`,
+      providerId,
+      providerName,
+      providerRole,
+      serviceKey,
+      startsAt,
+      endsAt,
+      modalities,
+      location,
+      source: "compass" as const,
+    };
+  };
+  const assignedAdvisorSlots = expandAdvisorAvailability(
+    assignedAvailability ?? defaultAdvisorAvailabilitySettings,
+    {
+      id: "provider-academic",
+      name: "Bucket L. Manyweather, Ph.D.",
+      role: "Your academic advisor",
+      serviceKey: "academic_advising",
+    },
+    { maximumSlots: 18 },
+  );
+  return [
+    ...assignedAdvisorSlots,
+    slot("provider-dropin", "Cameron Mastin, M.Ed.", "Academic drop-in advisor", "academic_advising", first, 11, 0, 30, ["in_person", "teams"], "Student Affairs Suite"),
+    slot("provider-dropin", "Cameron Mastin, M.Ed.", "Academic drop-in advisor", "academic_advising", third, 9, 30, 30, ["in_person", "phone"], "Student Affairs Suite"),
+    slot("provider-dropin", "Cameron Mastin, M.Ed.", "Academic drop-in advisor", "academic_advising", fifth, 14, 0, 30, ["teams", "phone"], null),
+    slot("provider-dropin-2", "Michael O'Leary, M.Ed.", "Academic drop-in advisor", "academic_advising", second, 10, 0, 30, ["teams", "phone"], null),
+    slot("provider-dropin-2", "Michael O'Leary, M.Ed.", "Academic drop-in advisor", "academic_advising", third, 13, 30, 30, ["in_person", "teams"], "Student Affairs Suite"),
+    slot("provider-dropin-2", "Michael O'Leary, M.Ed.", "Academic drop-in advisor", "academic_advising", fifth, 15, 0, 30, ["in_person", "teams", "phone"], "Student Affairs Suite"),
+    slot("provider-career", "Art Avila, M.Ed.", "Career advisor", "career_advising", first, 9, 30, 30, ["in_person", "teams"], "Student Affairs Suite"),
+    slot("provider-career", "Art Avila, M.Ed.", "Career advisor", "career_advising", second, 14, 30, 30, ["teams"], null),
+    slot("provider-career", "Art Avila, M.Ed.", "Career advisor", "career_advising", fourth, 11, 30, 30, ["in_person", "teams"], "Student Affairs Suite"),
+    slot("provider-career", "Art Avila, M.Ed.", "Career advisor", "career_advising", fifth, 13, 0, 30, ["teams"], null),
+    slot("provider-tutor", "Fictional peer tutor", "Peer tutor", "peer_tutoring", first, 13, 0, 60, ["in_person", "teams"], "Learning Commons"),
+    slot("provider-tutor", "Fictional peer tutor", "Peer tutor", "peer_tutoring", third, 15, 0, 60, ["in_person"], "Learning Commons"),
+    slot("provider-tutor", "Fictional peer tutor", "Peer tutor", "peer_tutoring", fifth, 10, 0, 60, ["teams"], null),
+  ];
+}
 
 const organizations = organizationsForSelect().map((organization) => ({
   ...organization,
@@ -1071,7 +1144,7 @@ function defaultSyntheticEventState(): SyntheticEventState {
   };
 }
 
-function oacaBootstrap() {
+function oacaBootstrap(assignedAvailability?: unknown) {
   const events = oacaEvents();
   return {
     services: [
@@ -1153,6 +1226,7 @@ function oacaBootstrap() {
         serviceKeys: ["peer_tutoring"],
       },
     ],
+    availabilitySlots: compassStudentAvailability(assignedAvailability),
     appointments: [
       {
         id: "appointment-completed-1",
@@ -1683,11 +1757,8 @@ function defaultSyntheticAdvisorState(): SyntheticAdvisorState {
       },
     ],
     availability: {
-      weekdays: [1, 2, 3, 4, 5],
-      startsAt: "09:00",
-      endsAt: "16:30",
-      bufferMinutes: 10,
-      modalities: ["in_person", "teams", "phone"],
+      academic: clone(defaultAdvisorAvailabilitySettings),
+      career: clone(defaultAdvisorAvailabilitySettings),
     },
     completedObligationIds: [],
     attentionFlags: [
@@ -2586,6 +2657,17 @@ class SyntheticPilotApi {
         ),
       ) as T;
     }
+    if (route === "/api/oaca/advisor/availability" && method === "GET") {
+      const workspace =
+        new URL(path, "https://preview.local").searchParams.get("workspace") ===
+        "career"
+          ? "career"
+          : "academic";
+      const stored = this.advisorState.availability;
+      return clone(
+        normalizeAdvisorAvailability(stored[workspace] ?? stored),
+      ) as T;
+    }
     if (route === "/api/oaca/advisor/appointments" && method === "POST") {
       const body = options.body as {
         workspace?: "academic" | "career";
@@ -2596,6 +2678,7 @@ class SyntheticPilotApi {
         confirmationMode?: "confirmed" | "student_confirmation";
         recurrence?: "none" | "weekly" | "monthly";
         recurrenceCount?: number;
+        durationMinutes?: number;
       };
       const workspace = body.workspace === "career" ? "career" : "academic";
       const bootstrap = advisorPreviewBootstrap(
@@ -2614,6 +2697,12 @@ class SyntheticPilotApi {
           ? Math.min(24, Math.max(2, Number(body.recurrenceCount) || 2))
           : 1;
       const seed = new Date(body.startsAt);
+      const requestedDuration = Number(body.durationMinutes);
+      const durationMinutes = appointmentDurationOptions.includes(
+        requestedDuration as (typeof appointmentDurationOptions)[number],
+      )
+        ? requestedDuration
+        : 30;
       const created: SyntheticAppointment[] = [];
       for (let index = 0; index < count; index += 1) {
         const starts = new Date(seed);
@@ -2621,7 +2710,9 @@ class SyntheticPilotApi {
           starts.setDate(starts.getDate() + index * 7);
         if (body.recurrence === "monthly")
           starts.setMonth(starts.getMonth() + index);
-        const ends = new Date(starts.getTime() + 30 * 60 * 1000);
+        const ends = new Date(
+          starts.getTime() + durationMinutes * 60 * 1000,
+        );
         created.push({
           id: `advisor-appointment-${crypto.randomUUID()}`,
           studentId: student.id,
@@ -2739,6 +2830,7 @@ class SyntheticPilotApi {
       const body = options.body as {
         appointmentId?: string;
         startsAt?: string;
+        durationMinutes?: number;
       };
       const appointment = this.appointments.find(
         (item) => item.id === body.appointmentId,
@@ -2746,9 +2838,15 @@ class SyntheticPilotApi {
       if (!appointment || !body.startsAt)
         throw new Error("Choose an appointment and replacement time.");
       const prior = appointment.startsAt;
+      const requestedDuration = Number(body.durationMinutes);
+      const durationMinutes = appointmentDurationOptions.includes(
+        requestedDuration as (typeof appointmentDurationOptions)[number],
+      )
+        ? requestedDuration
+        : 30;
       appointment.startsAt = new Date(body.startsAt).toISOString();
       appointment.endsAt = new Date(
-        new Date(body.startsAt).getTime() + 30 * 60 * 1000,
+        new Date(body.startsAt).getTime() + durationMinutes * 60 * 1000,
       ).toISOString();
       appointment.status = "confirmed";
       this.eventState.notices.unshift({
@@ -2970,12 +3068,15 @@ class SyntheticPilotApi {
         audited: true,
       }) as T;
     if (route === "/api/oaca/advisor/availability" && method === "POST") {
-      this.advisorState.availability = (options.body || {}) as Record<
-        string,
-        unknown
-      >;
+      const body = (options.body || {}) as Record<string, unknown>;
+      const workspace = body.workspace === "career" ? "career" : "academic";
+      const settings = normalizeAdvisorAvailability(body);
+      this.advisorState.availability = {
+        ...this.advisorState.availability,
+        [workspace]: settings,
+      };
       this.saveAdvisor();
-      return clone({ status: "saved", ...this.advisorState.availability }) as T;
+      return clone({ status: "saved", ...settings }) as T;
     }
     if (route === "/api/oaca/advisor/templates" && method === "POST") {
       const body = options.body as {
@@ -2999,7 +3100,10 @@ class SyntheticPilotApi {
     }
     if (path === "/api/oaca/bootstrap") {
       this.ensureEncountersLoaded();
-      const source = oacaBootstrap();
+      const source = oacaBootstrap(
+        this.advisorState.availability.academic ??
+          this.advisorState.availability,
+      );
       const isStudent = personaMemberships
         .find((item) => item.experienceKey === "oaca")
         ?.roles.includes("student");

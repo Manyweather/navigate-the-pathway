@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { demoTutorialSteps } from "../app/production/demo-workspace-tutorial.tsx";
+import { demoTutorialChapters, demoTutorialSteps } from "../app/production/demo-workspace-tutorial.tsx";
 
 test("every synthetic demonstration workspace has an optional role-aware tutorial", () => {
   const cases = [
@@ -19,8 +19,36 @@ test("every synthetic demonstration workspace has an optional role-aware tutoria
     const steps = demoTutorialSteps(workspace, persona);
     assert.ok(steps.length >= 4, `${workspace}:${persona} should receive a complete walkthrough`);
     assert.equal(steps[0].selector, "[data-demo-guide='role-switcher']");
-    assert.ok(steps.every((step) => step.title && step.body && step.selector));
+    assert.ok(steps.every((step) => step.id && step.chapterId && step.title && step.body && step.leadershipTitle && step.leadershipBody && step.selector));
+    const chapters = demoTutorialChapters(workspace, persona);
+    assert.ok(chapters.length >= 2, `${workspace}:${persona} should be split into resumable chapters`);
+    assert.ok(chapters.reduce((minutes, chapter) => minutes + chapter.minutes, 0) >= 3);
+    assert.equal(new Set(steps.map((step) => step.id)).size, steps.length, `${workspace}:${persona} step identifiers should be stable and unique`);
   }
+});
+
+test("tutorial progress and insights stay browser-local and guided tours never invoke record APIs", async () => {
+  const source = await readFile(new URL("../app/production/demo-workspace-tutorial.tsx", import.meta.url), "utf8");
+  assert.match(source, /navigate\.demo-tutorial\.v2/);
+  assert.match(source, /window\.localStorage/);
+  assert.doesNotMatch(source, /api\.request|fetch\(|XMLHttpRequest/);
+  assert.match(source, /never submits, publishes, approves, cancels, or sends a record/);
+  assert.match(source, /Learn this role/);
+  assert.match(source, /Leadership overview/);
+  assert.match(source, /Creator tutorial insights/);
+});
+
+test("tutorial targets are stable data hooks where a workflow control is highlighted", async () => {
+  const [compass, advisor, impact, pathway] = await Promise.all([
+    readFile(new URL("../app/production/oaca-compass-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/compass-advisor-workspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/genesis-impact-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/production-pilot-app.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(compass, /data-tutorial-id="student-availability"/);
+  assert.match(advisor, /data-tutorial-id={`advisor-tile-\$\{tile\.key\}`}/);
+  assert.match(impact, /data-tutorial-id="impact-events"/);
+  assert.match(pathway, /data-tutorial-id="pathway-portfolio"/);
 });
 
 test("Compass demo links can open the administrator view without broadening production access", async () => {
@@ -37,4 +65,3 @@ test("Compass demo links can open the administrator view without broadening prod
   assert.match(impact, /tutorialWorkspace="impact"/);
   assert.match(pathway, /tutorialWorkspace="pathway"/);
 });
-

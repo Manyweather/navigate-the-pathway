@@ -11,6 +11,13 @@ import {
   type AdvisorRelationship,
   type AdvisorWorkspaceKey,
 } from "./oaca-advisor-model";
+import {
+  appointmentDurationOptions,
+  defaultAdvisorAvailabilitySettings,
+  normalizeAdvisorAvailability,
+  type AdvisorAvailabilityBlock,
+  type AdvisorAvailabilitySettings,
+} from "./advisor-availability";
 
 type Appointment = {
   id: string;
@@ -225,6 +232,31 @@ function statusLabel(value: string) {
   return value.replaceAll("_", " ");
 }
 
+const advisorWeekdays = [
+  [1, "Monday", "Mon"],
+  [2, "Tuesday", "Tue"],
+  [3, "Wednesday", "Wed"],
+  [4, "Thursday", "Thu"],
+  [5, "Friday", "Fri"],
+] as const;
+
+function availabilityDaysLabel(block: AdvisorAvailabilityBlock) {
+  return advisorWeekdays
+    .filter(([value]) => block.weekdays.includes(value))
+    .map(([, , short]) => short)
+    .join(" · ");
+}
+
+function appointmentDuration(appointment?: Appointment) {
+  if (!appointment?.startsAt || !appointment.endsAt) return 30;
+  const minutes = Math.round(
+    (new Date(appointment.endsAt).getTime() -
+      new Date(appointment.startsAt).getTime()) /
+      60_000,
+  );
+  return minutes >= 15 && minutes <= 180 ? minutes : 30;
+}
+
 function fallbackBootstrap(
   data: AdvisorData,
   roles: string[],
@@ -426,6 +458,8 @@ export function CompassAdvisorWorkspace({
   const [messageBody, setMessageBody] = useState("");
   const [appointmentStudent, setAppointmentStudent] = useState("");
   const [appointmentStart, setAppointmentStart] = useState("");
+  const [appointmentDurationMinutes, setAppointmentDurationMinutes] =
+    useState("30");
   const [appointmentModality, setAppointmentModality] = useState("teams");
   const [appointmentTopic, setAppointmentTopic] = useState("");
   const [appointmentConfirmation, setAppointmentConfirmation] = useState<
@@ -449,8 +483,22 @@ export function CompassAdvisorWorkspace({
   const [planTitle, setPlanTitle] = useState("");
   const [planBody, setPlanBody] = useState("");
   const [reportName, setReportName] = useState("");
+  const [availabilitySettings, setAvailabilitySettings] =
+    useState<AdvisorAvailabilitySettings>(() =>
+      structuredClone(defaultAdvisorAvailabilitySettings),
+    );
+  const [availabilityDays, setAvailabilityDays] = useState<number[]>([1, 3, 5]);
   const [availabilityStart, setAvailabilityStart] = useState("09:00");
-  const [availabilityEnd, setAvailabilityEnd] = useState("16:30");
+  const [availabilityEnd, setAvailabilityEnd] = useState("12:00");
+  const [availabilityBuffer, setAvailabilityBuffer] = useState("10");
+  const [availabilityDuration, setAvailabilityDuration] = useState("30");
+  const [availabilityModalities, setAvailabilityModalities] = useState<string[]>([
+    "in_person",
+    "teams",
+  ]);
+  const [availabilityLocation, setAvailabilityLocation] = useState(
+    "Student Affairs Suite",
+  );
 
   const loadAdvisor = useCallback(
     async (nextWorkspace = workspace) => {
@@ -466,10 +514,32 @@ export function CompassAdvisorWorkspace({
     [api, capabilities, data, roles, workspace],
   );
 
+  const loadAvailability = useCallback(
+    async (nextWorkspace = workspace) => {
+      try {
+        const loaded = await api.request<unknown>(
+          `/api/oaca/advisor/availability?workspace=${nextWorkspace}`,
+        );
+        setAvailabilitySettings(normalizeAdvisorAvailability(loaded));
+      } catch {
+        setAvailabilitySettings(
+          structuredClone(defaultAdvisorAvailabilitySettings),
+        );
+      }
+    },
+    [api, workspace],
+  );
+
   useEffect(() => {
     const task = window.setTimeout(() => void loadAdvisor(), 0);
     return () => window.clearTimeout(task);
   }, [loadAdvisor]);
+
+  useEffect(() => {
+    if (view !== "availability") return;
+    const task = window.setTimeout(() => void loadAvailability(), 0);
+    return () => window.clearTimeout(task);
+  }, [loadAvailability, view]);
 
   const allAppointments = advisor.appointments || data.appointments;
   const allRecords = advisor.encounterRecords || data.encounterRecords;
@@ -578,6 +648,61 @@ export function CompassAdvisorWorkspace({
     }
   };
 
+  const saveAvailability = async (
+    next: AdvisorAvailabilitySettings,
+    success: string,
+  ) => {
+    setBusy(true);
+    setMessage("");
+    try {
+      await api.request("/api/oaca/advisor/availability", {
+        method: "POST",
+        body: { workspace, ...next },
+      });
+      setAvailabilitySettings(next);
+      setMessage(success);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Compass could not save those availability blocks.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addAvailabilityBlock = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!availabilityDays.length) {
+      setMessage("Choose at least one day for this availability block.");
+      return;
+    }
+    if (availabilityStart >= availabilityEnd) {
+      setMessage("The end time must be later than the start time.");
+      return;
+    }
+    if (!availabilityModalities.length) {
+      setMessage("Choose at least one appointment format.");
+      return;
+    }
+    const block: AdvisorAvailabilityBlock = {
+      id: `availability-${crypto.randomUUID()}`,
+      weekdays: availabilityDays,
+      startsAt: availabilityStart,
+      endsAt: availabilityEnd,
+      bufferMinutes: Number(availabilityBuffer),
+      durationMinutes: Number(availabilityDuration),
+      modalities: availabilityModalities,
+      location: availabilityLocation.trim(),
+    };
+    const next = {
+      defaultDurationMinutes: Number(availabilityDuration),
+      blocks: [...availabilitySettings.blocks, block],
+    };
+    await saveAvailability(next, "Availability block added.");
+  };
+
   const chooseWorkspace = (next: AdvisorWorkspaceKey) => {
     setWorkspace(next);
     setView("home");
@@ -611,6 +736,7 @@ export function CompassAdvisorWorkspace({
         {
           appointmentId: editingAppointmentId,
           startsAt: appointmentStart,
+          durationMinutes: Number(appointmentDurationMinutes),
           allowConflict,
         },
         "Appointment moved immediately and the student was notified.",
@@ -625,6 +751,7 @@ export function CompassAdvisorWorkspace({
         workspace,
         studentId: appointmentStudent,
         startsAt: appointmentStart,
+        durationMinutes: Number(appointmentDurationMinutes),
         modality: appointmentModality,
         topic: appointmentTopic,
         confirmationMode: appointmentConfirmation,
@@ -651,6 +778,7 @@ export function CompassAdvisorWorkspace({
         ? new Date(appointment.startsAt).toISOString().slice(0, 16)
         : "",
     );
+    setAppointmentDurationMinutes(String(appointmentDuration(appointment)));
     setRecurrence("none");
     setMessage(
       "Choose the new time. Confirmed appointments move immediately when saved.",
@@ -1030,15 +1158,38 @@ export function CompassAdvisorWorkspace({
                   onChange={(event) => setAppointmentTopic(event.target.value)}
                 />
               </label>
-              <label>
-                <span>Date and time</span>
-                <input
-                  required
-                  type="datetime-local"
-                  value={appointmentStart}
-                  onChange={(event) => setAppointmentStart(event.target.value)}
-                />
-              </label>
+              <div className="form-row">
+                <label>
+                  <span>Date and time</span>
+                  <input
+                    required
+                    type="datetime-local"
+                    value={appointmentStart}
+                    onChange={(event) => setAppointmentStart(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Appointment length</span>
+                  <select
+                    value={appointmentDurationMinutes}
+                    onChange={(event) =>
+                      setAppointmentDurationMinutes(event.target.value)
+                    }
+                  >
+                    {appointmentDurationOptions.map((minutes) => (
+                      <option key={minutes} value={minutes}>
+                        {minutes === 30
+                          ? "30 minutes · default"
+                          : minutes < 60
+                            ? `${minutes} minutes`
+                            : minutes === 60
+                              ? "1 hour"
+                              : `${minutes / 60} hours`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <div className="form-row">
                 <label>
                   <span>Format</span>
@@ -2225,97 +2376,137 @@ export function CompassAdvisorWorkspace({
             <p className="kicker">Scheduling controls</p>
             <h1>Availability and appointment settings</h1>
           </div>
-          <span className="status-chip">Outlook checked separately</span>
+          <span className="status-chip">Compass-managed availability</span>
         </div>
         <p className="form-message" aria-live="polite">
           {message}
         </p>
-        <form
-          className="experience-form advisor-availability"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void act(
-              "/api/oaca/advisor/availability",
-              {
-                workspace,
-                weekdays: [1, 2, 3, 4, 5],
-                startsAt: availabilityStart,
-                endsAt: availabilityEnd,
-                modalities: ["in_person", "phone", "teams"],
-                bufferMinutes: 10,
-              },
-              "Availability saved.",
-            );
-          }}
-        >
-          <fieldset>
-            <legend>Recurring days</legend>
-            <div className="channel-options">
-              {["Mon", "Tue", "Wed", "Thu", "Fri"].map((day) => (
-                <label key={day}>
-                  <input type="checkbox" defaultChecked />
-                  <span>{day}</span>
-                </label>
-              ))}
+        <div className="advisor-availability-layout">
+          <section className="advisor-availability-list" aria-label="Saved availability blocks">
+            <div className="advisor-availability-summary">
+              <div><span>Default appointment</span><strong>{availabilitySettings.defaultDurationMinutes} minutes</strong></div>
+              <div><span>Active blocks</span><strong>{availabilitySettings.blocks.length}</strong></div>
             </div>
-          </fieldset>
-          <div className="form-row">
-            <label>
-              <span>Start</span>
-              <input
-                type="time"
-                value={availabilityStart}
-                onChange={(event) => setAvailabilityStart(event.target.value)}
-              />
-            </label>
-            <label>
-              <span>End</span>
-              <input
-                type="time"
-                value={availabilityEnd}
-                onChange={(event) => setAvailabilityEnd(event.target.value)}
-              />
-            </label>
-            <label>
-              <span>Buffer</span>
-              <select defaultValue="10">
-                <option value="0">No buffer</option>
-                <option value="10">10 minutes</option>
-                <option value="15">15 minutes</option>
-                <option value="30">30 minutes</option>
-              </select>
-            </label>
-          </div>
-          <fieldset>
-            <legend>Formats offered</legend>
-            <div className="channel-options">
+            <h2>Current time blocks</h2>
+            {availabilitySettings.blocks.map((block) => (
+              <article className="advisor-availability-block" key={block.id}>
+                <div className="advisor-availability-block__time">
+                  <span>{availabilityDaysLabel(block)}</span>
+                  <strong>{block.startsAt}–{block.endsAt}</strong>
+                </div>
+                <div className="advisor-availability-block__details">
+                  <span>{block.durationMinutes}-minute appointments</span>
+                  <span>{block.bufferMinutes ? `${block.bufferMinutes}-minute buffer` : "No buffer"}</span>
+                  <span>{block.modalities.map((item) => statusLabel(item === "in_person" ? "in person" : item)).join(" · ")}</span>
+                  {block.location ? <span>{block.location}</span> : null}
+                </div>
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void saveAvailability(
+                      {
+                        ...availabilitySettings,
+                        blocks: availabilitySettings.blocks.filter((item) => item.id !== block.id),
+                      },
+                      "Availability block removed.",
+                    )
+                  }
+                >
+                  Remove
+                </button>
+              </article>
+            ))}
+            {!availabilitySettings.blocks.length ? (
+              <div className="empty-state">
+                <h3>No availability blocks</h3>
+                <p>Add a block to offer appointment times to students.</p>
+              </div>
+            ) : null}
+          </section>
+          <form className="experience-form advisor-availability" onSubmit={addAvailabilityBlock}>
+            <h2>Add an availability block</h2>
+            <fieldset>
+              <legend>Recurring days</legend>
+              <div className="channel-options">
+                {advisorWeekdays.map(([value, label, short]) => (
+                  <label key={value} title={label}>
+                    <input
+                      type="checkbox"
+                      checked={availabilityDays.includes(value)}
+                      onChange={() =>
+                        setAvailabilityDays((current) =>
+                          current.includes(value)
+                            ? current.filter((day) => day !== value)
+                            : [...current, value].sort(),
+                        )
+                      }
+                    />
+                    <span>{short}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div className="form-row">
               <label>
-                <input type="checkbox" defaultChecked />
-                <span>In person</span>
+                <span>Start</span>
+                <input required type="time" value={availabilityStart} onChange={(event) => setAvailabilityStart(event.target.value)} />
               </label>
               <label>
-                <input type="checkbox" defaultChecked />
-                <span>Teams</span>
-              </label>
-              <label>
-                <input type="checkbox" defaultChecked />
-                <span>Phone</span>
+                <span>End</span>
+                <input required type="time" value={availabilityEnd} onChange={(event) => setAvailabilityEnd(event.target.value)} />
               </label>
             </div>
-          </fieldset>
-          <label>
-            <span>Default in-person location</span>
-            <input placeholder="Office or room" />
-          </label>
-          <small>
-            Student-facing slot suggestions follow these hours and Outlook
-            free/busy. Advisors may explicitly override a conflict after
-            reviewing the warning.
-          </small>
-          <button className="primary-button" disabled={busy}>
-            Save availability
-          </button>
-        </form>
+            <div className="form-row">
+              <label>
+                <span>Appointment length</span>
+                <select value={availabilityDuration} onChange={(event) => setAvailabilityDuration(event.target.value)}>
+                  {appointmentDurationOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes === 30 ? "30 minutes · default" : `${minutes} minutes`}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Buffer</span>
+                <select value={availabilityBuffer} onChange={(event) => setAvailabilityBuffer(event.target.value)}>
+                  <option value="0">No buffer</option>
+                  <option value="5">5 minutes</option>
+                  <option value="10">10 minutes</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                </select>
+              </label>
+            </div>
+            <fieldset>
+              <legend>Formats offered</legend>
+              <div className="channel-options">
+                {[["in_person", "In person"], ["teams", "Teams"], ["phone", "Phone"]].map(([value, label]) => (
+                  <label key={value}>
+                    <input
+                      type="checkbox"
+                      checked={availabilityModalities.includes(value)}
+                      onChange={() =>
+                        setAvailabilityModalities((current) =>
+                          current.includes(value)
+                            ? current.filter((item) => item !== value)
+                            : [...current, value],
+                        )
+                      }
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <label>
+              <span>In-person location</span>
+              <input value={availabilityLocation} onChange={(event) => setAvailabilityLocation(event.target.value)} placeholder="Office or room" />
+            </label>
+            <small>
+              Students see only the blocks that match their service, format, and assigned advisor. These times are managed in Compass without Outlook linkage.
+            </small>
+            <button className="primary-button" disabled={busy}>Add time block</button>
+          </form>
+        </div>
       </section>
     );
 
@@ -2498,7 +2689,7 @@ export function CompassAdvisorWorkspace({
       </div>
       <div className="advisor-tile-grid">
         {tiles.map((tile) => (
-          <button key={tile.key} onClick={tile.action}>
+          <button key={tile.key} onClick={tile.action} data-tutorial-id={`advisor-tile-${tile.key}`}>
             <span className="advisor-tile-icon">
               <AdvisorIcon name={tile.key} />
             </span>

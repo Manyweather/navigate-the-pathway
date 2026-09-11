@@ -1116,6 +1116,18 @@ export async function experienceRoute(
       );
     }
     if (
+      url.pathname === "/api/oaca/advisor/availability" &&
+      request.method === "GET"
+    ) {
+      const workspace = url.searchParams.get("workspace") || "academic";
+      requireAdvisorWorkspace(membership, workspace);
+      return workspaceJson(
+        await services.rpc("oaca_advisor_get_availability", {
+          payload: { workspace },
+        }),
+      );
+    }
+    if (
       url.pathname.startsWith("/api/oaca/advisor/") &&
       request.method === "POST"
     ) {

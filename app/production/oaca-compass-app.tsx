@@ -29,6 +29,13 @@ import {
   type OacaNudgeSummary,
 } from "./oaca-engagement-center";
 import { CompassAdvisorWorkspace } from "./compass-advisor-workspace";
+import {
+  availabilityTimeBand,
+  filterStudentAvailability,
+  groupAvailabilityByDay,
+  studentVisibleAvailabilityProviderIds,
+  type OacaAvailabilitySlot,
+} from "./oaca-student-availability";
 
 type Service = { id: string; key: string; name: string; providerRule: string; policyStatus: string; modalities: string[]; durationMinutes?: number; settings?: Record<string, unknown> };
 type Provider = { id: string; displayName: string; classification: string; subjects: string[]; modalities: string[]; serviceKeys?: string[] };
@@ -50,6 +57,7 @@ type Bootstrap = {
   nudges: OacaNudgeSummary[]; communications: OacaCommunicationSummary[]; forms: OacaFormSummary[]; audienceOptions: OacaAudienceOptions;
   encounterRecords: EncounterRecord[];
   eventNotificationUnreadCount: number;
+  availabilitySlots?: OacaAvailabilitySlot[];
 };
 type OacaView = "home" | "schedule" | "appointments" | "requirements" | "policies" | "portfolio" | "records" | "analytics" | "imports" | "settings" | "schedule_student" | "tutor" | "events" | "notifications" | "checkin" | "outreach";
 
@@ -115,6 +123,158 @@ function CreatorTimePanel() {
 
 const fallbackServices: Service[] = oacaServiceLines.map((service) => ({ id: "", key: service.key, name: service.name, providerRule: service.providerRule, policyStatus: "sandbox_approved", modalities: ["in_person", "phone", "teams"], durationMinutes: service.key === "peer_tutoring" ? 60 : 30 }));
 const emptyBootstrap: Bootstrap = { services: [], providers: [], appointments: [], encounterRecords: [], assignedAdvisor: null, assignedStudents: [], currentProvider: null, policyDocuments: [], policyRules: [], acknowledgments: [], obligations: [], restrictions: [], tutorCompliance: null, liveScheduling: false, calendarConnected: false, canManageImports: false, canViewAnalytics: false, importBatches: [], analytics: null, canManageOutreach: false, canViewOutreachInsights: false, events: [], campaigns: [], nudges: [], communications: [], forms: [], audienceOptions: { cohorts: [], phases: [], years: [], campuses: [] }, eventNotificationUnreadCount: 0 };
+
+function appointmentTimeLabel(value: string) {
+  return new Date(value).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function providerInitials(name: string) {
+  return name
+    .replace(/,.*$/, "")
+    .split(/\s+/)
+    .filter((part) => part.length > 1)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("");
+}
+
+function StudentAvailabilityPicker({
+  slots,
+  serviceKey,
+  providerIds,
+  selectedProviderId,
+  onProvider,
+  modality,
+  selectedStartsAt,
+  onSelect,
+}: {
+  slots: OacaAvailabilitySlot[];
+  serviceKey: string;
+  providerIds: string[];
+  selectedProviderId: string;
+  onProvider: (providerId: string) => void;
+  modality: string;
+  selectedStartsAt: string;
+  onSelect: (slot: OacaAvailabilitySlot) => void;
+}) {
+  const [requestedDay, setRequestedDay] = useState("");
+  const allFiltered = filterStudentAvailability(slots, {
+    serviceKey,
+    providerIds,
+    modality,
+  });
+  const providers = [...new Map(allFiltered.map((slot) => [slot.providerId, slot])).values()];
+  const filtered = selectedProviderId && providers.length > 1
+    ? allFiltered.filter((slot) => slot.providerId === selectedProviderId)
+    : allFiltered;
+  const days = groupAvailabilityByDay(filtered);
+  const activeDay = days.some((day) => day.key === requestedDay)
+    ? requestedDay
+    : days[0]?.key || "";
+  const day = days.find((item) => item.key === activeDay);
+  const bands = ["Morning", "Midday", "Afternoon"];
+  return (
+    <fieldset className="student-availability-picker" data-tutorial-id="student-availability">
+      <legend>Choose an available time</legend>
+      <div className="availability-source-note">
+        <span aria-hidden="true">◷</span>
+        <div>
+          <strong>Compass availability</strong>
+          <p>These time blocks come from advisor availability entered in Compass. Outlook conflict checking is not connected in this pilot, so your advisor will confirm the request.</p>
+        </div>
+      </div>
+      {providers.length > 1 ? (
+        <div className="availability-advisors" aria-label="Available advisors">
+          {providers.map((provider) => {
+            const count = allFiltered.filter((slot) => slot.providerId === provider.providerId).length;
+            return (
+              <button
+                type="button"
+                key={provider.providerId}
+                className={selectedProviderId === provider.providerId ? "selected" : ""}
+                aria-pressed={selectedProviderId === provider.providerId}
+                onClick={() => onProvider(provider.providerId)}
+              >
+                <span>{providerInitials(provider.providerName)}</span>
+                <span><strong>{provider.providerName}</strong><small>{provider.providerRole} · {count} time{count === 1 ? "" : "s"}</small></span>
+              </button>
+            );
+          })}
+        </div>
+      ) : providers[0] ? (
+        <div className="availability-single-advisor">
+          <span>{providerInitials(providers[0].providerName)}</span>
+          <div><strong>{providers[0].providerName}</strong><small>{providers[0].providerRole}</small></div>
+          <small>{filtered.length} available time{filtered.length === 1 ? "" : "s"}</small>
+        </div>
+      ) : null}
+      {days.length ? (
+        <>
+          <div className="availability-days" aria-label="Available days">
+            {days.map((item) => (
+              <button
+                type="button"
+                key={item.key}
+                className={item.key === activeDay ? "selected" : ""}
+                aria-pressed={item.key === activeDay}
+                onClick={() => setRequestedDay(item.key)}
+              >
+                <strong>{item.shortLabel}</strong>
+                <small>{item.slots.length} opening{item.slots.length === 1 ? "" : "s"}</small>
+              </button>
+            ))}
+          </div>
+          <div className="availability-chart" aria-label={`Available time blocks for ${day?.label || "selected day"}`}>
+            <div className="availability-chart__heading">
+              <div><span>Time-block view</span><strong>{day?.label}</strong></div>
+              <small>{modality === "in_person" ? "In person" : modality === "teams" ? "Teams" : "Phone"}</small>
+            </div>
+            {bands.map((band) => {
+              const bandSlots = (day?.slots || []).filter(
+                (slot) => availabilityTimeBand(slot.startsAt) === band,
+              );
+              return (
+                <div className="availability-band" key={band}>
+                  <span>{band}</span>
+                  <div>
+                    {bandSlots.map((slot) => (
+                      <button
+                        type="button"
+                        key={slot.id}
+                        className={selectedStartsAt === slot.startsAt ? "selected" : ""}
+                        aria-pressed={selectedStartsAt === slot.startsAt}
+                        onClick={() => onSelect(slot)}
+                      >
+                        <strong>{appointmentTimeLabel(slot.startsAt)}</strong>
+                        <small>{slot.providerName.split(",")[0]}{slot.location ? ` · ${slot.location}` : " · Remote"}</small>
+                      </button>
+                    ))}
+                    {!bandSlots.length ? <span className="availability-empty-band">No openings</span> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {selectedStartsAt ? (
+            <p className="availability-selection" role="status">
+              <span aria-hidden="true">✓</span>
+              <strong>{new Date(selectedStartsAt).toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong>
+              selected for request
+            </p>
+          ) : <p className="availability-prompt" role="status">Select one of the available time blocks above.</p>}
+        </>
+      ) : (
+        <div className="availability-empty-state">
+          <strong>No published times match this selection.</strong>
+          <p>Try another modality or advisor. Additional availability can be added directly in Compass without Outlook.</p>
+        </div>
+      )}
+    </fieldset>
+  );
+}
 
 function CompassBrandMark() {
   return <svg viewBox="0 0 96 96" aria-hidden="true" focusable="false"><circle cx="48" cy="48" r="30" /><path d="M58 37 52 52 37 59l7-16 14-6Z" /><circle cx="48" cy="48" r="4" /><path className="compass-brand__detail" d="M48 12v8M48 76v8M12 48h8M76 48h8" /></svg>;
@@ -204,6 +364,18 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
   const selectedService = services.find((service) => service.key === serviceKey) || fallbackServices[0];
   const academicDropInProviders = data.providers.filter((provider) => provider.serviceKeys?.includes("academic_advising") && provider.id !== data.assignedAdvisor?.id && (provider.modalities.includes(modality) || !provider.modalities.length));
   const peerTutors = data.providers.filter((provider) => provider.classification === "peer_tutor" && (provider.modalities.includes(modality) || !provider.modalities.length));
+  const careerProvider = data.providers.find((provider) => provider.serviceKeys?.includes("career_advising"));
+  const availabilityProviderIds = studentVisibleAvailabilityProviderIds({
+    serviceKey,
+    assignedAcademicAdvisorId: data.assignedAdvisor?.id,
+    careerAdvisorId: careerProvider?.id,
+    peerTutorIds: peerTutors.map((provider) => provider.id),
+  });
+  const availabilitySelectedProviderId = serviceKey === "academic_advising"
+    ? data.assignedAdvisor?.id || ""
+    : serviceKey === "career_advising"
+      ? careerProvider?.id || ""
+      : providerId;
   const studentAgreement = data.policyDocuments.find((item) => item.key === "peer_tutoring_student_agreement_2026_2027");
   const tutoringAcknowledged = Boolean(studentAgreement && data.acknowledgments.some((item) => item.policyDocumentId === studentAgreement.id && item.kind === "student_tutoring"));
   const openObligations = data.obligations.filter((item) => item.serviceKey === serviceKey && item.status !== "completed");
@@ -219,6 +391,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
   const schedule = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedService.id) { setMessage("The policy is mapped, but this service has not yet been created for your OACA organization."); return; }
+    if (!startsAt) { setMessage("Choose one of the available time blocks."); return; }
     if (!reasonForVisit || (reasonForVisit === "other" && !customReason.trim())) { setMessage("Choose or type a reason for your visit."); return; }
     if (serviceKey === "academic_advising" && academicVisitType === "drop_in" && (!providerId || !academicBlockKey.trim())) { setMessage("Choose a drop-in advisor and enter the current academic block."); return; }
     if (serviceKey === "peer_tutoring" && !tutoringAcknowledged && (!agreementAccepted || typedName.trim().length < 2)) { setMessage("Review and acknowledge the student tutoring agreement before submitting."); return; }
@@ -281,7 +454,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
         <fieldset>
           <legend>1. Choose a service</legend>
           <div className="choice-grid">{services.map((service) => <label key={service.key} className={serviceKey === service.key ? "choice-card selected" : "choice-card"}>
-            <input type="radio" name="service" value={service.key} checked={serviceKey === service.key} onChange={() => { setServiceKey(service.key); setProviderId(""); setObligationId(""); setReasonForVisit(""); setCustomReason(""); setAcademicVisitType("assigned"); setSubmitted(false); setMessage(""); }} />
+            <input type="radio" name="service" value={service.key} checked={serviceKey === service.key} onChange={() => { setServiceKey(service.key); setProviderId(""); setStartsAt(""); setObligationId(""); setReasonForVisit(""); setCustomReason(""); setAcademicVisitType("assigned"); setSubmitted(false); setMessage(""); }} />
             <strong>{service.name}</strong><span>{oacaServiceLines.find((item) => item.key === service.key)?.description}</span>
           </label>)}</div>
         </fieldset>
@@ -310,8 +483,8 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
           <fieldset>
             <legend>Academic advising format</legend>
             <div className="segmented-control">
-              <label><input type="radio" name="academic-visit-type" checked={academicVisitType === "assigned"} onChange={() => { setAcademicVisitType("assigned"); setProviderId(""); setAcademicBlockKey(""); }} /><span>Meet with my assigned advisor</span></label>
-              <label><input type="radio" name="academic-visit-type" checked={academicVisitType === "drop_in"} onChange={() => { setAcademicVisitType("drop_in"); setProviderId(""); }} /><span>Academic drop-in</span></label>
+              <label><input type="radio" name="academic-visit-type" checked={academicVisitType === "assigned"} onChange={() => { setAcademicVisitType("assigned"); setProviderId(""); setStartsAt(""); setAcademicBlockKey(""); }} /><span>Meet with my assigned advisor</span></label>
+              <label><input type="radio" name="academic-visit-type" checked={academicVisitType === "drop_in"} onChange={() => { setAcademicVisitType("drop_in"); setProviderId(""); setStartsAt(""); }} /><span>Academic drop-in</span></label>
             </div>
           </fieldset>
           {academicVisitType === "assigned"
@@ -319,20 +492,39 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
             : <div className="drop-in-fields">
                 <p>Students may use another academic advisor for up to two drop-in visits per academic block.</p>
                 <label><span>Current academic block</span><input required value={academicBlockKey} onChange={(event) => setAcademicBlockKey(event.target.value)} placeholder="Example: Block 3" /></label>
-                <label><span>Drop-in advisor</span><select required value={providerId} onChange={(event) => setProviderId(event.target.value)}><option value="">Choose an academic advisor</option>{academicDropInProviders.map((provider) => <option key={provider.id} value={provider.id}>{provider.displayName}</option>)}</select></label>
+                <label><span>Drop-in advisor</span><select required value={providerId} onChange={(event) => { setProviderId(event.target.value); setStartsAt(""); }}><option value="">Choose an academic advisor</option>{academicDropInProviders.map((provider) => <option key={provider.id} value={provider.id}>{provider.displayName}</option>)}</select></label>
+                <label>
+                  <span>Preferred date and time</span>
+                  <input type="datetime-local" required value={startsAt} onChange={(event) => { setStartsAt(event.target.value); setSubmitted(false); setMessage(""); }} />
+                  <small>For privacy, Compass does not show another academic advisor's availability. Your preferred time will be confirmed or counterproposed after you submit.</small>
+                </label>
               </div>}
         </> : null}
         {serviceKey === "career_advising" ? <div className="assigned-provider"><strong>Career advisor</strong><span>Compass routes this request automatically.</span></div> : null}
         {serviceKey === "peer_tutoring" ? <>
           <label><span>Exam block or upcoming exam</span><input required value={examBlockKey} onChange={(event) => setExamBlockKey(event.target.value)} placeholder="Used only to apply the between-exams limit" /></label>
-          <label><span>Tutor</span><select required value={providerId} onChange={(event) => setProviderId(event.target.value)}><option value="">Choose a tutor</option>{peerTutors.map((provider) => <option key={provider.id} value={provider.id}>{provider.displayName}</option>)}</select></label>
+          <label><span>Tutor</span><select required value={providerId} onChange={(event) => { setProviderId(event.target.value); setStartsAt(""); }}><option value="">Choose a tutor or compare below</option>{peerTutors.map((provider) => <option key={provider.id} value={provider.id}>{provider.displayName}</option>)}</select></label>
           <label><span>Tutoring format</span><select value={format} onChange={(event) => setFormat(event.target.value)}><option value="individual">Individual</option><option value="small_group">Small group</option><option value="drop_in">Drop-in</option></select></label>
           <aside className="policy-rule-card policy-rule-card--compact"><strong>Before you book</strong><p>Maximum 2 hours per week, 1 hour per individual session, and 4 hours per course between exams. Book no more than 7 days ahead and cancel at least 24 hours before the session.</p>{!tutoringAcknowledged ? <div className="acknowledgment-box"><label><span>Type your full name</span><input value={typedName} onChange={(event) => setTypedName(event.target.value)} /></label><label className="check-row"><input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} /><span>I have reviewed and agree to the current Peer Tutoring Services Student Acknowledgement &amp; Agreement.</span></label><small>This versioned acknowledgment requires institutional approval before it can replace a signed form.</small></div> : <span className="policy-check policy-check--complete">Current agreement acknowledged</span>}</aside>
         </> : null}
-        <label><span>Date and time</span><input type="datetime-local" required value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /><small>Only policy-compliant platform availability and Outlook free/busy slots are accepted by the server.</small></label>
-        <fieldset><legend>Modality</legend><div className="segmented-control">{selectedService.modalities.map((item) => <label key={item}><input type="radio" name="modality" value={item} checked={modality === item} onChange={() => setModality(item)} /><span>{item === "teams" ? "Teams" : item === "in_person" ? "In person" : "Phone"}</span></label>)}</div></fieldset>
+        <fieldset><legend>Modality</legend><div className="segmented-control">{selectedService.modalities.map((item) => <label key={item}><input type="radio" name="modality" value={item} checked={modality === item} onChange={() => { setModality(item); setStartsAt(""); if (serviceKey === "peer_tutoring" || (serviceKey === "academic_advising" && academicVisitType === "drop_in")) setProviderId(""); }} /><span>{item === "teams" ? "Teams" : item === "in_person" ? "In person" : "Phone"}</span></label>)}</div></fieldset>
+        {serviceKey !== "academic_advising" || academicVisitType === "assigned" ? <StudentAvailabilityPicker
+          slots={data.availabilitySlots || []}
+          serviceKey={serviceKey}
+          providerIds={availabilityProviderIds}
+          selectedProviderId={availabilitySelectedProviderId}
+          onProvider={(nextProviderId) => { setProviderId(nextProviderId); setStartsAt(""); }}
+          modality={modality}
+          selectedStartsAt={startsAt}
+          onSelect={(slot) => {
+            if (serviceKey === "peer_tutoring") setProviderId(slot.providerId);
+            setStartsAt(slot.startsAt);
+            setSubmitted(false);
+            setMessage("");
+          }}
+        /> : null}
         <label><span>Optional preparation note</span><textarea value={preparationNote} onChange={(event) => setPreparationNote(event.target.value)} placeholder="Share anything that will help you get more from the appointment." /></label>
-        <button className="primary-button" disabled={busy}>{busy ? "Submitting…" : data.liveScheduling ? "Submit request" : "Submit sandbox request"}</button>
+        <button className="primary-button" disabled={busy || !startsAt}>{busy ? "Submitting…" : data.liveScheduling ? "Submit request" : "Submit sandbox request"}</button>
         <p className={submitted ? "form-message appointment-success" : "form-message"} aria-live="polite">{message}</p>
       </form>
     </section>;
@@ -362,7 +554,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
         <p>What would make today easier? Book support, check what’s coming up, or pick up where you left off.</p>
       </div>
       <div className="compass-hero-actions" aria-label="Compass quick actions">
-        <button onClick={() => setView("schedule")} aria-label="Request an appointment"><CompassHeroIcon kind="appointment" /><strong>Make an appointment</strong></button>
+        <button data-tutorial-id="student-availability" onClick={() => setView("schedule")} aria-label="Request an appointment"><CompassHeroIcon kind="appointment" /><strong>Make an appointment</strong></button>
         <button onClick={() => setView("notifications")} aria-label="Open notifications"><CompassHeroIcon kind="notifications" /><strong>Notifications</strong>{data.eventNotificationUnreadCount ? <small>{data.eventNotificationUnreadCount} unread</small> : null}</button>
         <button onClick={() => setView("events")} aria-label="Open events"><CompassHeroIcon kind="events" /><strong>Events</strong></button>
         <button onClick={() => setView("checkin")} aria-label="Show student check-in code"><CompassHeroIcon kind="checkin" /><strong>Check in</strong></button>
