@@ -105,7 +105,12 @@ export function PlatformAccess({ experience, children }: {
   if (configured === "error") return <ConfigurationRequired />;
   if (!supabase || configured === "loading") return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate" title="Connecting your secure account…" /></section></main>;
   if (!session) return <SignIn supabase={supabase} />;
-  if (recoveryMode) return <PasswordRecovery supabase={supabase} onComplete={() => { setRecoveryMode(false); setContext(null); setMessage("Opening your Navigate account…"); }} />;
+  if (recoveryMode) return <PasswordRecovery supabase={supabase} onComplete={() => {
+    window.history.replaceState({}, "", window.location.pathname);
+    setRecoveryMode(false);
+    setContext(null);
+    setMessage("Opening your Navigate account…");
+  }} />;
   if (accountLoadFailed) return <main className="production-auth"><section className="production-auth-card">
     <RosieGuide pose="idle" compact eyebrow="Account connected" title="Your password was accepted." body="The expanded secure workspace is still being connected to this pilot. You can explore every new dashboard now with fictional records." priority />
     <a className="preview-entry" href="/app?preview=creator"><span><strong>Open the Creator preview</strong><small>Compass, Navigate the Pathway, and Impact Studio with synthetic data only.</small></span><span aria-hidden="true">→</span></a>

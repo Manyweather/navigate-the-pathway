@@ -49,6 +49,9 @@ test("password recovery takes priority over account loading and offers a safe pr
   assert.match(access, /Open the Creator preview/);
   assert.match(signIn, /supabase\.auth\.updateUser\(\{ password \}\)/);
   assert.match(signIn, /Set new password/);
+  assert.match(signIn, /same_password/);
+  assert.match(signIn, /Send me a fresh reset link/);
+  assert.match(access, /window\.history\.replaceState/);
 });
 
 test("OACA state transitions preserve explicit approval and counterproposal semantics", () => {

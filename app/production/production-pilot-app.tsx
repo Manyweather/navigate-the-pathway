@@ -90,22 +90,58 @@ export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseC
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [canRequestAnotherLink, setCanRequestAnotherLink] = useState(false);
+
+  const recoveryErrorMessage = (error: { code?: string; message: string }) => {
+    const detail = `${error.code || ""} ${error.message}`.toLowerCase();
+    if (detail.includes("same_password") || (detail.includes("same") && detail.includes("password"))) {
+      return "Choose a password that is different from your current password.";
+    }
+    if (detail.includes("weak_password") || detail.includes("weak password") || detail.includes("at least")) {
+      return "That password does not meet the security requirements. Try a longer passphrase you have not used before.";
+    }
+    if (["expired", "session", "token", "jwt", "reauthentication"].some((term) => detail.includes(term))) {
+      return "This secure link has expired or was already used. Request a fresh password-reset email below.";
+    }
+    return `Supabase could not accept that password: ${error.message}`;
+  };
+
   const updatePassword = async (event: React.FormEvent) => {
     event.preventDefault();
     if (password.length < 12) { setMessage("Use at least 12 characters for your new password."); return; }
     if (password !== confirmation) { setMessage("The passwords do not match."); return; }
-    setBusy(true); setMessage("");
+    setBusy(true); setMessage(""); setCanRequestAnotherLink(false);
     const { error } = await supabase.auth.updateUser({ password });
     setBusy(false);
-    if (error) { setMessage("Your password could not be updated. Request a new secure link and try again."); return; }
+    if (error) {
+      setMessage(recoveryErrorMessage(error));
+      setCanRequestAnotherLink(true);
+      return;
+    }
     onComplete();
   };
+
+  const requestAnotherLink = async () => {
+    setBusy(true); setMessage("");
+    const { data } = await supabase.auth.getUser();
+    const email = data.user?.email;
+    if (!email) {
+      setBusy(false);
+      setMessage("Return to sign in, enter your email address, and choose Set or reset password.");
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/app` });
+    setBusy(false);
+    setMessage(error ? `A new link could not be sent: ${error.message}` : `A fresh password-reset link was sent to ${email}. Use only the newest email.`);
+  };
+
   return <main className="production-auth"><section className="production-auth-card production-auth-card--recovery">
     <RosieGuide pose="idle" compact eyebrow="Secure password reset" title="Choose your new password." body="Your email link was accepted. Set a new password below, then Navigate will open your account." priority />
     <form className="production-form" onSubmit={updatePassword}>
       <label><span>New password</span><input type="password" autoComplete="new-password" minLength={12} required value={password} onChange={(event) => setPassword(event.target.value)} /><small>Use at least 12 characters.</small></label>
       <label><span>Confirm new password</span><input type="password" autoComplete="new-password" minLength={12} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
       <button className="primary-button" disabled={busy}>{busy ? "Updating…" : "Set new password"}</button>
+      {canRequestAnotherLink ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void requestAnotherLink()}>{busy ? "Sending…" : "Send me a fresh reset link"}</button> : null}
       <p className="form-message" aria-live="polite">{message}</p>
     </form>
   </section></main>;
