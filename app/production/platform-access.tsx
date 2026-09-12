@@ -133,7 +133,7 @@ export function PlatformAccess({ experience, children }: {
   useEffect(() => {
     if (!supabase || previewMode) return;
     let active = true;
-    setAuthReady(false);
+    const readinessTask = window.setTimeout(() => { if (active) setAuthReady(false); }, 0);
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
       setSession(nextSession);
@@ -160,7 +160,7 @@ export function PlatformAccess({ experience, children }: {
         setRecoveryError("Compass could not validate a recovery session from that link. This does not necessarily mean the email was old; request one new email and use only its latest reset link.");
       }
     })();
-    return () => { active = false; data.subscription.unsubscribe(); };
+    return () => { active = false; window.clearTimeout(readinessTask); data.subscription.unsubscribe(); };
   }, [previewMode, recoveryError, recoveryMode, supabase]);
 
   const load = useCallback(async () => {

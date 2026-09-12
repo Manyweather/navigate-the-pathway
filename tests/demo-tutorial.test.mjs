@@ -46,6 +46,8 @@ test("tutorial targets are stable data hooks where a workflow control is highlig
     readFile(new URL("../app/production/production-pilot-app.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(compass, /data-tutorial-id="student-availability"/);
+  assert.match(compass, /data-tutorial-id="student-upcoming-events"/);
+  assert.match(compass, /studentNavigation=/);
   assert.match(advisor, /data-tutorial-id={`advisor-tile-\$\{tile\.key\}`}/);
   assert.match(impact, /data-tutorial-id="impact-events"/);
   assert.match(pathway, /data-tutorial-id="pathway-portfolio"/);

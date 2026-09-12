@@ -1306,12 +1306,29 @@ export async function experienceRoute(
     if (
       url.pathname === "/api/oaca/events/workspace" &&
       request.method === "GET"
-    )
-      return workspaceJson(
-        await services.rpc("oaca_event_workspace", {
+    ) {
+      const [workspace, catalog] = await Promise.all([
+        services.rpc<Record<string, unknown>>("oaca_event_workspace", {
           payload: { eventId: url.searchParams.get("eventId") || null },
         }),
+        services.rpc<Array<Record<string, unknown>>>("oaca_event_feed", {
+          payload: {},
+        }),
+      ]);
+      const catalogById = new Map(
+        catalog.map((event) => [String(event.id), event]),
       );
+      const workspaceEvents = Array.isArray(workspace.events)
+        ? (workspace.events as Array<Record<string, unknown>>)
+        : [];
+      return workspaceJson({
+        ...workspace,
+        events: workspaceEvents.map((event) => ({
+          ...catalogById.get(String(event.id)),
+          ...event,
+        })),
+      });
+    }
     if (
       url.pathname === "/api/oaca/events/audience-preview" &&
       request.method === "POST"
@@ -1405,7 +1422,7 @@ export async function experienceRoute(
       url.pathname === "/api/oaca/events/check-in/self" &&
       request.method === "POST"
     ) {
-      requireRole(membership, ["student"]);
+      requireRole(membership, ["student", "faculty", "staff", "administrator"]);
       return workspaceJson(
         await services.rpc("oaca_self_checkin", {
           payload: await workspaceBody(request),
@@ -1539,7 +1556,7 @@ export async function experienceRoute(
       url.pathname === "/api/oaca/event-messages" &&
       request.method === "POST"
     ) {
-      requireRole(membership, ["student", "faculty", "staff", "administrator"]);
+      requireRole(membership, ["student"]);
       return workspaceJson(
         await services.rpc("oaca_send_event_message", {
           payload: await workspaceBody(request),
@@ -1563,12 +1580,23 @@ export async function experienceRoute(
       url.pathname === "/api/oaca/events/register" &&
       request.method === "POST"
     ) {
-      requireRole(membership, ["student", "faculty", "staff", "administrator"]);
+      requireRole(membership, ["student"]);
       return workspaceJson(
         await services.rpc("oaca_register_event", {
           payload: await workspaceBody(request),
         }),
         201,
+      );
+    }
+    if (
+      url.pathname === "/api/oaca/events/registration/cancel" &&
+      request.method === "POST"
+    ) {
+      requireRole(membership, ["student"]);
+      return workspaceJson(
+        await services.rpc("oaca_cancel_event_registration", {
+          payload: await workspaceBody(request),
+        }),
       );
     }
     if (url.pathname === "/api/oaca/events" && request.method === "POST") {

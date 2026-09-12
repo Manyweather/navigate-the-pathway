@@ -57,21 +57,31 @@ const compassStudentChapters: TutorialChapter[] = [
   {
     id: "student-start", title: "Start here", minutes: 1,
     steps: [
-      step("student-start", "student-home", "Your student home", "This banner places appointments, notifications, events, and check-in within thumb reach without exposing anyone else’s record.", "Student self-service", "The home surface prioritizes the highest-frequency mobile actions and reduces staff-dependent navigation.", ".compass-student-hero"),
-      step("student-start", "student-actions", "Choose a next action", "Request an appointment, read notifications, open student-facing event details, show your check-in code, or review visits.", "Core service entry points", "Each icon routes students into a permission-safe flow. Staff event workspaces and advising notes are separate API scopes.", ".compass-hero-actions"),
+      step("student-start", "student-home", "Your student home", "This welcome keeps the page calm while placing support, events, and your next steps directly beneath it.", "Student self-service", "The home surface prioritizes the highest-frequency mobile tasks without carrying staff controls into the student response.", ".compass-student-hero"),
+      step("student-start", "student-actions", "Use your everyday tools", "Notifications, Events, Check-In, and My Visits stay in the header. On a phone, Notifications remains visible and the other tools move into More.", "Persistent, role-scoped navigation", "These controls render only for the Compass Student role. Staff, Peer Tutor, Manager, and Impact previews receive their own navigation and data scopes.", ".platform-header--oaca"),
     ],
   },
   {
     id: "student-support", title: "Appointments and support", minutes: 1,
     steps: [
-      step("student-support", "student-next", "See what is next", "At-a-glance cards show the next visit and event, including a clear cancelled state and a rebook option.", "Reduce missed connections", "Status, event, and rebooking information is surfaced together so students do not have to reconcile separate systems.", ".compass-at-a-glance"),
-      step("student-support", "student-availability", "Choose from your advisor’s time blocks", "Academic advising availability comes only from your assigned Academic Advisor. Times reflect their configured blocks, buffers, formats, and appointment length.", "Availability respects assignment", "The student payload excludes other Academic Advisors’ schedules. The default is 30 minutes, while advisors can intentionally configure shorter or longer visits.", "[data-tutorial-id='student-availability']"),
-      step("student-support", "student-materials", "Keep your work together", "Requirements, private portfolio items, policy information, and tutoring support remain in your own Compass record.", "Longitudinal student record", "The student-facing record combines support history without exposing protected working notes or peer comparisons.", ".compass-secondary-actions"),
+      step("student-support", "student-department", "Choose the right department", "Start with Academic Advising, Career Advising, or Peer Tutoring. Switching departments clears incompatible selections before showing new times.", "One scheduling entry point", "The same server-backed scheduling contract applies assignment, qualification, duration, format, buffer, and conflict rules for each service.", ".home-service-choice"),
+      step("student-support", "student-availability", "Choose a time block", "Use the weekly chart to pick a published time. Academic Advising shows only your assigned advisor; Career Advising is routed automatically; Peer Tutoring starts with a subject.", "Availability respects assignment", "The student response excludes other Academic Advisors’ calendars. Every selected block is revalidated by the server before a request can be submitted.", "[data-tutorial-id='student-availability']"),
+      step("student-support", "student-next", "See what comes next", "Your next visit, next registered event, open requirements, and published action plans stay together below the scheduler.", "Reduce missed connections", "Status and follow-through information is surfaced without exposing protected working notes or peer comparisons.", ".student-next-steps"),
+    ],
+  },
+  {
+    id: "student-events", title: "Events", minutes: 1,
+    steps: [
+      step("student-events", "student-upcoming-events", "Discover upcoming events", "The next three eligible events appear here, with registered and waitlisted events first. Open a card for the full description, accessibility details, and your own status.", "Purposeful event discovery", "Audience eligibility and the signed-in student’s RSVP state shape this row; no roster or another student’s attendance is returned.", "[data-tutorial-id='student-upcoming-events']"),
+      step("student-events", "student-rsvp", "Manage your RSVP on the event page", "Open Events to register, join a waitlist, see your position, or cancel before an event begins. The tutorial stops before any of those actions are submitted.", "Complete RSVP lifecycle", "Capacity changes promote the earliest eligible waitlisted student through an idempotent, audited server operation. Public history exposes summary data only.", "[data-tutorial-id='student-upcoming-events']"),
     ],
   },
   {
     id: "student-impact", title: "Affiliations and Impact", minutes: 1,
-    steps: [step("student-impact", "student-affiliations", "Request an affiliation", "Declare an interest-group affiliation here. Impact appears only after an Impact Administrator or Community Liaison verifies it.", "Verified nested access", "Affiliation states are audited. Student Council is useful profile metadata but does not unlock Impact by itself.", ".hub-affiliations")],
+    steps: [
+      step("student-impact", "student-materials", "Keep your work together", "Portfolio, policies, affiliations, and optional Peer Tutor access remain available as supporting tools instead of competing with scheduling.", "Longitudinal student record", "The student-facing record combines support history without exposing protected working notes, staff analytics, or peer comparisons.", ".student-supporting-tools"),
+      step("student-impact", "student-affiliations", "Request an affiliation", "Declare an interest-group affiliation here. Impact appears only after an Impact Administrator or Community Liaison verifies it.", "Verified nested access", "Affiliation states are audited. Student Council is useful profile metadata but does not unlock Impact by itself.", ".hub-affiliations"),
+    ],
   },
 ];
 

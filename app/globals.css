@@ -1024,6 +1024,82 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .compass-at-a-glance article>strong { color:#2d376f; font:700 1.2rem Georgia,"Times New Roman",serif; }
 .compass-at-a-glance article>small { color:#62677b; line-height:1.45; }
 .compass-at-a-glance .text-button { width:max-content; padding-left:0; }
+.student-header-actions { display:flex; align-items:center; gap:.3rem; }
+.student-header-actions button,.student-header-mobile>button { position:relative; min-width:48px; min-height:48px; display:grid; place-items:center; gap:.1rem; padding:.3rem .45rem; border:1px solid transparent; border-radius:13px; color:#314b76; background:transparent; font:inherit; cursor:pointer; }
+.student-header-actions button:hover,.student-header-actions button:focus-visible,.student-header-actions button.active,.student-header-mobile>button:hover,.student-header-mobile>button:focus-visible,.student-header-mobile>button.active { border-color:#bbc4e7; background:#edf1ff; }
+.student-header-actions svg,.student-header-mobile svg,.student-header-menu svg { width:21px; height:21px; }
+.student-header-actions button>strong { font-size:.64rem; line-height:1; }
+.student-header-actions button>span,.student-header-mobile button>span:not(.sr-only) { position:absolute; top:-4px; right:-3px; min-width:21px; min-height:21px; display:grid; place-items:center; padding:0 .25rem; border:2px solid #fff; border-radius:999px; color:#fff; background:#791034; font-size:.65rem; font-weight:900; }
+.student-header-mobile { display:none; position:relative; margin-left:auto; gap:.3rem; }
+.student-header-menu { position:absolute; top:calc(100% + .55rem); right:0; z-index:20; width:min(18rem,calc(100vw - 2rem)); display:grid; gap:.25rem; padding:.55rem; border:1px solid #ccd2e8; border-radius:16px; background:#fff; box-shadow:0 18px 48px rgba(35,42,81,.2); }
+.student-header-menu>div { display:grid; gap:.15rem; padding:.65rem .7rem; border-bottom:1px solid #e3e5ee; }
+.student-header-menu small { color:#687087; }
+.student-header-menu>button { min-height:48px; display:flex; align-items:center; gap:.7rem; padding:.65rem .75rem; border:0; border-radius:10px; color:#303b78; background:transparent; font:inherit; font-weight:800; text-align:left; cursor:pointer; }
+.student-header-menu>button:hover,.student-header-menu>button:focus-visible { background:#eef1ff; }
+.compass-student-hero--compact { margin-bottom:1rem; padding:clamp(1.35rem,4vw,2.4rem); border-radius:24px; }
+.compass-student-hero--compact h1 { font-size:clamp(2.5rem,6vw,4.7rem); margin-bottom:.6rem; }
+.compass-student-hero--compact .hero-status { padding:1rem 1.1rem; }
+.compass-student-hero--compact .hero-status>img { width:52px; height:52px; display:block; margin-bottom:.55rem; object-fit:contain; filter:drop-shadow(0 8px 12px rgba(17,26,80,.24)); }
+.home-appointment-scheduler { display:grid; gap:1.05rem; margin:0 0 1.35rem; padding:clamp(1rem,3vw,1.5rem); border:1px solid #cbd2ea; border-radius:24px; background:rgba(255,255,255,.96); box-shadow:0 16px 42px rgba(45,57,119,.1); }
+.home-scheduler-heading,.home-section-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; }
+.home-scheduler-heading h2,.home-section-heading h2 { margin:.2rem 0 0; color:#30386c; font:700 clamp(1.65rem,4vw,2.35rem)/1.05 Georgia,"Times New Roman",serif; }
+.home-scheduler-heading>span { padding:.45rem .7rem; border-radius:999px; color:#3d4c9e; background:#edf0ff; font-size:.78rem; font-weight:850; }
+.home-service-choice { margin:0; padding:0; border:0; }
+.home-service-choice>legend { margin-bottom:.55rem; color:#464b62; font-size:.88rem; font-weight:850; }
+.home-service-choice>div { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; }
+.home-service-choice label { min-height:96px; display:grid; grid-template-columns:38px 1fr; align-items:center; gap:.65rem; padding:.8rem; border:1px solid #d8dceb; border-radius:16px; background:#fafbff; cursor:pointer; }
+.home-service-choice label.selected { border-color:#5364cb; background:#edf0ff; box-shadow:inset 0 0 0 1px #5364cb; }
+.home-service-choice input { position:absolute; opacity:0; pointer-events:none; }
+.home-service-choice svg { width:30px; height:30px; color:#5364cb; }
+.home-service-choice label>span { display:grid; gap:.2rem; }
+.home-service-choice strong { color:#2e376f; }
+.home-service-choice small { color:#646a7d; line-height:1.35; }
+.home-scheduler-controls { display:grid; grid-template-columns:minmax(260px,1.35fr) repeat(2,minmax(150px,.55fr)); gap:.7rem; align-items:end; }
+.home-scheduler-controls>label { display:grid; gap:.35rem; color:#464b62; font-size:.85rem; font-weight:800; }
+.home-scheduler-controls input,.home-scheduler-controls select { width:100%; min-height:48px; padding:.65rem .75rem; border:1px solid #aeb4c9; border-radius:11px; color:#272a39; background:#fff; font:inherit; }
+.home-provider-summary { min-height:64px; display:grid; grid-template-columns:44px 1fr; align-items:center; gap:.7rem; padding:.55rem .7rem; border-radius:13px; background:#f3f5fd; }
+.home-provider-summary>span { width:44px; height:44px; display:grid; place-items:center; border-radius:12px; color:#fff; background:#5364cb; font-weight:900; }
+.home-provider-summary>div { display:grid; gap:.1rem; }
+.home-provider-summary small { color:#6b7082; }
+.student-availability-picker--compact { margin:0; padding:1rem; border-color:#d5d9e8; background:#fbfcff; }
+.student-availability-picker--compact .availability-source-note { padding:.7rem; }
+.student-availability-picker--compact .availability-source-note p { margin:.1rem 0 0; font-size:.8rem; }
+.student-availability-picker--compact .availability-chart { min-height:unset; }
+.home-scheduler-prompt { padding:1rem; border:1px dashed #aeb7dc; border-radius:15px; color:#3d477e; background:#f5f7ff; }
+.home-scheduler-prompt p { margin:.25rem 0 0; color:#62697e; }
+.home-scheduler-footer { display:flex; align-items:center; justify-content:space-between; gap:.8rem; }
+.appointment-selection-summary { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem; border:1px solid #b8c4ea; border-radius:16px; background:#f1f4ff; }
+.appointment-selection-summary>div { display:grid; gap:.15rem; }
+.appointment-selection-summary span { color:#626b88; font-size:.74rem; font-weight:850; letter-spacing:.06em; text-transform:uppercase; }
+.appointment-selection-summary strong { color:#303b78; font:700 1.3rem Georgia,"Times New Roman",serif; }
+.appointment-selection-summary small { color:#555d76; }
+.home-upcoming-events,.student-next-steps,.student-supporting-tools { margin:1.7rem 0; }
+.home-section-heading { margin-bottom:.8rem; }
+.home-upcoming-events>.home-section-heading>.text-button { padding-right:0; }
+.home-upcoming-events>div:last-child { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.8rem; }
+.home-upcoming-events article { min-width:0; overflow:hidden; border:1px solid #d6dbea; border-radius:18px; background:#fff; box-shadow:0 10px 28px rgba(40,52,109,.08); }
+.home-upcoming-events article>img,.home-event-mark { width:100%; height:132px; display:grid; place-items:center; object-fit:cover; background:linear-gradient(135deg,#eef1ff,#fff0e9); }
+.home-event-mark img { width:72px; height:72px; object-fit:contain; }
+.home-upcoming-events article>div:last-child { display:grid; gap:.35rem; padding:.85rem; }
+.home-upcoming-events article span { color:#5364a1; font-size:.75rem; font-weight:850; text-transform:uppercase; }
+.home-upcoming-events h3 { margin:0; color:#30386c; font:700 1.15rem/1.15 Georgia,"Times New Roman",serif; }
+.home-upcoming-events small { color:#656a7d; }
+.home-upcoming-events .secondary-button { width:100%; margin-top:.35rem; }
+.home-event-status { color:#176349; font-size:.78rem; }
+.student-next-steps>div:last-child { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; }
+.student-next-steps button { min-height:112px; display:grid; grid-template-columns:42px 1fr; align-items:center; gap:.75rem; padding:.9rem; border:1px solid #d7dbea; border-radius:16px; color:#34417f; background:#fff; font:inherit; text-align:left; cursor:pointer; }
+.student-next-steps button:hover,.student-next-steps button:focus-visible { border-color:#6b79cf; background:#f7f8ff; }
+.student-next-steps button>svg,.student-next-steps button>span:first-child { width:32px; height:32px; display:grid; place-items:center; font-size:1.5rem; }
+.student-next-steps button>span:last-child { display:grid; gap:.15rem; }
+.student-next-steps small { color:#686e80; font-weight:850; text-transform:uppercase; letter-spacing:.05em; }
+.student-next-steps strong { color:#30386c; font:700 1.12rem Georgia,"Times New Roman",serif; }
+.student-next-steps em { color:#656b7d; font-size:.78rem; font-style:normal; }
+.student-supporting-tools { padding-top:1rem; border-top:1px solid #d9ddea; }
+.student-supporting-tools>div:nth-child(2) { display:flex; flex-wrap:wrap; gap:.55rem; }
+.student-supporting-tools>div:nth-child(2)>button { min-height:64px; display:grid; grid-template-columns:30px 1fr; align-items:center; gap:.55rem; padding:.65rem .8rem; border:1px solid #d7dbea; border-radius:14px; color:#303b78; background:#fff; font:inherit; text-align:left; cursor:pointer; }
+.student-supporting-tools>div:nth-child(2)>button>span { grid-row:1/3; font-size:1.3rem; }
+.student-supporting-tools>div:nth-child(2)>button>strong,.student-supporting-tools>div:nth-child(2)>button>small { grid-column:2; }
+.student-supporting-tools>div:nth-child(2)>button>small { color:#686e80; }
 .home-action-grid--experience { margin:1.3rem 0; grid-template-columns:repeat(4,minmax(0,1fr)); }
 .home-action-grid--experience button { min-height:150px; }
 .section-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1.3rem; }
@@ -1274,6 +1350,48 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .communication-feed { display:grid; gap:.75rem; }
 .communication-feed>article { padding:1rem; border:1px solid #d8dce9; border-radius:16px; background:#fff; }
 .communication-feed h3 { margin:.45rem 0 .3rem; }
+.student-events-catalog { display:grid; gap:1rem; }
+.student-events-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+.student-events-heading h1 { margin:.2rem 0 .35rem; }
+.student-events-heading p:last-child { max-width:760px; margin:0; color:#61677b; }
+.student-events-heading>img { width:76px; height:76px; flex:0 0 auto; object-fit:contain; filter:drop-shadow(0 8px 14px rgba(29,42,102,.2)); }
+.student-event-featured { min-height:260px; display:grid; grid-template-columns:minmax(240px,.7fr) minmax(0,1.3fr); overflow:hidden; border:1px solid #cbd2ec; border-radius:24px; background:linear-gradient(135deg,#edf1ff 0%,#fff 62%,#fff1eb 100%); box-shadow:0 18px 42px rgba(38,50,111,.12); }
+.student-event-featured>img,.student-event-featured__mark { width:100%; height:100%; min-height:260px; object-fit:cover; }
+.student-event-featured__mark { display:grid; place-items:center; background:linear-gradient(145deg,#dce5ff,#f8e8ea); }
+.student-event-featured__mark img { width:124px; height:124px; object-fit:contain; filter:drop-shadow(0 12px 18px rgba(31,43,108,.22)); }
+.student-event-featured>div:last-child { display:grid; align-content:center; gap:.65rem; padding:clamp(1.1rem,3vw,2rem); }
+.student-event-featured>div:last-child>span { color:#5364a1; font-size:.78rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+.student-event-featured h2 { margin:0; color:#30386c; font:700 clamp(1.7rem,4vw,2.8rem)/1.05 Georgia,"Times New Roman",serif; }
+.student-event-featured p { margin:0; color:#555d72; line-height:1.55; }
+.student-event-featured strong { color:#3a4277; }
+.student-event-tabs { display:flex; gap:.35rem; padding:.32rem; overflow-x:auto; border:1px solid #d5d9e9; border-radius:15px; background:#f5f7fd; }
+.student-event-tabs button { min-width:116px; min-height:46px; flex:1 0 auto; padding:.65rem .9rem; border:0; border-radius:11px; color:#525a78; background:transparent; font:inherit; font-weight:850; cursor:pointer; }
+.student-event-tabs button:hover,.student-event-tabs button:focus-visible { color:#303b78; background:#eef1ff; }
+.student-event-tabs button.active { color:#fff; background:#3f51b5; box-shadow:0 6px 14px rgba(50,67,159,.2); }
+.student-event-past-scope { display:flex; align-items:center; flex-wrap:wrap; gap:.45rem; margin:0; padding:.7rem; border:1px solid #d8dce9; border-radius:15px; background:#fff; }
+.student-event-past-scope legend { padding:0 .4rem; color:#555b71; font-size:.78rem; font-weight:850; }
+.student-event-past-scope label { min-height:44px; display:flex; align-items:center; gap:.4rem; padding:.45rem .75rem; border:1px solid #d8dce9; border-radius:999px; color:#4b5371; cursor:pointer; }
+.student-event-past-scope label:has(input:checked) { border-color:#5364cb; color:#303b78; background:#edf0ff; }
+.student-event-past-scope input { width:18px; height:18px; accent-color:#5364cb; }
+.student-event-filters { display:grid; grid-template-columns:minmax(230px,1.4fr) repeat(3,minmax(145px,.55fr)); gap:.6rem; }
+.student-event-filters input,.student-event-filters select { width:100%; min-height:48px; padding:.65rem .75rem; border:1px solid #aeb5cb; border-radius:11px; color:#2e3243; background:#fff; font:inherit; }
+.student-event-list--catalog { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; }
+.student-event-list--catalog>article { min-width:0; display:grid; grid-template-columns:150px minmax(0,1fr); overflow:hidden; border:1px solid #d5daea; border-radius:18px; background:#fff; box-shadow:0 8px 24px rgba(41,52,105,.07); }
+.student-event-list--catalog>article>img,.student-event-list--catalog .student-event-list__mark { width:100%; height:100%; min-height:210px; object-fit:cover; }
+.student-event-list--catalog .student-event-list__mark { display:grid; place-items:center; background:linear-gradient(145deg,#eef1ff,#fff0e9); }
+.student-event-list--catalog .student-event-list__mark img { width:74px; height:74px; object-fit:contain; }
+.student-event-list--catalog>article>div:last-child { min-width:0; display:grid; align-content:start; gap:.4rem; padding:.85rem; }
+.student-event-list--catalog h2 { margin:0; color:#30386c; font:700 1.25rem/1.15 Georgia,"Times New Roman",serif; }
+.student-event-list--catalog p { display:-webkit-box; margin:0; overflow:hidden; color:#5c6275; line-height:1.45; -webkit-box-orient:vertical; -webkit-line-clamp:3; }
+.student-event-list--catalog small { color:#646b80; }
+.student-event-card-meta { display:flex; align-items:center; justify-content:space-between; gap:.45rem; }
+.student-event-card-meta>.event-date { min-width:58px; padding:.4rem; }
+.student-event-card-meta>span:last-child { color:#5364a1; font-size:.72rem; font-weight:850; text-transform:uppercase; }
+.student-own-attendance { color:#176349; font-size:.75rem; font-weight:850; text-transform:capitalize; }
+.student-event-detail__placeholder>img { width:128px; height:128px; object-fit:contain; filter:drop-shadow(0 10px 16px rgba(31,43,108,.2)); }
+.event-registration-confirm { display:grid; gap:.6rem; padding:.8rem; border:1px solid #e3c8b8; border-radius:12px; background:#fff7ef; }
+.event-registration-confirm p { margin:0; color:#615a58; }
+.event-registration-cancel { color:#8b1538; }
 .embedded-compass-form { display:grid; gap:.75rem; margin-top:.9rem; padding:.9rem; border-radius:12px; background:#f6f8ff; }
 .embedded-compass-form label { display:grid; gap:.35rem; }
 .embedded-compass-form textarea { min-height:92px; padding:.7rem; border:1px solid #bfc5da; border-radius:10px; font:inherit; }
@@ -1293,6 +1411,10 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 @media(max-width:620px) { .platform-header,.worksheet-page>header { align-items:flex-start; flex-wrap:wrap; } .worksheet-page>header { flex-direction:column; } .experience-title { order:3; width:100%; align-items:flex-start; padding-left:3px; } .platform-header--oaca .rucom-brand { width:min(55vw,185px); } .platform-header--oaca .compass-brand { order:3; width:100%; justify-content:center; margin:.2rem 0 0; } .platform-account>span { display:none; } .platform-main { padding-top:1.2rem; } .experience-grid,.experience-grid--compact,.home-action-grid--experience,.metric-grid,.source-fields,.worksheet-actions,.security-control-grid { grid-template-columns:1fr; } .experience-card { min-height:260px; } .section-heading { flex-direction:column; } .experience-form { padding:1rem; } .source-fields label,.source-fields label:has(textarea) { grid-column:1; } .synthetic-preview-banner { grid-template-columns:auto 1fr; } .synthetic-preview-banner .secondary-button { grid-column:1 / -1; width:100%; } .compass-role-nav { justify-content:stretch; } .compass-role-nav label { width:100%; justify-content:space-between; } .compass-role-nav select { flex:1; } .compass-hero-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .compass-hero-actions button:first-child { grid-column:1/-1; } .booking-progress,.compass-at-a-glance,.creator-time-panel { grid-template-columns:1fr; } .creator-time-breakdown { grid-column:1; } .rebook-prompt { align-items:flex-start; flex-direction:column; } }
 @media(max-width:620px) { .availability-single-advisor { grid-template-columns:42px 1fr; } .availability-single-advisor>small { grid-column:2; } .availability-band { grid-template-columns:1fr; } .availability-band>span { min-height:38px; padding:.55rem .75rem; } .availability-band>div { grid-template-columns:repeat(2,minmax(0,1fr)); } .availability-chart__heading { align-items:flex-start; flex-direction:column; } }
 @media(max-width:390px) { .availability-band>div { grid-template-columns:1fr; } }
+@media(max-width:1050px) { .student-header-actions button>strong { display:none; } .student-event-list--catalog { grid-template-columns:1fr; } .student-event-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:760px) { .student-header-actions { display:none; } .student-header-mobile { display:flex; } .platform-header:has(.student-header-mobile) .platform-account { display:none; } .home-service-choice>div { grid-template-columns:1fr; } .home-service-choice label { min-height:74px; } .home-scheduler-controls { grid-template-columns:1fr 1fr; } .home-scheduler-controls>label:first-child { grid-column:1/-1; } .home-upcoming-events>div:last-child { display:flex; overflow-x:auto; padding:.15rem 0 .65rem; scroll-snap-type:x mandatory; } .home-upcoming-events article { width:min(82vw,320px); flex:0 0 auto; scroll-snap-align:start; } .student-event-featured { grid-template-columns:1fr; } .student-event-featured>img,.student-event-featured__mark { min-height:180px; height:180px; } .student-event-filters { grid-template-columns:1fr 1fr; } }
+@media(max-width:620px) { .platform-header:has(.student-header-mobile) { align-items:center; flex-wrap:nowrap; } .platform-header:has(.student-header-mobile) .rucom-brand { width:min(45vw,165px); } .platform-header:has(.student-header-mobile) .compass-brand { order:initial; width:auto; margin:0; } .platform-header:has(.student-header-mobile) .compass-brand strong { display:none; } .compass-student-hero--compact h1 { font-size:clamp(2.35rem,14vw,3.65rem); } .home-scheduler-heading,.home-section-heading,.home-scheduler-footer,.appointment-selection-summary { align-items:flex-start; flex-direction:column; } .home-scheduler-heading>span { align-self:flex-start; } .home-scheduler-controls { grid-template-columns:1fr; } .home-scheduler-controls>label:first-child { grid-column:1; } .home-scheduler-footer .secondary-button { width:100%; } .student-next-steps>div:last-child { grid-template-columns:1fr; } .student-next-steps button { min-height:96px; } .student-events-heading { align-items:flex-start; } .student-events-heading>img { width:54px; height:54px; } .student-event-filters { grid-template-columns:1fr; } .student-event-list--catalog>article { grid-template-columns:105px minmax(0,1fr); } .student-event-list--catalog>article>img,.student-event-list--catalog .student-event-list__mark { min-height:230px; } .student-event-list--catalog .student-event-list__mark img { width:58px; height:58px; } .student-event-list--catalog .workspace-actions { align-items:flex-start; flex-direction:column; } .student-event-list--catalog .primary-button { width:100%; } }
+@media(max-width:390px) { .platform-header:has(.student-header-mobile) .compass-brand { display:none; } .student-event-list--catalog>article { grid-template-columns:1fr; } .student-event-list--catalog>article>img,.student-event-list--catalog .student-event-list__mark { min-height:150px; height:150px; } }
 @media(max-width:640px) { .hub-affiliations__heading { display:grid; } .affiliation-filters,.affiliation-list { grid-template-columns:1fr; } .affiliation-list { max-height:55dvh; } .affiliation-editor__body>.primary-button { width:100%; } }
 @media print { .print-hidden,.platform-header,.experience-nav { display:none!important; } .worksheet-page { width:100%; margin:0; font-size:11pt; } .worksheet-page>section { break-inside:avoid; } .worksheet-page textarea { border:0; border-bottom:1px solid #555; border-radius:0; min-height:90px; } }
 

@@ -468,6 +468,8 @@ type SyntheticEvent = {
   capacity: number | null;
   registrationCount: number;
   registered: boolean;
+  registrationStatus?: "none" | "registered" | "waitlisted" | "cancelled" | "attended" | "no_show";
+  waitlistPosition?: number | null;
   status: string;
   audience: OacaAudience;
   formId: string | null;
@@ -477,6 +479,11 @@ type SyntheticEvent = {
   absentCount?: number;
   notRecordedCount?: number;
   attendanceStatus?: "present" | "absent" | "not_recorded" | null;
+  category?: string | null;
+  accessibilityDetails?: string | null;
+  audienceEligible?: boolean;
+  publicCatalog?: boolean;
+  canCancelRegistration?: boolean;
   checkinOpen?: boolean;
   sourceSystem?: string | null;
 };
@@ -1023,6 +1030,13 @@ const syntheticEncounterStorageKey = "navigate.compass.synthetic-encounters.v1";
 function defaultSyntheticEventState(): SyntheticEventState {
   const events = [...oacaEvents(), ...penjiHistoryEvents()].map((event) => ({
     ...event,
+    registrationStatus: event.registrationStatus || (event.registered ? "registered" as const : "none" as const),
+    waitlistPosition: event.waitlistPosition || null,
+    category: event.category || (/career|specialty/i.test(event.title) ? "Career" : /tutor|study|reading|testing|clerkship/i.test(event.title) ? "Academic support" : "Community"),
+    accessibilityDetails: event.accessibilityDetails || "Contact the event team through Compass for accessibility support.",
+    audienceEligible: true,
+    publicCatalog: event.publicCatalog ?? (event.sourceSystem === "penji" || event.status === "completed"),
+    canCancelRegistration: event.registered && new Date(event.startsAt).getTime() > Date.now(),
     timezone: "America/Los_Angeles",
     canManage: true,
     presentCount: event.presentCount ?? (event.id === "event-past" ? 18 : 2),
@@ -2685,7 +2699,16 @@ class SyntheticPilotApi {
           (event) => event.sourceSystem === "penji" && !savedIds.has(event.id),
         );
         this.eventState = {
-          events: [...savedEvents, ...requiredHistory],
+          events: [...savedEvents, ...requiredHistory].map((event) => ({
+            ...event,
+            registrationStatus: event.registrationStatus || (event.registered ? "registered" : "none"),
+            waitlistPosition: event.waitlistPosition || null,
+            category: event.category || (/career|specialty/i.test(event.title) ? "Career" : /tutor|study|reading|testing|clerkship/i.test(event.title) ? "Academic support" : "Community"),
+            accessibilityDetails: event.accessibilityDetails || "Contact the event team through Compass for accessibility support.",
+            audienceEligible: event.audienceEligible ?? true,
+            publicCatalog: event.publicCatalog ?? (event.sourceSystem === "penji" || event.status === "completed"),
+            canCancelRegistration: event.registered && new Date(event.startsAt).getTime() > Date.now(),
+          })),
           hosts: { ...defaults.hosts, ...(parsed.hosts || {}) },
           notices: Array.isArray(parsed.notices)
             ? parsed.notices
@@ -3579,6 +3602,7 @@ class SyntheticPilotApi {
         ),
         encounterRecords: this.encounterRecords,
         events: this.eventState.events,
+        eventNotificationUnreadCount: this.eventState.notices.filter((notice) => !notice.category.startsWith("event_staff_") && !notice.readAt && !notice.dismissedAt).length,
       };
       return clone(
         isStudent
@@ -3690,6 +3714,8 @@ class SyntheticPilotApi {
         capacity: body.capacity ? Number(body.capacity) : null,
         registrationCount: 0,
         registered: false,
+        registrationStatus: "none",
+        waitlistPosition: null,
         status: publish ? "published" : "draft",
         audience: body.audience || { includeAllMembers: true },
         formId: null,
@@ -3699,6 +3725,11 @@ class SyntheticPilotApi {
         absentCount: 0,
         notRecordedCount: 0,
         attendanceStatus: null,
+        category: String(body.category || "Community"),
+        accessibilityDetails: String(body.accessibilityDetails || "Contact the event team through Compass for accessibility support."),
+        audienceEligible: true,
+        publicCatalog: Boolean(body.publicCatalog),
+        canCancelRegistration: false,
         checkinOpen: false,
         sourceSystem: null,
       };
@@ -3744,6 +3775,9 @@ class SyntheticPilotApi {
         Object.assign(event, {
           title: body.title ?? event.title,
           description: body.description ?? event.description,
+          category: body.category ?? event.category,
+          accessibilityDetails: body.accessibilityDetails ?? event.accessibilityDetails,
+          publicCatalog: body.publicCatalog ?? event.publicCatalog,
           startsAt: body.startsAt ?? event.startsAt,
           endsAt: body.endsAt ?? event.endsAt,
           location: body.location ?? event.location,
@@ -4057,6 +4091,45 @@ class SyntheticPilotApi {
       return clone(
         this.impactEvents.filter((item) => item.status === "published"),
       ) as T;
+    if (path === "/api/oaca/events/register" && method === "POST") {
+      const event = this.eventState.events.find(
+        (item) => item.id === (options.body as { eventId?: string })?.eventId,
+      );
+      if (!event || event.status !== "published" || new Date(event.startsAt).getTime() <= Date.now()) throw new Error("This event is not available for registration.");
+      if (["registered", "waitlisted"].includes(event.registrationStatus || "")) return clone({ status: event.registrationStatus }) as T;
+      const full = event.capacity != null && event.registrationCount >= event.capacity;
+      event.registrationStatus = full ? "waitlisted" : "registered";
+      event.waitlistPosition = full ? 1 : null;
+      event.registered = true;
+      event.canCancelRegistration = true;
+      if (!full) event.registrationCount += 1;
+      this.eventState.notices.unshift({
+        id: `student-event-registration-${event.id}-${Date.now()}`,
+        eventId: event.id,
+        category: full ? "event_waitlist" : "event_registration",
+        title: full ? "You joined the waitlist" : "You are registered",
+        body: `${event.title} is now in your Compass events.`,
+        deepLink: `/app/compass?event=${event.id}`,
+        readAt: null,
+        dismissedAt: null,
+        createdAt: new Date().toISOString(),
+      });
+      this.saveEvents();
+      return clone({ status: event.registrationStatus, waitlistPosition: event.waitlistPosition }) as T;
+    }
+    if (path === "/api/oaca/events/registration/cancel" && method === "POST") {
+      const event = this.eventState.events.find(
+        (item) => item.id === (options.body as { eventId?: string })?.eventId,
+      );
+      if (!event || new Date(event.startsAt).getTime() <= Date.now() || !["registered", "waitlisted"].includes(event.registrationStatus || "")) throw new Error("This registration can no longer be cancelled.");
+      if (event.registrationStatus === "registered") event.registrationCount = Math.max(0, event.registrationCount - 1);
+      event.registrationStatus = "cancelled";
+      event.waitlistPosition = null;
+      event.registered = false;
+      event.canCancelRegistration = false;
+      this.saveEvents();
+      return clone({ status: "cancelled" }) as T;
+    }
     if (path === "/api/platform/files") return { id: "synthetic-file" } as T;
     if (path === "/api/platform/notification-preferences")
       return { smsEnabled: false } as T;
