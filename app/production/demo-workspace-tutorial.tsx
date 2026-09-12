@@ -91,7 +91,8 @@ const peerTutorChapters: TutorialChapter[] = [
     id: "tutor-today", title: "Today", minutes: 1,
     steps: [
       step("tutor-today", "tutor-home", "Your Peer Tutor workspace", "Tutor mode is separate from your student dashboard. It includes only tutoring work and the limited student context needed for each session.", "A secondary student role", "Peer Tutors retain student access while the tutor response is separately scoped. Advising notes, grades, portfolios, and unrelated records are removed before the tutor dashboard loads.", "[data-tutorial-id='tutor-home']"),
-      step("tutor-today", "tutor-priorities", "Start with what needs attention", "See unanswered requests, today’s sessions, unread session messages, and documentation due within 24 hours.", "Operational accountability", "Response and documentation clocks produce explainable work queues. They never create a predictive student or tutor score.", "[data-tutorial-id='tutor-today']"),
+      step("tutor-today", "tutor-availability", "Publish your bookable time first", "Add a single day when your schedule changes or create a weekly pattern with a start time, end time, session length, format, and location.", "Tutor-controlled availability", "Students receive only slots that also pass qualification, buffer, commitment, and appointment-limit checks.", "[data-tutorial-id='tutor-home-availability']"),
+      step("tutor-today", "tutor-priorities", "Work tasks, then your agenda", "Unanswered requests and due logs appear before upcoming sessions, followed by the wider workload summary.", "Operational accountability", "Response and documentation clocks produce explainable work queues. They never create a predictive student or tutor score.", "[data-tutorial-id='tutor-home-tasks']"),
     ],
   },
   {
@@ -146,8 +147,8 @@ function advisorChapters(persona: SyntheticPersonaKey): TutorialChapter[] {
       id: "advisor-today", title: "Today", minutes: 1,
       steps: [
         step("advisor-today", "advisor-home", career ? "Your Career Advisor workspace" : "Your Academic Advisor workspace", career ? "Focus on the four-year roadmap, career visits, artifacts, and follow-through." : "Focus on permanent caseloads, drop-ins, milestones, plans, and shared advising history.", "Service-specific workspaces", career ? "Career tools are separated from academic caseload controls while both contribute to the shared student record." : "Academic tools reflect assignment and drop-in rules while allowing authorized cross-caseload continuity.", ".advisor-workspace-hero"),
-        step("advisor-today", "advisor-metrics", "Scan today’s workload", "Appointments, pending requests, unread messages, and due actions are visible at a glance.", "Operational overview", "The dashboard summarizes work without using a predictive risk score; attention conditions remain explainable.", ".advisor-today-metrics"),
-        step("advisor-today", "advisor-agenda", "Work the agenda", "Open the next session or follow an attention item into messages, tasks, milestones, or appointment requests.", "Traceable attention", "Every count links to its source work queue, supporting operational review without ranking students.", ".advisor-home-grid"),
+        step("advisor-today", "advisor-availability-home", "Start with appointment availability", "Add one day when your schedule changes or create a recurring weekly block. Set the visit length and format before publishing the time.", "Compass-managed schedule", "Students see only the blocks permitted for their service and assigned advisor. Outlook can later refine these rules without becoming the system of record.", "[data-tutorial-id='advisor-home-availability']"),
+        step("advisor-today", "advisor-agenda", "Work tasks, then the agenda", "Due follow-through appears first, followed by today’s appointments and the wider workload summary.", "Traceable attention", "Every item links to its source work queue, supporting operational review without ranking students.", "[data-tutorial-id='advisor-home-tasks']"),
       ],
     },
     {
@@ -160,7 +161,7 @@ function advisorChapters(persona: SyntheticPersonaKey): TutorialChapter[] {
     {
       id: "advisor-availability", title: "Availability", minutes: 1,
       steps: [
-        step("advisor-availability", "advisor-availability", "Set bookable time blocks", "Configure recurring days, start and end times, formats, locations, buffers, and appointment lengths. New appointments default to 30 minutes.", "Scheduling without Outlook", "These blocks power the synthetic student booking chart now and form the platform source rules that Outlook free/busy can later refine.", "[data-tutorial-id='advisor-tile-availability']"),
+        step("advisor-availability", "advisor-availability", "Fine-tune all bookable time", "Open the full availability workspace to review, remove, or adjust one-day and recurring blocks, formats, locations, buffers, and appointment lengths.", "Scheduling without Outlook", "These blocks power the synthetic student booking chart now and form the platform source rules that Outlook free/busy can later refine.", "[data-tutorial-id='advisor-tile-availability']"),
         ...(director ? [step("advisor-availability", "director-controls", "Use Director controls", "Open policy, import, requirement, handoff, and aggregate reporting controls without leaving the advisor workspace.", "Govern the full service", "Director access adds configuration and aggregate operations while protected conversations and records retain their own access rules.", ".advisor-director-strip")] : []),
       ],
     },

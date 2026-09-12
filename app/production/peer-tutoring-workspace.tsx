@@ -62,19 +62,76 @@ function timeLabel(value: string) {
   return new Date(value).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+function tutorInputDate(offsetDays = 0) {
+  const value = new Date();
+  value.setDate(value.getDate() + offsetDays);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+}
+
+const tutorWeekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
 function Metric({ value, label }: { value: string | number; label: string }) {
   return <article><strong>{value}</strong><span>{label}</span></article>;
 }
 
-function PeerTutorHome({ data, onOpen }: { data: TutorBootstrap; onOpen: (view: string) => void }) {
+function PeerTutorHome({ data, onOpen, onSave, message }: { data: TutorBootstrap; onOpen: (view: string) => void; onSave: (path: string, body: Record<string, unknown>) => Promise<void>; message: string }) {
   const pending = data.requests.filter((item) => item.status === "pending_approval");
   const today = data.sessions.filter((item) => new Date(item.startsAt).toDateString() === new Date().toDateString());
   const dueLogs = data.sessions.filter((item) => ["due", "overdue"].includes(item.logStatus));
   const unread = data.messages.filter((item) => item.unread).length;
+  const [mode, setMode] = useState<"date" | "recurring">("recurring");
+  const [days, setDays] = useState(["Monday", "Wednesday"]);
+  const [date, setDate] = useState(() => tutorInputDate(1));
+  const [startsAt, setStartsAt] = useState("16:00");
+  const [endsAt, setEndsAt] = useState("18:00");
+  const [duration, setDuration] = useState<30 | 45 | 60>(60);
+  const [modality, setModality] = useState("in_person");
+  const [location, setLocation] = useState("Learning Commons");
+  const upcoming = [...data.sessions].filter((item) => new Date(item.endsAt).getTime() >= Date.now()).sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime()).slice(0, 3);
+  const saveHomeAvailability = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (startsAt >= endsAt) return;
+    if (mode === "date") {
+      await onSave("/api/oaca/tutor/availability/exceptions", { date, kind: "add", startsAt, endsAt, note: `${modality.replaceAll("_", " ")} · ${location}` });
+      return;
+    }
+    if (!days.length) return;
+    await onSave("/api/oaca/tutor/availability", {
+      ...data.availability,
+      defaultDurationMinutes: duration,
+      rules: [
+        ...data.availability.rules,
+        ...days.map((day) => ({ id: `tutor-rule-${crypto.randomUUID()}`, day, startsAt, endsAt, modalities: [modality], location })),
+      ],
+    } as unknown as Record<string, unknown>);
+  };
   return <section className="experience-panel tutoring-workspace tutoring-workspace--tutor">
     <div className="tutoring-hero" data-tutorial-id="tutor-home">
       <div><p className="kicker">Peer Tutor workspace</p><h1>Ready for today.</h1><p>Respond to requests, run sessions, and finish documentation without opening student advising records.</p></div>
       <div className="tutoring-hero__status"><span>{data.eligibility.active ? "Active tutor" : "Not cleared"}</span><strong>{today.length}</strong><small>session{today.length === 1 ? "" : "s"} today</small></div>
+    </div>
+    <section className="provider-home-availability provider-home-availability--tutor" data-tutorial-id="tutor-home-availability">
+      <div className="provider-home-availability__heading"><div><p className="kicker">Appointment availability</p><h2>Choose when students can request you</h2><p>Add an extra day or keep a dependable weekly pattern.</p></div><button className="text-button" type="button" onClick={() => onOpen("availability")}>Manage all blocks</button></div>
+      <div className="provider-home-availability__layout">
+        <div className="provider-home-availability__schedule" aria-label="Current tutoring availability">
+          <div className="provider-home-availability__summary"><span><strong>{data.availability.rules.length + data.availability.exceptions.filter((item) => item.kind === "add").length}</strong> active blocks</span><span><strong>{data.availability.defaultDurationMinutes} min</strong> default</span></div>
+          {data.availability.exceptions.filter((item) => item.kind === "add").slice(0, 2).map((item) => <article key={item.id}><time>{new Date(`${item.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</time><strong>{item.startsAt}–{item.endsAt}</strong><small>One day · {item.note}</small></article>)}
+          {data.availability.rules.slice(0, 3).map((rule) => <article key={rule.id}><time>{rule.day.slice(0, 3)}</time><strong>{rule.startsAt}–{rule.endsAt}</strong><small>Repeats weekly · {rule.modalities.map((item) => item.replaceAll("_", " ")).join(" · ")}</small></article>)}
+        </div>
+        <form className="provider-home-availability__form" onSubmit={saveHomeAvailability}>
+          <div className="provider-availability-mode" role="group" aria-label="Availability frequency"><button type="button" className={mode === "date" ? "active" : ""} aria-pressed={mode === "date"} onClick={() => setMode("date")}>One day</button><button type="button" className={mode === "recurring" ? "active" : ""} aria-pressed={mode === "recurring"} onClick={() => setMode("recurring")}>Repeats weekly</button></div>
+          {mode === "date" ? <label><span>Date</span><input required min={tutorInputDate()} type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label> : <fieldset><legend>Days</legend><div className="provider-day-options">{tutorWeekdays.map((day) => <label key={day}><input type="checkbox" checked={days.includes(day)} onChange={() => setDays((current) => current.includes(day) ? current.filter((item) => item !== day) : [...current, day])} /><span>{day.slice(0, 3)}</span></label>)}</div></fieldset>}
+          <div className="form-row"><label><span>Start</span><input required type="time" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></label><label><span>End</span><input required type="time" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></label></div>
+          <div className="form-row"><label><span>Session length</span><select value={duration} onChange={(event) => setDuration(Number(event.target.value) as 30 | 45 | 60)}><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><label><span>Format</span><select value={modality} onChange={(event) => setModality(event.target.value)}><option value="in_person">In person</option><option value="teams">Teams</option></select></label></div>
+          <label><span>Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} /></label>
+          <button className="primary-button" disabled={startsAt >= endsAt || (mode === "recurring" && !days.length)}>{mode === "date" ? "Add this day" : "Add weekly block"}</button>
+        </form>
+      </div>
+      {message ? <p className="form-message" aria-live="polite">{message}</p> : null}
+    </section>
+    <div className="provider-home-work-grid">
+      <section className="provider-home-task-list" data-tutorial-id="tutor-home-tasks"><div className="section-heading"><div><p className="kicker">Tasks</p><h2>What needs action</h2></div><button className="text-button" onClick={() => onOpen(pending.length ? "requests" : "logs")}>Open queue</button></div>{pending.slice(0, 2).map((request) => <button key={request.id} onClick={() => onOpen("requests")}><span><strong>Respond to {request.studentName}</strong><small>{request.subject}</small></span><time>{timeLabel(request.startsAt)}</time></button>)}{dueLogs.slice(0, 2).map((session) => <button key={session.id} onClick={() => onOpen("logs")}><span><strong>Finish session log</strong><small>{session.studentName} · {session.subject}</small></span><time>{session.logStatus}</time></button>)}{!pending.length && !dueLogs.length ? <p>Your tutoring tasks are current.</p> : null}</section>
+      <section className="provider-home-agenda" data-tutorial-id="tutor-home-agenda"><div className="section-heading"><div><p className="kicker">Agenda</p><h2>Next sessions</h2></div><button className="text-button" onClick={() => onOpen("sessions")}>Full calendar</button></div>{upcoming.map((session) => <button key={session.id} onClick={() => onOpen("sessions")}><time>{timeLabel(session.startsAt)}</time><span><strong>{session.studentName}</strong><small>{session.subject} · {session.modality.replaceAll("_", " ")}</small></span></button>)}{!upcoming.length ? <p>No upcoming tutoring sessions.</p> : null}</section>
     </div>
     <div className="tutoring-today-grid" data-tutorial-id="tutor-today">
       <Metric value={pending.length} label="requests awaiting response" />
@@ -82,10 +139,6 @@ function PeerTutorHome({ data, onOpen }: { data: TutorBootstrap; onOpen: (view: 
       <Metric value={dueLogs.length} label="session logs due" />
       <Metric value={data.rooms.filter((room) => room.checkedIn).length} label="active drop-in rooms" />
     </div>
-    <section className="tutoring-priority" aria-labelledby="tutor-priority-title">
-      <div><p className="kicker">Next action</p><h2 id="tutor-priority-title">{pending[0] ? `Respond to ${pending[0].studentName}` : dueLogs[0] ? "Complete a session log" : "Review today’s schedule"}</h2><p>{pending[0] ? `${pending[0].subject} · ${timeLabel(pending[0].startsAt)}` : dueLogs[0] ? `${dueLogs[0].studentName} · ${dueLogs[0].subject}` : "Your tutoring queue is up to date."}</p></div>
-      <button className="primary-button" onClick={() => onOpen(pending[0] ? "requests" : dueLogs[0] ? "logs" : "sessions")}>Open</button>
-    </section>
     <div className="tutoring-action-grid" data-tutorial-id="tutor-tools">
       {[
         ["requests", "Requests", "Confirm, decline, or propose another time", "↗"],
@@ -187,5 +240,5 @@ export function PeerTutoringWorkspace({ api, mode }: { api: PilotApiClient; mode
   }, [api, load]);
   if (!data) return <section className="experience-panel"><p className="form-message" aria-live="polite">{message}</p></section>;
   if (view !== "home") return <section className="experience-panel tutoring-workspace"><button className="workspace-back text-button" onClick={() => setView("home")}>← Tutoring home</button><p className="kicker">{mode === "peer_tutor" ? "Peer Tutor" : "Tutoring Manager"}</p><h1>{title}</h1>{message ? <p className="form-message" aria-live="polite">{message}</p> : null}{data.role === "peer_tutor" ? <TutorDetail data={data} view={view} action={action} message={message} /> : <ManagerDetail data={data} view={view} action={action} />}</section>;
-  return data.role === "peer_tutor" ? <PeerTutorHome data={data} onOpen={setView} /> : <ManagerHome data={data} onOpen={setView} />;
+  return data.role === "peer_tutor" ? <PeerTutorHome data={data} onOpen={setView} onSave={action} message={message} /> : <ManagerHome data={data} onOpen={setView} />;
 }

@@ -13,13 +13,27 @@ export type AdvisorAvailabilityBlock = {
   location: string;
 };
 
+export type AdvisorAvailabilityException = {
+  id: string;
+  date: string;
+  kind: "add" | "remove";
+  startsAt: string;
+  endsAt: string;
+  bufferMinutes: number;
+  durationMinutes: number;
+  modalities: string[];
+  location: string;
+};
+
 export type AdvisorAvailabilitySettings = {
   defaultDurationMinutes: number;
   blocks: AdvisorAvailabilityBlock[];
+  exceptions: AdvisorAvailabilityException[];
 };
 
 export const defaultAdvisorAvailabilitySettings: AdvisorAvailabilitySettings = {
   defaultDurationMinutes: 30,
+  exceptions: [],
   blocks: [
     {
       id: "weekday-mornings",
@@ -90,10 +104,52 @@ export function normalizeAdvisorAvailability(
       },
     ];
   });
+  const exceptions = (Array.isArray(raw.exceptions) ? raw.exceptions : []).flatMap(
+    (candidate, index) => {
+      if (!candidate || typeof candidate !== "object") return [];
+      const item = candidate as Record<string, unknown>;
+      const date = typeof item.date === "string" ? item.date : "";
+      const startsAt = validTime(item.startsAt) ? item.startsAt : "09:00";
+      const endsAt = validTime(item.endsAt) ? item.endsAt : "12:00";
+      const modalities = Array.isArray(item.modalities)
+        ? item.modalities.map(String).filter(Boolean)
+        : [];
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || startsAt >= endsAt) return [];
+      return [
+        {
+          id:
+            typeof item.id === "string" && item.id
+              ? item.id
+              : `availability-exception-${index + 1}`,
+          date,
+          kind: item.kind === "remove" ? "remove" : "add",
+          startsAt,
+          endsAt,
+          bufferMinutes: Math.min(
+            60,
+            Math.max(0, Number(item.bufferMinutes) || 0),
+          ),
+          durationMinutes: validDuration(
+            item.durationMinutes ?? raw.defaultDurationMinutes,
+          ),
+          modalities,
+          location: typeof item.location === "string" ? item.location : "",
+        },
+      ];
+    },
+  );
   return {
     defaultDurationMinutes: validDuration(raw.defaultDurationMinutes),
     blocks,
+    exceptions,
   };
+}
+
+function localDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function setLocalTime(date: Date, time: string) {
@@ -121,7 +177,27 @@ export function expandAdvisorAvailability(
   for (let offset = 0; offset <= days && slots.length < maximumSlots; offset += 1) {
     const day = new Date(now);
     day.setDate(day.getDate() + offset);
-    for (const block of settings.blocks.filter((item) => item.weekdays.includes(day.getDay()))) {
+    const dateKey = localDateKey(day);
+    const removed = settings.exceptions.filter(
+      (item) => item.date === dateKey && item.kind === "remove",
+    );
+    const recurring = settings.blocks.filter(
+      (item) =>
+        item.weekdays.includes(day.getDay()) &&
+        !removed.some(
+          (exception) =>
+            exception.startsAt < item.endsAt && exception.endsAt > item.startsAt,
+        ),
+    );
+    const additions = settings.exceptions
+      .filter(
+        (item) =>
+          item.date === dateKey &&
+          item.kind === "add" &&
+          item.modalities.length > 0,
+      )
+      .map((item) => ({ ...item, weekdays: [day.getDay()] }));
+    for (const block of [...recurring, ...additions]) {
       let start = setLocalTime(day, block.startsAt);
       const windowEnd = setLocalTime(day, block.endsAt);
       while (slots.length < maximumSlots) {
@@ -145,7 +221,8 @@ export function expandAdvisorAvailability(
       }
     }
   }
-  return slots.sort(
+  const unique = new Map(slots.map((slot) => [`${slot.startsAt}-${slot.endsAt}`, slot]));
+  return [...unique.values()].sort(
     (left, right) =>
       new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime(),
   );

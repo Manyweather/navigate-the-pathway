@@ -89,3 +89,35 @@ test("availability expansion respects shorter and longer appointment blocks", ()
     60 * 60_000,
   );
 });
+
+test("one-day availability augments recurring blocks without changing the weekly pattern", () => {
+  const provider = {
+    id: "advisor-1",
+    name: "Assigned Advisor",
+    role: "Your academic advisor",
+    serviceKey: "academic_advising",
+  };
+  const slots = expandAdvisorAvailability(
+    {
+      defaultDurationMinutes: 30,
+      blocks: [],
+      exceptions: [
+        {
+          id: "extra-tuesday",
+          date: "2026-09-15",
+          kind: "add",
+          startsAt: "13:00",
+          endsAt: "14:00",
+          bufferMinutes: 0,
+          durationMinutes: 30,
+          modalities: ["teams"],
+          location: "",
+        },
+      ],
+    },
+    provider,
+    { now: new Date("2026-09-14T08:00:00-07:00"), days: 2 },
+  );
+  assert.equal(slots.length, 2);
+  assert.ok(slots.every((slot) => slot.startsAt.startsWith("2026-09-15")));
+});

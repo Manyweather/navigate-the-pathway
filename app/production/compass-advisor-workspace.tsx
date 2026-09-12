@@ -232,6 +232,15 @@ function statusLabel(value: string) {
   return value.replaceAll("_", " ");
 }
 
+function localInputDate(offsetDays = 0) {
+  const value = new Date();
+  value.setDate(value.getDate() + offsetDays);
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 const advisorWeekdays = [
   [1, "Monday", "Mon"],
   [2, "Tuesday", "Tue"],
@@ -487,6 +496,12 @@ export function CompassAdvisorWorkspace({
     useState<AdvisorAvailabilitySettings>(() =>
       structuredClone(defaultAdvisorAvailabilitySettings),
     );
+  const [availabilityMode, setAvailabilityMode] = useState<"recurring" | "date">(
+    "recurring",
+  );
+  const [availabilityDate, setAvailabilityDate] = useState(() =>
+    localInputDate(1),
+  );
   const [availabilityDays, setAvailabilityDays] = useState<number[]>([1, 3, 5]);
   const [availabilityStart, setAvailabilityStart] = useState("09:00");
   const [availabilityEnd, setAvailabilityEnd] = useState("12:00");
@@ -536,10 +551,9 @@ export function CompassAdvisorWorkspace({
   }, [loadAdvisor]);
 
   useEffect(() => {
-    if (view !== "availability") return;
     const task = window.setTimeout(() => void loadAvailability(), 0);
     return () => window.clearTimeout(task);
-  }, [loadAvailability, view]);
+  }, [loadAvailability]);
 
   const allAppointments = advisor.appointments || data.appointments;
   const allRecords = advisor.encounterRecords || data.encounterRecords;
@@ -701,6 +715,45 @@ export function CompassAdvisorWorkspace({
       blocks: [...availabilitySettings.blocks, block],
     };
     await saveAvailability(next, "Availability block added.");
+  };
+
+  const addHomeAvailability = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (availabilityStart >= availabilityEnd) {
+      setMessage("The end time must be later than the start time.");
+      return;
+    }
+    if (!availabilityModalities.length) {
+      setMessage("Choose at least one appointment format.");
+      return;
+    }
+    if (availabilityMode === "date") {
+      if (!availabilityDate) {
+        setMessage("Choose a date for this availability block.");
+        return;
+      }
+      const next = {
+        ...availabilitySettings,
+        defaultDurationMinutes: Number(availabilityDuration),
+        exceptions: [
+          ...availabilitySettings.exceptions,
+          {
+            id: `availability-date-${crypto.randomUUID()}`,
+            date: availabilityDate,
+            kind: "add" as const,
+            startsAt: availabilityStart,
+            endsAt: availabilityEnd,
+            bufferMinutes: Number(availabilityBuffer),
+            durationMinutes: Number(availabilityDuration),
+            modalities: availabilityModalities,
+            location: availabilityLocation.trim(),
+          },
+        ],
+      };
+      await saveAvailability(next, "One-day availability added.");
+      return;
+    }
+    await addAvailabilityBlock(event);
   };
 
   const chooseWorkspace = (next: AdvisorWorkspaceKey) => {
@@ -2418,6 +2471,20 @@ export function CompassAdvisorWorkspace({
                 </button>
               </article>
             ))}
+            {availabilitySettings.exceptions.map((item) => (
+              <article className="advisor-availability-block" key={item.id}>
+                <div className="advisor-availability-block__time">
+                  <span>{item.kind === "add" ? "One day" : "Unavailable"}</span>
+                  <strong>{new Date(`${item.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {item.startsAt}–{item.endsAt}</strong>
+                </div>
+                <div className="advisor-availability-block__details">
+                  <span>{item.durationMinutes}-minute appointments</span>
+                  <span>{item.modalities.map((format) => statusLabel(format)).join(" · ")}</span>
+                  {item.location ? <span>{item.location}</span> : null}
+                </div>
+                <button type="button" className="text-button" disabled={busy} onClick={() => void saveAvailability({ ...availabilitySettings, exceptions: availabilitySettings.exceptions.filter((exception) => exception.id !== item.id) }, "One-day availability removed.")}>Remove</button>
+              </article>
+            ))}
             {!availabilitySettings.blocks.length ? (
               <div className="empty-state">
                 <h3>No availability blocks</h3>
@@ -2604,26 +2671,81 @@ export function CompassAdvisorWorkspace({
           <small>{advisor.currentAdvisorName}</small>
         </div>
       </div>
-      <div className="advisor-today-metrics">
-        <article>
-          <strong>{todayAppointments.length}</strong>
-          <span>today</span>
-        </article>
-        <article>
-          <strong>{pending.length}</strong>
-          <span>requests to review</span>
-        </article>
-        <article>
-          <strong>{unreadMessages.length}</strong>
-          <span>unread messages</span>
-        </article>
-        <article>
-          <strong>{openTasks.length}</strong>
-          <span>open actions</span>
-        </article>
-      </div>
-      <div className="advisor-home-grid">
-        <section className="advisor-today-list">
+      <section className="provider-home-availability" data-tutorial-id="advisor-home-availability">
+        <div className="provider-home-availability__heading">
+          <div>
+            <p className="kicker">Appointment availability</p>
+            <h2>Set the times students can book</h2>
+            <p>Add one day when your schedule changes, or build a weekly pattern.</p>
+          </div>
+          <button className="text-button" type="button" onClick={() => setView("availability")}>Manage all blocks</button>
+        </div>
+        <div className="provider-home-availability__layout">
+          <div className="provider-home-availability__schedule" aria-label="Current availability">
+            <div className="provider-home-availability__summary">
+              <span><strong>{availabilitySettings.blocks.length + availabilitySettings.exceptions.filter((item) => item.kind === "add").length}</strong> active blocks</span>
+              <span><strong>{availabilitySettings.defaultDurationMinutes} min</strong> default</span>
+            </div>
+            {availabilitySettings.exceptions.filter((item) => item.kind === "add").slice(0, 2).map((item) => (
+              <article key={item.id}>
+                <time>{new Date(`${item.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</time>
+                <strong>{item.startsAt}–{item.endsAt}</strong>
+                <small>One day · {item.durationMinutes}-minute visits</small>
+              </article>
+            ))}
+            {availabilitySettings.blocks.slice(0, 3).map((block) => (
+              <article key={block.id}>
+                <time>{availabilityDaysLabel(block)}</time>
+                <strong>{block.startsAt}–{block.endsAt}</strong>
+                <small>Repeats weekly · {block.durationMinutes}-minute visits</small>
+              </article>
+            ))}
+          </div>
+          <form className="provider-home-availability__form" onSubmit={addHomeAvailability}>
+            <div className="provider-availability-mode" role="group" aria-label="Availability frequency">
+              <button type="button" className={availabilityMode === "date" ? "active" : ""} aria-pressed={availabilityMode === "date"} onClick={() => setAvailabilityMode("date")}>One day</button>
+              <button type="button" className={availabilityMode === "recurring" ? "active" : ""} aria-pressed={availabilityMode === "recurring"} onClick={() => setAvailabilityMode("recurring")}>Repeats weekly</button>
+            </div>
+            {availabilityMode === "date" ? (
+              <label><span>Date</span><input required min={localInputDate()} type="date" value={availabilityDate} onChange={(event) => setAvailabilityDate(event.target.value)} /></label>
+            ) : (
+              <fieldset>
+                <legend>Days</legend>
+                <div className="provider-day-options">
+                  {advisorWeekdays.map(([value, label, short]) => (
+                    <label key={value} title={label}><input type="checkbox" checked={availabilityDays.includes(value)} onChange={() => setAvailabilityDays((current) => current.includes(value) ? current.filter((day) => day !== value) : [...current, value].sort())} /><span>{short}</span></label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
+            <div className="form-row">
+              <label><span>Start</span><input required type="time" value={availabilityStart} onChange={(event) => setAvailabilityStart(event.target.value)} /></label>
+              <label><span>End</span><input required type="time" value={availabilityEnd} onChange={(event) => setAvailabilityEnd(event.target.value)} /></label>
+            </div>
+            <div className="form-row">
+              <label><span>Visit length</span><select value={availabilityDuration} onChange={(event) => setAvailabilityDuration(event.target.value)}>{appointmentDurationOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></label>
+              <label><span>Format</span><select value={availabilityModalities[0] || "in_person"} onChange={(event) => setAvailabilityModalities([event.target.value])}><option value="in_person">In person</option><option value="teams">Teams</option><option value="phone">Phone</option></select></label>
+            </div>
+            <button className="primary-button" disabled={busy}>{availabilityMode === "date" ? "Add this day" : "Add weekly block"}</button>
+          </form>
+        </div>
+        {message ? <p className="form-message" aria-live="polite">{message}</p> : null}
+      </section>
+      <div className="provider-home-work-grid">
+        <section className="provider-home-task-list" data-tutorial-id="advisor-home-tasks">
+          <div className="section-heading">
+            <div><p className="kicker">Tasks</p><h2>Follow-through</h2></div>
+            <button className="text-button" onClick={() => setView("tasks")}>All tasks</button>
+          </div>
+          {openTasks.slice(0, 3).map((task) => (
+            <button key={task.id} onClick={() => setView("tasks")}>
+              <span><strong>{task.title}</strong><small>{task.studentName}</small></span>
+              <time>{task.dueAt ? new Date(task.dueAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "No due date"}</time>
+            </button>
+          ))}
+          {!openTasks.length ? <p>Nothing is waiting for follow-through.</p> : null}
+        </section>
+        <section className="advisor-today-list" data-tutorial-id="advisor-home-agenda">
           <div className="section-heading">
             <div>
               <p className="kicker">Agenda</p>
@@ -2655,7 +2777,14 @@ export function CompassAdvisorWorkspace({
             <p>No appointments are currently in your {workspace} scope.</p>
           ) : null}
         </section>
-        <aside className="advisor-attention-panel">
+      </div>
+      <div className="advisor-today-metrics">
+        <article><strong>{todayAppointments.length}</strong><span>today</span></article>
+        <article><strong>{pending.length}</strong><span>requests to review</span></article>
+        <article><strong>{unreadMessages.length}</strong><span>unread messages</span></article>
+        <article><strong>{openTasks.length}</strong><span>open actions</span></article>
+      </div>
+      <aside className="advisor-attention-panel advisor-attention-panel--row">
           <div>
             <p className="kicker">Needs attention</p>
             <h2>{attentionTotal(advisor.attention)} explainable items</h2>
@@ -2685,8 +2814,7 @@ export function CompassAdvisorWorkspace({
               to the advisor who created them.
             </p>
           ) : null}
-        </aside>
-      </div>
+      </aside>
       <div className="advisor-tile-grid">
         {tiles.map((tile) => (
           <button key={tile.key} onClick={tile.action} data-tutorial-id={`advisor-tile-${tile.key}`}>
