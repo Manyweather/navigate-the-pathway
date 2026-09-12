@@ -98,7 +98,7 @@ function PeerTutorHome({ data, onOpen }: { data: TutorBootstrap; onOpen: (view: 
         ["policies", "Policies & help", "Eligibility, limits, and Workday reminder", "§"],
       ].map(([key, title, description, icon]) => <button key={key} onClick={() => onOpen(key)} data-tutorial-id={`tutor-${key}`}><span aria-hidden="true">{icon}</span><strong>{title}</strong><small>{description}</small></button>)}
     </div>
-    <section className="tutoring-coaching" data-tutorial-id="tutor-coaching"><div><p className="kicker">My coaching snapshot</p><h2>Your activity, never a ranking.</h2></div><div><Metric value={`${data.coaching.hoursThisWeek} hr`} label="taught this week" /><Metric value={`${data.coaching.medianResponseMinutes} min`} label="median response" /><Metric value={`${data.coaching.logCompletionRate}%`} label="logs on time" /><Metric value={`${data.coaching.feedback.helpfulnessPercent}%`} label={`helpful · ${data.coaching.feedback.responseCount} responses`} /></div></section>
+    <section className="tutoring-coaching" data-tutorial-id="tutor-coaching"><div><p className="kicker">My coaching snapshot</p><h2>Your activity, never a ranking.</h2></div><div><Metric value={`${data.coaching.hoursThisWeek} hr`} label="Tutoring Hours" /><Metric value={`${data.coaching.medianResponseMinutes} min`} label="median response" /><Metric value={`${data.coaching.logCompletionRate}%`} label="logs on time" /><Metric value={`${data.coaching.feedback.helpfulnessPercent}%`} label={`helpful · ${data.coaching.feedback.responseCount} responses`} /></div></section>
   </section>;
 }
 

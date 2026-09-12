@@ -277,12 +277,8 @@ function StudentAvailabilityPicker({
   );
 }
 
-function CompassBrandMark() {
-  return <svg viewBox="0 0 96 96" aria-hidden="true" focusable="false"><circle cx="48" cy="48" r="30" /><path d="M58 37 52 52 37 59l7-16 14-6Z" /><circle cx="48" cy="48" r="4" /><path className="compass-brand__detail" d="M48 12v8M48 76v8M12 48h8M76 48h8" /></svg>;
-}
-
 function ExperienceHeader({ api, context, memberships, previewMode, onSignOut }: { api: PilotApiClient; context: AuthorizationContext; memberships: ExperienceMembership[]; previewMode: boolean; onSignOut: () => Promise<void> }) {
-  return <header className="platform-header platform-header--oaca"><a className="rucom-brand" href="/app/compass" aria-label="Compass home"><img src="/assets/brand/rucom-logo-white.svg" alt="Roseman University College of Medicine" /></a><a className="compass-brand" href="/app/compass" aria-label="Compass home"><span className="compass-brand__mark"><CompassBrandMark /></span><strong>Compass</strong></a><WorkspaceSwitcher api={api} memberships={memberships} current="compass" previewMode={previewMode} /><div className="platform-account"><span>{context.displayName}</span><button className="text-button" onClick={() => void onSignOut()}>Sign out</button></div></header>;
+  return <header className="platform-header platform-header--oaca"><a className="rucom-brand" href="/app/compass" aria-label="Compass home"><img src="/assets/brand/rucom-logo-white.svg" alt="Roseman University College of Medicine" /></a><a className="compass-brand" href="/app/compass" aria-label="Compass home"><span className="compass-brand__mark"><img src="/assets/brand/compass-emblem-v2.png" alt="" /></span><strong>Compass</strong></a><WorkspaceSwitcher api={api} memberships={memberships} current="compass" previewMode={previewMode} /><div className="platform-account"><span>{context.displayName}</span><button className="text-button" onClick={() => void onSignOut()}>Sign out</button></div></header>;
 }
 
 function CompassHeroIcon({ kind }: { kind: "appointment" | "notifications" | "events" | "checkin" | "visits" }) {

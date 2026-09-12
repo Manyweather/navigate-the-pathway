@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   },
   description: "The secure Compass home for advising, tutoring, events, Navigate the Pathway, and verified Impact access.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/assets/brand/compass-emblem-v2.png",
+    shortcut: "/assets/brand/compass-emblem-v2.png",
+    apple: "/assets/brand/compass-emblem-v2.png",
+  },
   openGraph: {
     title: "Compass",
     description: "One secure starting point for student support and authorized workspaces.",

@@ -27,8 +27,8 @@ function Gateway({ access }: { access: PlatformAccessValue }) {
   }, [access]);
   return <div className="navigate-platform navigate-platform--hub">
     <CreatorPreviewBanner persona={access.previewPersona} onPersona={access.setPreviewPersona} onExit={() => void access.signOut()} />
-    <header className="platform-header platform-header--oaca"><a className="platform-wordmark" href="/app"><span aria-hidden="true">C</span><strong>Compass</strong></a><div className="platform-account"><span>{access.context.displayName}</span><button className="text-button" onClick={() => void access.signOut()}>Sign out</button></div></header>
-    <main className="platform-main"><section className="access-pending-card" aria-live="polite"><div className="compass-gateway-mark" aria-hidden="true">⌁</div><p className="kicker">Compass</p><h1>{message}</h1><p>Compass routes each account only to workspaces assigned to its active roles.</p></section></main>
+    <header className="platform-header platform-header--oaca"><a className="platform-wordmark" href="/app"><span className="platform-wordmark__logo" aria-hidden="true"><img src="/assets/brand/compass-emblem-v2.png" alt="" /></span><strong>Compass</strong></a><div className="platform-account"><span>{access.context.displayName}</span><button className="text-button" onClick={() => void access.signOut()}>Sign out</button></div></header>
+    <main className="platform-main"><section className="access-pending-card" aria-live="polite"><div className="compass-gateway-mark" aria-hidden="true"><img src="/assets/brand/compass-emblem-v2.png" alt="" /></div><p className="kicker">Compass</p><h1>{message}</h1><p>Compass routes each account only to workspaces assigned to its active roles.</p></section></main>
   </div>;
 }
 

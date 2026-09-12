@@ -9,6 +9,6 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#f8fbff",
     theme_color: "#791034",
-    icons: [{ src: "/assets/navigate-pathway-mark.svg", sizes: "any", type: "image/svg+xml" }],
+    icons: [{ src: "/assets/brand/compass-emblem-v2.png", sizes: "1200x1200", type: "image/png" }],
   };
 }

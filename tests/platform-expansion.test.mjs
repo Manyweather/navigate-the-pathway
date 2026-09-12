@@ -452,3 +452,21 @@ test("peer tutoring migration is additive, capability-scoped, and production-dis
   assert.match(migration, /oaca_tutor_session_log_revisions/);
   assert.match(migration, /oaca_tutoring_feedback_forms/);
 });
+
+test("Compass uses its approved emblem wherever the Compass brand mark appears", async () => {
+  const [layout, manifest, signIn, compass, impact, hub, tutor] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/manifest.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/production-pilot-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/oaca-compass-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/genesis-impact-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/navigate-hub-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/peer-tutoring-workspace.tsx", import.meta.url), "utf8"),
+  ]);
+  const emblem = /assets\/brand\/compass-emblem-v2\.png/;
+  for (const source of [layout, manifest, signIn, compass, impact, hub]) assert.match(source, emblem);
+  assert.doesNotMatch(compass, /function CompassBrandMark/);
+  assert.doesNotMatch(impact + hub, /<span aria-hidden="true">C<\/span>/);
+  assert.match(tutor, /label="Tutoring Hours"/);
+  assert.doesNotMatch(tutor, /taught this week/i);
+});

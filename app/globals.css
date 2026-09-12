@@ -933,6 +933,8 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .platform-header { position:relative; z-index:2; min-height:72px; display:flex; align-items:center; gap:1rem; padding:.75rem clamp(1rem,4vw,3rem); border-bottom:1px solid rgba(89,88,84,.18); background:rgba(255,255,255,.92); backdrop-filter:blur(16px); }
 .platform-wordmark { display:flex; align-items:center; gap:.65rem; color:#2b2527; text-decoration:none; min-height:44px; }
 .platform-wordmark>span { display:grid; place-items:center; width:40px; height:40px; border-radius:13px; background:#791034; color:#fff; font:800 1.25rem Georgia,serif; }
+.platform-wordmark>.platform-wordmark__logo { border-radius:0; background:transparent; }
+.platform-wordmark__logo img { display:block; width:40px; height:40px; object-fit:contain; filter:drop-shadow(0 5px 8px rgba(31,5,16,.18)); }
 .platform-wordmark>strong { font:700 1.2rem Georgia,serif; }
 .experience-title { margin:auto; display:flex; flex-direction:column; align-items:center; line-height:1.1; }
 .experience-title span { color:var(--experience-accent); font-size:.72rem; font-weight:900; letter-spacing:.16em; }
@@ -940,10 +942,8 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .rucom-brand { width:clamp(160px,20vw,230px); min-height:44px; display:flex; align-items:center; padding:.55rem .75rem; border-radius:11px; background:#791034; box-shadow:0 7px 18px rgba(121,16,52,.16); }
 .rucom-brand img { display:block; width:100%; height:auto; }
 .compass-brand { margin:auto; min-height:48px; display:flex; align-items:center; gap:.65rem; color:#314b76; text-decoration:none; }
-.compass-brand__mark { width:48px; height:48px; display:grid; place-items:center; border-radius:15px; color:#365f8c; background:#e5eef7; }
-.compass-brand__mark svg { width:40px; height:40px; overflow:visible; }
-.compass-brand__mark circle,.compass-brand__mark path { fill:none; stroke:currentColor; stroke-width:4; stroke-linecap:round; stroke-linejoin:round; }
-.compass-brand__mark .compass-brand__detail { stroke-width:3; opacity:.72; }
+.compass-brand__mark { width:48px; height:48px; display:grid; place-items:center; }
+.compass-brand__mark img { width:48px; height:48px; display:block; object-fit:contain; filter:drop-shadow(0 5px 8px rgba(31,5,16,.18)); }
 .compass-brand>strong { font:700 1.35rem Georgia,"Times New Roman",serif; }
 .platform-account { display:flex; align-items:center; gap:1rem; margin-left:auto; }
 .platform-main { position:relative; z-index:1; width:min(1180px,100%); margin:0 auto; padding:clamp(1.2rem,4vw,3rem) clamp(1rem,4vw,2.5rem) 5rem; }
@@ -1350,7 +1350,8 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 .platform-header--oaca .workspace-switcher select,.platform-header--genesis .workspace-switcher select { border-color:rgba(255,255,255,.4); }
 .access-pending-card { width:min(720px,100%); margin:10vh auto; padding:clamp(1.5rem,5vw,3rem); text-align:center; border:1px solid rgba(89,88,84,.2); border-radius:28px; background:#fff; box-shadow:0 24px 70px rgba(54,39,45,.12); }
 .access-pending-card h1 { font:700 clamp(2rem,6vw,3.6rem)/1.04 Georgia,serif; color:#3a292f; }
-.compass-gateway-mark { width:72px; height:72px; display:grid; place-items:center; margin:0 auto 1rem; color:#fff; border-radius:24px; background:linear-gradient(145deg,#791034,#a84465); font-size:2rem; box-shadow:0 16px 34px rgba(121,16,52,.22); }
+.compass-gateway-mark { width:88px; height:88px; display:grid; place-items:center; margin:0 auto 1rem; }
+.compass-gateway-mark img { width:88px; height:88px; display:block; object-fit:contain; filter:drop-shadow(0 12px 18px rgba(121,16,52,.22)); }
 .production-auth-card.compass-signin { width:min(100%,68rem); padding:0 0 clamp(1.4rem,4vw,2.5rem); overflow:hidden; gap:1.15rem; }
 .compass-signin>:not(.compass-signin__identity) { width:min(calc(100% - 2.5rem),44rem); margin-left:auto; margin-right:auto; }
 .compass-signin__identity { position:relative; isolation:isolate; min-height:17rem; display:grid; grid-template-columns:minmax(12rem,.72fr) minmax(0,1.35fr); align-items:center; gap:clamp(1rem,4vw,3rem); padding:clamp(1.5rem,4vw,2.75rem) clamp(1.25rem,5vw,3.5rem); overflow:hidden; color:#fff; background:radial-gradient(circle at 18% 16%,rgba(255,255,255,.13),transparent 28%),linear-gradient(118deg,#630828 0%,#850038 58%,#65113a 100%); }
