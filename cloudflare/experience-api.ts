@@ -102,6 +102,39 @@ function requireAdvisorWorkspace(
   requireCapability(membership, `oaca.advisor.${workspace}`, false);
 }
 
+async function requireActivePeerTutor(services: ExperienceServices) {
+  const providers = await services.service<Array<{ id: string }>>(
+    `oaca_providers?user_id=eq.${services.user.id}&classification=eq.peer_tutor&active=eq.true&select=id&limit=1`,
+  );
+  const provider = providers[0];
+  if (!provider)
+    throw new WorkspaceError(403, "An active Peer Tutor record is required.");
+  const compliance = await services.service<
+    Array<{
+      eligible_at: string | null;
+      suspended_at: string | null;
+      handbook_acknowledgment_id: string | null;
+    }>
+  >(
+    `oaca_tutor_compliance?provider_id=eq.${provider.id}&select=eligible_at,suspended_at,handbook_acknowledgment_id&limit=1`,
+  );
+  if (
+    !compliance[0]?.eligible_at ||
+    compliance[0]?.suspended_at ||
+    !compliance[0]?.handbook_acknowledgment_id
+  )
+    throw new WorkspaceError(
+      403,
+      "Tutoring access is paused until eligibility is current.",
+    );
+  return provider.id;
+}
+
+function requireTutoringManager(membership: ExperienceMembership) {
+  requireRole(membership, ["staff", "administrator"]);
+  requireCapability(membership, "oaca.tutoring.manage");
+}
+
 async function assignmentScope(
   services: ExperienceServices,
   experienceKey: ExperienceKey,
@@ -1086,6 +1119,74 @@ export async function experienceRoute(
     const membership = await requireMembership(request, services, "oaca");
     if (url.pathname === "/api/oaca/bootstrap" && request.method === "GET")
       return workspaceJson(await oacaBootstrap(services, membership));
+    if (
+      url.pathname === "/api/oaca/tutor/bootstrap" &&
+      request.method === "GET"
+    ) {
+      await requireActivePeerTutor(services);
+      return workspaceJson(
+        await services.rpc("oaca_tutor_workspace", { payload: {} }),
+      );
+    }
+    if (
+      url.pathname === "/api/oaca/tutoring-manager/bootstrap" &&
+      request.method === "GET"
+    ) {
+      requireTutoringManager(membership);
+      return workspaceJson(
+        await services.rpc("oaca_tutoring_manager_workspace", { payload: {} }),
+      );
+    }
+    if (
+      url.pathname.startsWith("/api/oaca/tutor/") &&
+      request.method === "POST"
+    ) {
+      await requireActivePeerTutor(services);
+      const body = await workspaceBody(request);
+      const routes: Record<string, { rpc: string; status?: number }> = {
+        "/api/oaca/tutor/requests/action": { rpc: "oaca_tutor_change_request" },
+        "/api/oaca/tutor/availability": { rpc: "oaca_tutor_save_availability" },
+        "/api/oaca/tutor/availability/exceptions": { rpc: "oaca_tutor_save_availability_exception", status: 201 },
+        "/api/oaca/tutor/sessions/action": { rpc: "oaca_tutor_update_session" },
+        "/api/oaca/tutor/attendance": { rpc: "oaca_tutor_save_attendance" },
+        "/api/oaca/tutor/logs": { rpc: "oaca_tutor_save_log", status: 201 },
+        "/api/oaca/tutor/recaps": { rpc: "oaca_tutor_publish_recap", status: 201 },
+        "/api/oaca/tutor/messages": { rpc: "oaca_tutor_send_message", status: 201 },
+        "/api/oaca/tutor/follow-ups": { rpc: "oaca_tutor_offer_followup", status: 201 },
+        "/api/oaca/tutor/drop-in/action": { rpc: "oaca_tutor_update_dropin" },
+      };
+      const route = routes[url.pathname];
+      if (!route) throw new WorkspaceError(404, "Peer Tutor action not found.");
+      return workspaceJson(
+        await services.rpc(route.rpc, { payload: body }),
+        route.status,
+      );
+    }
+    if (
+      url.pathname.startsWith("/api/oaca/tutoring-manager/") &&
+      request.method === "POST"
+    ) {
+      requireTutoringManager(membership);
+      const body = await workspaceBody(request);
+      const routes: Record<string, { rpc: string; status?: number }> = {
+        "/api/oaca/tutoring-manager/tutors/action": { rpc: "oaca_tutoring_manager_update_tutor" },
+        "/api/oaca/tutoring-manager/qualifications": { rpc: "oaca_tutoring_manager_save_qualifications" },
+        "/api/oaca/tutoring-manager/requests/action": { rpc: "oaca_tutoring_manager_update_request" },
+        "/api/oaca/tutoring-manager/exceptions/action": { rpc: "oaca_tutoring_manager_resolve_exception" },
+        "/api/oaca/tutoring-manager/offerings": { rpc: "oaca_tutoring_manager_save_offering", status: 201 },
+        "/api/oaca/tutoring-manager/rooms/action": { rpc: "oaca_tutoring_manager_update_room" },
+        "/api/oaca/tutoring-manager/logs/addendum": { rpc: "oaca_tutoring_manager_add_log_addendum", status: 201 },
+        "/api/oaca/tutoring-manager/feedback-forms": { rpc: "oaca_tutoring_manager_save_feedback_form", status: 201 },
+        "/api/oaca/tutoring-manager/reports/export": { rpc: "oaca_tutoring_manager_prepare_export", status: 202 },
+      };
+      const route = routes[url.pathname];
+      if (!route)
+        throw new WorkspaceError(404, "Tutoring Manager action not found.");
+      return workspaceJson(
+        await services.rpc(route.rpc, { payload: body }),
+        route.status,
+      );
+    }
     if (
       url.pathname === "/api/oaca/tasks/action" &&
       request.method === "POST"

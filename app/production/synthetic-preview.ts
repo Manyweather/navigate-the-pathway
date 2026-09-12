@@ -23,6 +23,8 @@ export const SYNTHETIC_PREVIEW_SCOPE_KEY = "navigate.synthetic-pilot-scope.v1";
 export type SyntheticPersonaKey =
   | "pathway_student"
   | "compass_student"
+  | "peer_tutor"
+  | "tutoring_manager"
   | "compass_staff"
   | "academic_advisor"
   | "career_advisor"
@@ -45,6 +47,16 @@ export const SYNTHETIC_PERSONAS: Array<{
   {
     key: "compass_student",
     label: "Compass student",
+    defaultPath: "/app/compass",
+  },
+  {
+    key: "peer_tutor",
+    label: "Peer Tutor",
+    defaultPath: "/app/compass",
+  },
+  {
+    key: "tutoring_manager",
+    label: "Tutoring Manager",
     defaultPath: "/app/compass",
   },
   {
@@ -194,6 +206,22 @@ export function syntheticMembershipsForPersona(
     return [
       membership("oaca", ["student"], ["oaca.schedule", "oaca.portfolio.own"]),
     ];
+  if (persona === "peer_tutor")
+    return [
+      membership(
+        "oaca",
+        ["student"],
+        ["oaca.schedule", "oaca.portfolio.own", "oaca.tutor"],
+      ),
+    ];
+  if (persona === "tutoring_manager")
+    return [
+      membership(
+        "oaca",
+        ["staff"],
+        ["oaca.tutoring.manage", "oaca.records", "oaca.analytics"],
+      ),
+    ];
   if (persona === "compass_staff" || persona === "academic_advisor")
     return [
       membership(
@@ -271,6 +299,7 @@ export function syntheticContextForPersona(
   const isStudent = [
     "pathway_student",
     "compass_student",
+    "peer_tutor",
     "impact_student",
   ].includes(persona);
   const context = clone(syntheticPreviewContext);
@@ -283,6 +312,10 @@ export function syntheticContextForPersona(
       ? "Jordan Premed"
       : persona === "impact_student"
         ? "Taylor Morgan"
+        : persona === "peer_tutor"
+          ? "Morgan Lee"
+          : persona === "tutoring_manager"
+            ? "Dominique Rich, MAT"
         : persona === "compass_student"
           ? "Taylor Morgan"
           : persona === "community_liaison"
@@ -1914,7 +1947,7 @@ function advisorPreviewBootstrap(
         label: "Open actions due today or overdue",
         count: state.tasks.filter(
           (item) =>
-            item.status === "open" && item.dueAt <= isoAt(0, 12).slice(0, 10),
+            item.status === "open" && Boolean(item.dueAt) && item.dueAt! <= isoAt(0, 12).slice(0, 10),
         ).length,
       },
       {
@@ -2269,6 +2302,261 @@ function genesisBootstrap(
   };
 }
 
+type SyntheticTutoringRequest = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  subject: string;
+  startsAt: string;
+  endsAt: string;
+  modality: "in_person" | "teams";
+  status: "pending_approval" | "counterproposed" | "confirmed" | "declined";
+  requestedAt: string;
+  preparationNote: string;
+};
+
+type SyntheticTutoringState = {
+  requests: SyntheticTutoringRequest[];
+  sessions: Array<{
+    id: string;
+    studentId: string;
+    studentName: string;
+    subject: string;
+    startsAt: string;
+    endsAt: string;
+    modality: "in_person" | "teams";
+    location: string;
+    type: "individual" | "group" | "review" | "drop_in";
+    status: "scheduled" | "in_progress" | "completed";
+    attendanceStatus: "present" | "no_show" | "excused" | "not_recorded";
+    logDueAt: string | null;
+    logStatus: "not_due" | "due" | "overdue" | "submitted";
+  }>;
+  availability: {
+    active: boolean;
+    defaultDurationMinutes: 30 | 45 | 60;
+    bufferBeforeMinutes: number;
+    bufferAfterMinutes: number;
+    rules: Array<{ id: string; day: string; startsAt: string; endsAt: string; modalities: string[]; location: string }>;
+    exceptions: Array<{ id: string; date: string; kind: "add" | "remove"; startsAt: string; endsAt: string; note: string }>;
+  };
+  rooms: Array<{
+    id: string;
+    name: string;
+    location: string;
+    subject: string;
+    capacity: number;
+    coverageStartsAt: string;
+    coverageEndsAt: string;
+    checkedIn: boolean;
+    queue: Array<{ id: string; studentName: string; joinedAt: string; status: "waiting" | "called" | "in_session" | "completed" | "skipped" }>;
+  }>;
+  messages: Array<{ id: string; sessionId: string; studentName: string; sender: "student" | "tutor"; body: string; createdAt: string; unread: boolean }>;
+  logs: Array<{ id: string; sessionId: string; version: number; tutoringMinutes: number; prepMinutes: number; topics: string; summary: string; understanding: string; challenges: string; recommendations: string; submittedAt: string }>;
+  recaps: Array<{ id: string; sessionId: string; version: number; body: string; nextSteps: string; publishedAt: string }>;
+  tutors: Array<{ id: string; name: string; status: "active" | "suspended"; subjects: string[]; modalities: string[]; handbookAcknowledged: boolean; eligibleAt: string | null; hoursThisWeek: number; responseMinutes: number; logCompletionRate: number }>;
+  offerings: Array<{ id: string; title: string; subject: string; type: "group" | "review"; tutorName: string; startsAt: string; capacity: number; registered: number; waitlisted: number; status: "draft" | "published" }>;
+  feedbackForms: Array<{ id: string; title: string; version: number; status: "draft" | "published"; fields: string[] }>;
+};
+
+const syntheticTutoringStorageKey = "navigate.compass.synthetic-tutoring.v1";
+
+function defaultSyntheticTutoringState(): SyntheticTutoringState {
+  return {
+    requests: [
+      {
+        id: "tutor-request-1",
+        studentId: "student-2",
+        studentName: "Riley Thompson",
+        subject: "General",
+        startsAt: isoAt(1, 13),
+        endsAt: isoAt(1, 14),
+        modality: "in_person",
+        status: "pending_approval",
+        requestedAt: isoAt(0, 8),
+        preparationNote: "Practice applying this week's core concepts before the assessment.",
+      },
+      {
+        id: "tutor-request-2",
+        studentId: "student-4",
+        studentName: "Alexis Nguyen",
+        subject: "Clinical skills",
+        startsAt: isoAt(2, 15),
+        endsAt: isoAt(2, 16),
+        modality: "teams",
+        status: "counterproposed",
+        requestedAt: isoAt(-1, 15),
+        preparationNote: "Review the practice checklist and talk through sequencing.",
+      },
+    ],
+    sessions: [
+      {
+        id: "tutor-session-today",
+        studentId: "student-1",
+        studentName: "Taylor Morgan",
+        subject: "General",
+        startsAt: isoAt(0, 11),
+        endsAt: isoAt(0, 12),
+        modality: "in_person",
+        location: "Learning Commons · Table 4",
+        type: "individual",
+        status: "scheduled",
+        attendanceStatus: "not_recorded",
+        logDueAt: null,
+        logStatus: "not_due",
+      },
+      {
+        id: "tutor-session-completed",
+        studentId: "student-3",
+        studentName: "Cameron Ellis",
+        subject: "Clinical skills",
+        startsAt: isoAt(-1, 14),
+        endsAt: isoAt(-1, 15),
+        modality: "in_person",
+        location: "Clinical Skills Lab",
+        type: "individual",
+        status: "completed",
+        attendanceStatus: "present",
+        logDueAt: isoAt(0, 15),
+        logStatus: "due",
+      },
+      {
+        id: "tutor-session-overdue",
+        studentId: "student-2",
+        studentName: "Riley Thompson",
+        subject: "General",
+        startsAt: isoAt(-3, 10),
+        endsAt: isoAt(-3, 11),
+        modality: "teams",
+        location: "Microsoft Teams",
+        type: "individual",
+        status: "completed",
+        attendanceStatus: "present",
+        logDueAt: isoAt(-2, 11),
+        logStatus: "overdue",
+      },
+    ],
+    availability: {
+      active: true,
+      defaultDurationMinutes: 60,
+      bufferBeforeMinutes: 10,
+      bufferAfterMinutes: 10,
+      rules: [
+        { id: "tutor-rule-mon", day: "Monday", startsAt: "13:00", endsAt: "16:00", modalities: ["in_person", "teams"], location: "Learning Commons" },
+        { id: "tutor-rule-wed", day: "Wednesday", startsAt: "10:00", endsAt: "12:00", modalities: ["in_person"], location: "Learning Commons" },
+        { id: "tutor-rule-thu", day: "Thursday", startsAt: "15:00", endsAt: "17:00", modalities: ["teams"], location: "Microsoft Teams" },
+      ],
+      exceptions: [
+        { id: "tutor-exception-1", date: isoAt(6, 9).slice(0, 10), kind: "remove", startsAt: "13:00", endsAt: "16:00", note: "Assessment week" },
+      ],
+    },
+    rooms: [
+      {
+        id: "dropin-room-1",
+        name: "Foundations drop-in",
+        location: "Learning Commons · Room 118",
+        subject: "General",
+        capacity: 8,
+        coverageStartsAt: isoAt(0, 16),
+        coverageEndsAt: isoAt(0, 18),
+        checkedIn: false,
+        queue: [
+          { id: "queue-1", studentName: "Jordan Kim", joinedAt: isoAt(0, 15, 42), status: "waiting" },
+          { id: "queue-2", studentName: "Sam Rivera", joinedAt: isoAt(0, 15, 49), status: "waiting" },
+        ],
+      },
+    ],
+    messages: [
+      { id: "tutor-message-1", sessionId: "tutor-session-today", studentName: "Taylor Morgan", sender: "student", body: "I uploaded the practice outline. Could we focus on the areas I marked?", createdAt: isoAt(0, 8), unread: true },
+      { id: "tutor-message-2", sessionId: "tutor-session-completed", studentName: "Cameron Ellis", sender: "tutor", body: "Your recap is posted. Try the two sequencing exercises before our next session.", createdAt: isoAt(-1, 16), unread: false },
+    ],
+    logs: [],
+    recaps: [
+      { id: "tutor-recap-1", sessionId: "tutor-session-completed", version: 1, body: "Practiced the full sequence twice and identified two transitions to rehearse.", nextSteps: "Repeat the checklist without prompts and bring one question to the next session.", publishedAt: isoAt(-1, 16) },
+    ],
+    tutors: [
+      { id: "provider-tutor", name: "Morgan Lee", status: "active", subjects: ["General", "Clinical skills"], modalities: ["in_person", "teams"], handbookAcknowledged: true, eligibleAt: isoAt(-60, 9), hoursThisWeek: 4.5, responseMinutes: 38, logCompletionRate: 94 },
+      { id: "provider-tutor-2", name: "Jordan Patel", status: "active", subjects: ["General"], modalities: ["in_person"], handbookAcknowledged: true, eligibleAt: isoAt(-45, 9), hoursThisWeek: 3, responseMinutes: 51, logCompletionRate: 89 },
+      { id: "provider-tutor-3", name: "Casey Brooks", status: "suspended", subjects: ["Clinical skills"], modalities: ["teams"], handbookAcknowledged: false, eligibleAt: null, hoursThisWeek: 0, responseMinutes: 0, logCompletionRate: 0 },
+    ],
+    offerings: [
+      { id: "offering-1", title: "Foundations concept review", subject: "General", type: "review", tutorName: "Morgan Lee", startsAt: isoAt(4, 17), capacity: 8, registered: 6, waitlisted: 1, status: "published" },
+    ],
+    feedbackForms: [
+      { id: "feedback-1", title: "Peer tutoring session feedback", version: 2, status: "published", fields: ["Session helped me understand the material", "I know what to practice next", "Optional private comment"] },
+    ],
+  };
+}
+
+function peerTutorBootstrap(state: SyntheticTutoringState) {
+  const tutor = state.tutors[0];
+  return {
+    role: "peer_tutor",
+    tutor,
+    eligibility: {
+      active: tutor.status === "active" && tutor.handbookAcknowledged,
+      checklist: [
+        { key: "application", label: "Staff-created tutor record", complete: true },
+        { key: "recommendation", label: "Faculty recommendation", complete: true },
+        { key: "interview", label: "Interview completed", complete: true },
+        { key: "workday", label: "Workday onboarding", complete: true },
+        { key: "training", label: "Required training", complete: true },
+        { key: "handbook", label: "Current handbook acknowledged", complete: tutor.handbookAcknowledged },
+      ],
+    },
+    requests: state.requests.filter((item) => item.status !== "declined"),
+    sessions: state.sessions,
+    availability: state.availability,
+    rooms: state.rooms,
+    messages: state.messages,
+    logs: state.logs,
+    recaps: state.recaps,
+    coaching: {
+      hoursThisWeek: tutor.hoursThisWeek,
+      medianResponseMinutes: tutor.responseMinutes,
+      attendanceCompletionRate: 97,
+      logCompletionRate: tutor.logCompletionRate,
+      upcomingLoad: state.sessions.filter((item) => item.status === "scheduled").length + state.requests.filter((item) => item.status === "confirmed").length,
+      feedback: { responseCount: 8, helpfulnessPercent: 94, nextStepClarityPercent: 88, commentsVisible: false, minimumGroupSize: 3 },
+    },
+    privacyBoundary: {
+      sameCoursePublishedRecapsOnly: true,
+      advisingNotesIncluded: false,
+      gradesIncluded: false,
+      portfolioIncluded: false,
+      otherTutorRecordsIncluded: false,
+      staffAnalyticsIncluded: false,
+    },
+  };
+}
+
+function tutoringManagerBootstrap(state: SyntheticTutoringState) {
+  return {
+    role: "tutoring_manager",
+    tutors: state.tutors,
+    requests: state.requests,
+    sessions: state.sessions,
+    rooms: state.rooms,
+    offerings: state.offerings,
+    feedbackForms: state.feedbackForms,
+    exceptions: [
+      { id: "exception-response", type: "request_response", title: "Request awaiting tutor response", detail: "Riley Thompson · General · 10 hours", status: "open" },
+      { id: "exception-log", type: "overdue_log", title: "Session log overdue", detail: "Morgan Lee · Riley Thompson · 2 days", status: "open" },
+      { id: "exception-attendance", type: "attendance", title: "Attendance not recorded", detail: "Foundations concept review · 1 participant", status: "open" },
+    ],
+    feedback: { responseCount: 18, averageHelpfulness: 4.6, concernCount: 1, minimumGroupSize: 3 },
+    reports: {
+      activeTutors: state.tutors.filter((item) => item.status === "active").length,
+      hoursThisWeek: state.tutors.reduce((sum, item) => sum + item.hoursThisWeek, 0),
+      medianResponseMinutes: 44,
+      attendanceCompletionRate: 96,
+      logCompletionRate: 91,
+      averageDropinWaitMinutes: 11,
+    },
+    supervisoryAccess: { conversationsOnDemandOnly: true, accessAudited: true },
+  };
+}
+
 class SyntheticPilotApi {
   private affiliations = defaultSyntheticAffiliations();
   private studentCouncilByPersona: Record<string, boolean> = {
@@ -2295,6 +2583,8 @@ class SyntheticPilotApi {
   private advisorLoaded = false;
   private eventState: SyntheticEventState = defaultSyntheticEventState();
   private eventsLoaded = false;
+  private tutoringState: SyntheticTutoringState = defaultSyntheticTutoringState();
+  private tutoringLoaded = false;
 
   private ensureEncountersLoaded() {
     if (this.encountersLoaded) return;
@@ -2423,6 +2713,22 @@ class SyntheticPilotApi {
       );
   }
 
+  private ensureTutoringLoaded() {
+    if (this.tutoringLoaded) return;
+    this.tutoringLoaded = true;
+    if (typeof window === "undefined") return;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(syntheticTutoringStorageKey) || "null") as Partial<SyntheticTutoringState> | null;
+      if (saved) this.tutoringState = { ...defaultSyntheticTutoringState(), ...saved } as SyntheticTutoringState;
+    } catch {
+      this.tutoringState = defaultSyntheticTutoringState();
+    }
+  }
+
+  private saveTutoring() {
+    if (typeof window !== "undefined") window.localStorage.setItem(syntheticTutoringStorageKey, JSON.stringify(this.tutoringState));
+  }
+
   private ensureImpactLoaded() {
     if (this.impactLoaded) return;
     this.impactLoaded = true;
@@ -2492,6 +2798,7 @@ class SyntheticPilotApi {
     this.ensureEventsLoaded();
     this.ensureImpactLoaded();
     this.ensureAdvisorLoaded();
+    this.ensureTutoringLoaded();
     const route = path.split("?")[0];
     const method = (options.method || "GET").toUpperCase();
     const persona = getSyntheticPreviewPersona();
@@ -2518,6 +2825,7 @@ class SyntheticPilotApi {
       oacaRoles.length > 0 && oacaRoles.every((role) => role === "student");
     const staffOnlyOacaRoutes = [
       "/api/oaca/advisor",
+      "/api/oaca/tutoring-manager",
       "/api/oaca/events/audience-preview",
       "/api/oaca/events/recipients/refresh",
       "/api/oaca/events/update",
@@ -2640,6 +2948,135 @@ class SyntheticPilotApi {
         impactHref:
           hasApproved || hasEndedApproval ? "/app/compass/impact" : null,
       }) as T;
+    }
+    if (route === "/api/oaca/tutor/bootstrap") {
+      if (!["peer_tutor", "platform_creator"].includes(persona))
+        throw new Error("An active Peer Tutor record is required.");
+      return clone(peerTutorBootstrap(this.tutoringState)) as T;
+    }
+    if (route === "/api/oaca/tutoring-manager/bootstrap") {
+      const capability = personaMemberships
+        .find((item) => item.experienceKey === "oaca")
+        ?.capabilities.includes("oaca.tutoring.manage");
+      if (!capability && persona !== "platform_creator")
+        throw new Error("Tutoring Manager access is required.");
+      return clone(tutoringManagerBootstrap(this.tutoringState)) as T;
+    }
+    if (route.startsWith("/api/oaca/tutor/") && method === "POST") {
+      if (!["peer_tutor", "platform_creator"].includes(persona))
+        throw new Error("An active Peer Tutor record is required.");
+      const body = (options.body || {}) as Record<string, unknown>;
+      if (route === "/api/oaca/tutor/requests/action") {
+        const request = this.tutoringState.requests.find((item) => item.id === body.requestId);
+        if (!request) throw new Error("That request is no longer available.");
+        if (body.decision === "confirm") request.status = "confirmed";
+        else if (body.decision === "decline") request.status = "declined";
+        else if (body.decision === "counterpropose" && body.startsAt) {
+          const duration = new Date(request.endsAt).getTime() - new Date(request.startsAt).getTime();
+          request.startsAt = new Date(String(body.startsAt)).toISOString();
+          request.endsAt = new Date(new Date(request.startsAt).getTime() + duration).toISOString();
+          request.status = "counterproposed";
+        }
+      } else if (route === "/api/oaca/tutor/availability") {
+        this.tutoringState.availability = { ...this.tutoringState.availability, ...body } as SyntheticTutoringState["availability"];
+      } else if (route === "/api/oaca/tutor/availability/exceptions") {
+        this.tutoringState.availability.exceptions.unshift({
+          id: `tutor-exception-${crypto.randomUUID()}`,
+          date: String(body.date),
+          kind: body.kind === "add" ? "add" : "remove",
+          startsAt: String(body.startsAt || "09:00"),
+          endsAt: String(body.endsAt || "17:00"),
+          note: String(body.note || "Availability exception"),
+        });
+      } else if (route === "/api/oaca/tutor/sessions/action") {
+        const session = this.tutoringState.sessions.find((item) => item.id === body.sessionId);
+        if (!session) throw new Error("Session not found.");
+        if (body.action === "start") session.status = "in_progress";
+        if (body.action === "end") {
+          session.status = "completed";
+          session.logStatus = "due";
+          session.logDueAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        }
+      } else if (route === "/api/oaca/tutor/attendance") {
+        const session = this.tutoringState.sessions.find((item) => item.id === body.sessionId);
+        if (!session) throw new Error("Session not found.");
+        session.attendanceStatus = ["present", "no_show", "excused"].includes(String(body.status)) ? body.status as "present" | "no_show" | "excused" : "not_recorded";
+      } else if (route === "/api/oaca/tutor/logs") {
+        const session = this.tutoringState.sessions.find((item) => item.id === body.sessionId);
+        if (!session) throw new Error("Session not found.");
+        const version = this.tutoringState.logs.filter((item) => item.sessionId === session.id).length + 1;
+        this.tutoringState.logs.unshift({
+          id: `tutor-log-${crypto.randomUUID()}`,
+          sessionId: session.id,
+          version,
+          tutoringMinutes: Math.min(60, Math.max(1, Number(body.tutoringMinutes) || 60)),
+          prepMinutes: Math.max(0, Number(body.prepMinutes) || 0),
+          topics: String(body.topics || ""),
+          summary: String(body.summary || ""),
+          understanding: String(body.understanding || ""),
+          challenges: String(body.challenges || ""),
+          recommendations: String(body.recommendations || ""),
+          submittedAt: new Date().toISOString(),
+        });
+        session.logStatus = "submitted";
+      } else if (route === "/api/oaca/tutor/recaps") {
+        const sessionId = String(body.sessionId || "");
+        const version = this.tutoringState.recaps.filter((item) => item.sessionId === sessionId).length + 1;
+        this.tutoringState.recaps.unshift({ id: `tutor-recap-${crypto.randomUUID()}`, sessionId, version, body: String(body.body || ""), nextSteps: String(body.nextSteps || ""), publishedAt: new Date().toISOString() });
+      } else if (route === "/api/oaca/tutor/messages") {
+        const session = this.tutoringState.sessions.find((item) => item.id === body.sessionId);
+        this.tutoringState.messages.unshift({ id: `tutor-message-${crypto.randomUUID()}`, sessionId: String(body.sessionId), studentName: session?.studentName || "Student", sender: "tutor", body: String(body.body || ""), createdAt: new Date().toISOString(), unread: false });
+      } else if (route === "/api/oaca/tutor/follow-ups") {
+        const session = this.tutoringState.sessions.find((item) => item.id === body.sessionId);
+        if (!session) throw new Error("Session not found.");
+        this.tutoringState.requests.unshift({ id: `tutor-followup-${crypto.randomUUID()}`, studentId: session.studentId, studentName: session.studentName, subject: session.subject, startsAt: isoAt(7, 12), endsAt: isoAt(7, 13), modality: session.modality, status: "counterproposed", requestedAt: new Date().toISOString(), preparationNote: "Tutor offered a follow-up. Student acceptance is required before confirmation." });
+      } else if (route === "/api/oaca/tutor/drop-in/action") {
+        const room = this.tutoringState.rooms.find((item) => item.id === body.roomId);
+        if (!room) throw new Error("Drop-in room not found.");
+        if (body.action === "check_in") room.checkedIn = true;
+        if (body.action === "check_out") room.checkedIn = false;
+        const entry = room.queue.find((item) => item.id === body.queueId);
+        if (entry && body.action === "call") entry.status = "called";
+        if (entry && body.action === "complete") entry.status = "completed";
+      }
+      this.saveTutoring();
+      return clone({ ok: true }) as T;
+    }
+    if (route.startsWith("/api/oaca/tutoring-manager/") && method === "POST") {
+      const capability = personaMemberships.find((item) => item.experienceKey === "oaca")?.capabilities.includes("oaca.tutoring.manage");
+      if (!capability && persona !== "platform_creator") throw new Error("Tutoring Manager access is required.");
+      const body = (options.body || {}) as Record<string, unknown>;
+      if (route === "/api/oaca/tutoring-manager/tutors/action") {
+        const tutor = this.tutoringState.tutors.find((item) => item.id === body.tutorId);
+        if (!tutor) throw new Error("Tutor not found.");
+        tutor.status = body.action === "suspend" ? "suspended" : "active";
+      } else if (route === "/api/oaca/tutoring-manager/qualifications") {
+        const tutor = this.tutoringState.tutors.find((item) => item.id === body.tutorId);
+        if (!tutor) throw new Error("Tutor not found.");
+        tutor.subjects = Array.isArray(body.subjects) ? body.subjects.map(String) : tutor.subjects;
+        tutor.modalities = Array.isArray(body.modalities) ? body.modalities.map(String) : tutor.modalities;
+      } else if (route === "/api/oaca/tutoring-manager/requests/action") {
+        const request = this.tutoringState.requests.find((item) => item.id === body.requestId);
+        const tutor = this.tutoringState.tutors.find((item) => item.id === body.tutorId);
+        if (!request || !tutor) throw new Error("Choose an available request and tutor.");
+        request.status = "pending_approval";
+        request.preparationNote = `${request.preparationNote} Reassigned to ${tutor.name} for response.`;
+      } else if (route === "/api/oaca/tutoring-manager/offerings") {
+        const tutor = this.tutoringState.tutors.find((item) => item.id === body.tutorId);
+        const requestedCapacity = Number(body.capacity) || 8;
+        if (!tutor || !body.startsAt) throw new Error("Choose an active tutor and time.");
+        this.tutoringState.offerings.unshift({ id: `offering-${crypto.randomUUID()}`, title: String(body.title || "Group review"), subject: String(body.subject || "General"), type: body.type === "group" ? "group" : "review", tutorName: tutor.name, startsAt: new Date(String(body.startsAt)).toISOString(), capacity: Math.min(8, Math.max(3, requestedCapacity)), registered: 0, waitlisted: 0, status: body.action === "publish" ? "published" : "draft" });
+      } else if (route === "/api/oaca/tutoring-manager/rooms/action") {
+        const room = this.tutoringState.rooms.find((item) => item.id === body.roomId);
+        if (!room) throw new Error("Room not found.");
+        room.checkedIn = body.action === "open";
+      } else if (route === "/api/oaca/tutoring-manager/feedback-forms") {
+        const title = String(body.title || "Peer tutoring feedback");
+        const version = this.tutoringState.feedbackForms.filter((item) => item.title === title).length + 1;
+        this.tutoringState.feedbackForms.unshift({ id: `feedback-${crypto.randomUUID()}`, title, version, status: body.action === "publish" ? "published" : "draft", fields: Array.isArray(body.fields) ? body.fields.map(String) : [] });
+      }
+      this.saveTutoring();
+      return clone({ ok: true, audited: true }) as T;
     }
     if (route === "/api/oaca/advisor/bootstrap") {
       const requested =
@@ -3423,6 +3860,7 @@ class SyntheticPilotApi {
       this.appointments = compass.appointments;
       this.encounterRecords = compass.encounterRecords;
       this.advisorState = defaultSyntheticAdvisorState();
+      this.tutoringState = defaultSyntheticTutoringState();
       this.affiliations = defaultSyntheticAffiliations();
       this.impactEvents = defaultSyntheticImpactEvents();
       this.impactNotifications = [
@@ -3438,6 +3876,7 @@ class SyntheticPilotApi {
       this.saveEvents();
       this.saveEncounters();
       this.saveAdvisor();
+      this.saveTutoring();
       this.saveImpact();
       return { ok: true } as T;
     }
@@ -3656,6 +4095,7 @@ class SyntheticPilotApi {
             modality?: string;
             format?: string;
             topic?: string;
+            durationMinutes?: number;
           }
         | undefined;
       const seed = oacaBootstrap();
@@ -3678,7 +4118,7 @@ class SyntheticPilotApi {
         subject: body?.topic || null,
         format: body?.format || "individual",
         startsAt: body?.startsAt || null,
-        endsAt: null,
+        endsAt: body?.startsAt ? new Date(new Date(body.startsAt).getTime() + Math.min(60, Math.max(30, Number(body.durationMinutes) || 60)) * 60_000).toISOString() : null,
         modality: body?.modality || "teams",
         status: "pending_approval",
         sandbox: true,

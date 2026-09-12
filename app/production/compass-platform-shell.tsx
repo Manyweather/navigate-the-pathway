@@ -65,7 +65,7 @@ export function WorkspaceSwitcher({ memberships, current, api, previewMode }: { 
 export function CreatorPreviewBanner({ persona, onPersona, onExit, scope = "creator", tutorialWorkspace = "compass" }: { persona: SyntheticPersonaKey | null; onPersona: (persona: SyntheticPersonaKey) => void; onExit: () => void; scope?: "creator" | "compass"; tutorialWorkspace?: DemoTutorialWorkspace }) {
   if (!persona) return null;
   const personaOptions = scope === "compass"
-    ? SYNTHETIC_PERSONAS.filter((item) => ["compass_student", "academic_advisor", "career_advisor", "compass_director"].includes(item.key))
+    ? SYNTHETIC_PERSONAS.filter((item) => ["compass_student", "peer_tutor", "tutoring_manager", "academic_advisor", "career_advisor", "compass_director"].includes(item.key))
     : SYNTHETIC_PERSONAS;
   const changePersona = (next: SyntheticPersonaKey) => {
     onPersona(next);

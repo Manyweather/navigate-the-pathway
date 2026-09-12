@@ -18,6 +18,7 @@ import {
 import { organizationCollegeOrder, organizationsForSelect, studentOrganizations } from "../app/production/student-organizations.ts";
 import { SYNTHETIC_PERSONA_KEY, syntheticMembershipsForPersona, syntheticPreviewApi, syntheticPreviewContext, syntheticPreviewMemberships } from "../app/production/synthetic-preview.ts";
 import { parseRecoveryCallback } from "../app/production/auth-recovery.ts";
+import { demoTutorialChapters, demoTutorialSteps } from "../app/production/demo-workspace-tutorial.tsx";
 
 test("Compass is the parent for three isolated workspace destinations", () => {
   assert.deepEqual(Object.keys(experiences), ["pathway", "oaca", "genesis"]);
@@ -377,4 +378,77 @@ test("the secure OACA import template ships as an Excel workbook", async () => {
   const [bytes, details] = await Promise.all([readFile(url), stat(url)]);
   assert.deepEqual([...bytes.subarray(0, 2)], [0x50, 0x4b]);
   assert.ok(details.size > 10000);
+});
+
+test("Peer Tutor and Tutoring Manager demos enforce separate role boundaries", async () => {
+  const values = new Map();
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    localStorage: { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)), removeItem: (key) => values.delete(key) },
+    dispatchEvent: () => true,
+  };
+  try {
+    values.set(SYNTHETIC_PERSONA_KEY, "peer_tutor");
+    await syntheticPreviewApi.request("/api/oaca/synthetic/reset", { method: "POST", body: {} });
+    const tutorMembership = syntheticMembershipsForPersona("peer_tutor")[0];
+    assert.deepEqual(tutorMembership.roles, ["student"]);
+    assert.ok(tutorMembership.capabilities.includes("oaca.tutor"));
+    const tutor = await syntheticPreviewApi.request("/api/oaca/tutor/bootstrap");
+    assert.equal(tutor.role, "peer_tutor");
+    assert.equal(tutor.privacyBoundary.advisingNotesIncluded, false);
+    assert.equal(tutor.privacyBoundary.gradesIncluded, false);
+    assert.equal(tutor.privacyBoundary.portfolioIncluded, false);
+    assert.equal(tutor.privacyBoundary.staffAnalyticsIncluded, false);
+    assert.ok(tutor.requests.length > 0);
+    assert.ok(tutor.coaching.hoursThisWeek >= 0);
+    await assert.rejects(() => syntheticPreviewApi.request("/api/oaca/tutoring-manager/bootstrap"), /cannot access staff|Tutoring Manager access is required/i);
+
+    const pending = tutor.requests.find((request) => request.status === "pending_approval");
+    assert.ok(pending);
+    await syntheticPreviewApi.request("/api/oaca/tutor/requests/action", { method: "POST", body: { requestId: pending.id, decision: "confirm" } });
+    const confirmed = await syntheticPreviewApi.request("/api/oaca/tutor/bootstrap");
+    assert.equal(confirmed.requests.find((request) => request.id === pending.id)?.status, "confirmed");
+
+    const scheduled = confirmed.sessions.find((session) => session.status === "scheduled");
+    assert.ok(scheduled);
+    await syntheticPreviewApi.request("/api/oaca/tutor/sessions/action", { method: "POST", body: { sessionId: scheduled.id, action: "end" } });
+    const ended = await syntheticPreviewApi.request("/api/oaca/tutor/bootstrap");
+    assert.equal(ended.sessions.find((session) => session.id === scheduled.id)?.logStatus, "due");
+    await syntheticPreviewApi.request("/api/oaca/tutor/logs", { method: "POST", body: { sessionId: scheduled.id, tutoringMinutes: 60, preparationMinutes: 15, topics: "Synthetic topic", summary: "Synthetic operational summary" } });
+    const logged = await syntheticPreviewApi.request("/api/oaca/tutor/bootstrap");
+    assert.equal(logged.sessions.find((session) => session.id === scheduled.id)?.logStatus, "submitted");
+
+    values.set(SYNTHETIC_PERSONA_KEY, "tutoring_manager");
+    const managerMembership = syntheticMembershipsForPersona("tutoring_manager")[0];
+    assert.ok(managerMembership.capabilities.includes("oaca.tutoring.manage"));
+    const manager = await syntheticPreviewApi.request("/api/oaca/tutoring-manager/bootstrap");
+    assert.equal(manager.role, "tutoring_manager");
+    assert.ok(manager.tutors.length > 0 && manager.reports.activeTutors > 0);
+    assert.doesNotMatch(JSON.stringify(manager), /rank|ranking/i);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("Peer tutoring demos include complete, non-consequential role tutorials", () => {
+  for (const persona of ["peer_tutor", "tutoring_manager"]) {
+    const chapters = demoTutorialChapters("compass", persona);
+    const steps = demoTutorialSteps("compass", persona);
+    assert.ok(chapters.length >= 3);
+    assert.ok(steps.length >= 6);
+    assert.ok(steps.every((step) => step.selector && step.body && step.leadershipBody));
+  }
+});
+
+test("peer tutoring migration is additive, capability-scoped, and production-disabled", async () => {
+  const migration = await readFile(new URL("../supabase/migrations/202609110005_oaca_peer_tutoring_workspaces.sql", import.meta.url), "utf8");
+  assert.doesNotMatch(migration, /\b(drop table|truncate|delete from public\.profiles|alter table public\.appointments drop)\b/i);
+  assert.match(migration, /oaca\.tutoring\.manage/);
+  assert.match(migration, /"peerTutoringProductionEnabled":false/);
+  assert.match(migration, /oaca_tutor_workspace/);
+  assert.match(migration, /oaca_tutoring_manager_workspace/);
+  assert.match(migration, /enable row level security/);
+  assert.match(migration, /revoke all on public\.oaca_tutor_qualifications/);
+  assert.match(migration, /oaca_tutor_session_log_revisions/);
+  assert.match(migration, /oaca_tutoring_feedback_forms/);
 });

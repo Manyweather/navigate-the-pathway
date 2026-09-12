@@ -79,6 +79,10 @@ export function PlatformAccess({ experience, children }: {
       if (requestedPreview === "compass") {
         const requestedPersona: SyntheticPersonaKey = requestedDemoRole === "admin"
           ? "compass_director"
+          : requestedDemoRole === "peer-tutor"
+            ? "peer_tutor"
+            : requestedDemoRole === "tutoring-manager"
+              ? "tutoring_manager"
           : requestedDemoRole === "student"
             ? "compass_student"
             : requestedDemoRole === "career"
@@ -178,7 +182,7 @@ export function PlatformAccess({ experience, children }: {
   }, [load]);
 
   if (previewMode && configured === "preview") {
-    const compassPreviewRoles: SyntheticPersonaKey[] = ["compass_student", "academic_advisor", "career_advisor", "compass_director"];
+    const compassPreviewRoles: SyntheticPersonaKey[] = ["compass_student", "peer_tutor", "tutoring_manager", "academic_advisor", "career_advisor", "compass_director"];
     const scopedPersona = previewScope === "compass" && !compassPreviewRoles.includes(previewPersona) ? "academic_advisor" : previewPersona;
     const previewMemberships = syntheticMembershipsForPersona(scopedPersona);
     const previewContext = syntheticContextForPersona(scopedPersona);

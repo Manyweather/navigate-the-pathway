@@ -75,6 +75,58 @@ const compassStudentChapters: TutorialChapter[] = [
   },
 ];
 
+const peerTutorChapters: TutorialChapter[] = [
+  orientation("compass"),
+  {
+    id: "tutor-today", title: "Today", minutes: 1,
+    steps: [
+      step("tutor-today", "tutor-home", "Your Peer Tutor workspace", "Tutor mode is separate from your student dashboard. It includes only tutoring work and the limited student context needed for each session.", "A secondary student role", "Peer Tutors retain student access while the tutor response is separately scoped. Advising notes, grades, portfolios, and unrelated records are removed before the tutor dashboard loads.", "[data-tutorial-id='tutor-home']"),
+      step("tutor-today", "tutor-priorities", "Start with what needs attention", "See unanswered requests, today’s sessions, unread session messages, and documentation due within 24 hours.", "Operational accountability", "Response and documentation clocks produce explainable work queues. They never create a predictive student or tutor score.", "[data-tutorial-id='tutor-today']"),
+    ],
+  },
+  {
+    id: "tutor-session", title: "Requests and sessions", minutes: 1,
+    steps: [
+      step("tutor-session", "tutor-requests", "Respond to requests", "Confirm, decline, or propose another time. Unanswered requests remind you and alert the Tutoring Manager after 12 hours.", "Managed response workflow", "Requests never auto-decline. Escalation lets the Manager reassign or resolve them before students lose access to support.", "[data-tutorial-id='tutor-requests']"),
+      step("tutor-session", "tutor-sessions", "Run the whole session here", "Open the preparation note, start the session, scan the student’s permanent Compass QR, record attendance, and close the session.", "Protected tutoring context", "The session surface exposes only same-course published tutoring recaps. Operational notes and the separately published student recap remain distinct.", "[data-tutorial-id='tutor-sessions']"),
+      step("tutor-session", "tutor-dropin", "Open a drop-in queue", "Check in to your assigned room before students enter the live queue. Call, start, complete, or skip each entry with an accessible manual fallback.", "Coordinated drop-in operations", "Manager-configured rooms separate coverage from appointment availability and prevent conflicting commitments.", "[data-tutorial-id='tutor-dropin']"),
+    ],
+  },
+  {
+    id: "tutor-finish", title: "Document and improve", minutes: 1,
+    steps: [
+      step("tutor-finish", "tutor-logs", "Complete the operational log", "A log becomes due after the session ends and is expected within 24 hours. Workday remains the official payroll record.", "Versioned documentation", "Tutor revisions and attributed Manager corrections preserve the original record. Session closure is never blocked by unfinished documentation.", "[data-tutorial-id='tutor-logs']"),
+      step("tutor-finish", "tutor-feedback", "Use private feedback aggregates", "See coaching indicators only after at least three responses. Student names, raw comments, and peer rankings are excluded.", "Coaching without ranking", "Managers retain individual response and concern review while tutors receive only privacy-protected aggregates.", "[data-tutorial-id='tutor-feedback']"),
+    ],
+  },
+];
+
+const tutoringManagerChapters: TutorialChapter[] = [
+  orientation("compass"),
+  {
+    id: "manager-today", title: "Program operations", minutes: 1,
+    steps: [
+      step("manager-today", "manager-home", "Your Tutoring Manager workspace", "One operational home collects tutor readiness, unanswered requests, attendance exceptions, overdue documentation, rooms, and service results.", "Supervise the tutoring service", "The Manager capability is separate from advising roles and uses MFA through the existing Compass staff policy.", "[data-tutorial-id='manager-home']"),
+      step("manager-today", "manager-exceptions", "Resolve explainable exceptions", "Review the exact request, session, attendance, or documentation item requiring action.", "No hidden scoring", "Every exception is traceable to a policy clock or missing operational record; no predictive risk score or peer ranking is used.", "[data-tutorial-id='manager-today']"),
+    ],
+  },
+  {
+    id: "manager-service", title: "Tutors and offerings", minutes: 1,
+    steps: [
+      step("manager-service", "manager-tutors", "Manage tutor readiness", "Activate or suspend tutors, confirm current handbook acknowledgment, and set subjects, modalities, and effective dates.", "Staff-controlled eligibility", "Compass does not accept tutor applications. Manager-created provider records and completed onboarding determine access.", "[data-tutorial-id='manager-tutors']"),
+      step("manager-service", "manager-offerings", "Publish group support", "Create group or review offerings for three to eight students, assign a qualified tutor, and manage registration and waitlists.", "Separate individual and group models", "Student-requested appointments remain one-to-one. Only Managers create multi-student offerings.", "[data-tutorial-id='manager-offerings']"),
+      step("manager-service", "manager-dropin", "Coordinate drop-in coverage", "Configure rooms and coverage, then monitor live queues after assigned tutors check in.", "Conflict-safe coverage", "Appointment, group, and drop-in commitments share the same availability conflict rules.", "[data-tutorial-id='manager-dropin']"),
+    ],
+  },
+  {
+    id: "manager-quality", title: "Quality and privacy", minutes: 1,
+    steps: [
+      step("manager-quality", "manager-feedback", "Version the feedback form", "Publish Manager-defined questions, review responses and concerns, and release aggregate coaching results after the privacy threshold.", "Govern the instrument", "Every response stays tied to its form version. Tutors never receive raw comments or identifiable responses.", "[data-tutorial-id='manager-feedback']"),
+      step("manager-quality", "manager-reports", "Review service results", "Monitor demand, hours, response time, attendance, log completion, capacity, and drop-in wait time without ranking tutors.", "Operational insight with limits", "Exports are permission-scoped and audited; small feedback aggregates remain suppressed.", "[data-tutorial-id='manager-reports']"),
+    ],
+  },
+];
+
 function advisorChapters(persona: SyntheticPersonaKey): TutorialChapter[] {
   const career = persona === "career_advisor";
   const director = persona === "compass_director" || persona === "platform_creator";
@@ -159,6 +211,8 @@ function tutorialChapters(workspace: DemoTutorialWorkspace, persona: SyntheticPe
   if (workspace === "pathway") return persona === "pathway_student" ? pathwayChapters : pathwayCreatorChapters;
   if (workspace === "impact") return persona === "impact_student" ? impactStudentChapters : impactStaffChapters;
   if (persona === "compass_student") return compassStudentChapters;
+  if (persona === "peer_tutor") return peerTutorChapters;
+  if (persona === "tutoring_manager") return tutoringManagerChapters;
   return advisorChapters(persona);
 }
 
@@ -208,7 +262,7 @@ export function DemoWorkspaceTutorial({ workspace, persona }: { workspace: DemoT
   const persist = useCallback((next?: Partial<SavedRoleProgress>, metricUpdate?: (metric: TutorialMetric) => TutorialMetric) => {
     const store = loadStore();
     const priorRole = store.roles[key];
-    store.roles[key] = { audience, currentChapterId: chapter.id, currentStepIndex: safeIndex, completedChapterIds: completed, ...priorRole, ...next };
+    store.roles[key] = { ...priorRole, audience, currentChapterId: chapter.id, currentStepIndex: safeIndex, completedChapterIds: completed, ...next };
     if (metricUpdate) {
       const priorMetric = store.metrics[key] || { workspace, persona, starts: 0, completions: 0, skips: 0, activeSeconds: 0, updatedAt: new Date().toISOString() };
       store.metrics[key] = metricUpdate(priorMetric);

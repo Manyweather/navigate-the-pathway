@@ -29,6 +29,7 @@ import {
   type OacaNudgeSummary,
 } from "./oaca-engagement-center";
 import { CompassAdvisorWorkspace } from "./compass-advisor-workspace";
+import { PeerTutoringWorkspace } from "./peer-tutoring-workspace";
 import {
   availabilityTimeBand,
   filterStudentAvailability,
@@ -63,7 +64,7 @@ type OacaView = "home" | "schedule" | "appointments" | "requirements" | "policie
 
 type CreatorActivity = { totalMs: number; locations: Record<string, number>; firstSeenAt: string; lastSeenAt: string };
 const creatorActivityKey = "navigate.creator.compass-time.v1";
-const oacaRoleLabels: Record<string, string> = { creator: "Creator", administrator: "Administrator", staff: "Staff", faculty: "Faculty", student: "Student" };
+const oacaRoleLabels: Record<string, string> = { creator: "Creator", administrator: "Administrator", staff: "Staff", faculty: "Faculty", student: "Student", peer_tutor: "Peer Tutor", tutoring_manager: "Tutoring Manager" };
 const oacaViewLabels: Record<OacaView, string> = { home: "Home", schedule: "Request appointment", appointments: "My visits", requirements: "Requirements", policies: "Policies", portfolio: "Portfolio", records: "Visit records", analytics: "Analytics", imports: "Data imports", settings: "Service configuration", schedule_student: "Schedule for student", tutor: "Tutor desk", events: "Events", notifications: "Notifications", checkin: "Check-in", outreach: "Events and outreach" };
 
 function readCreatorActivity(): CreatorActivity {
@@ -345,7 +346,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
   const [providerId, setProviderId] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [modality, setModality] = useState("teams");
-  const [format, setFormat] = useState("individual");
+  const [tutoringDurationMinutes, setTutoringDurationMinutes] = useState<30 | 45 | 60>(60);
   const [examBlockKey, setExamBlockKey] = useState("");
   const [obligationId, setObligationId] = useState("");
   const [reasonForVisit, setReasonForVisit] = useState("");
@@ -411,7 +412,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
     setBusy(true); setMessage(""); setSubmitted(false);
     try {
       if (serviceKey === "peer_tutoring" && !tutoringAcknowledged) await api.request("/api/oaca/policy-acknowledgments", { method: "POST", body: { policyKey: "peer_tutoring_student_agreement_2026_2027", kind: "student_tutoring", typedName, userAgent: navigator.userAgent } });
-      await api.request("/api/oaca/appointments", { method: "POST", body: { serviceLineId: selectedService.id, topic, providerId: requestedProviderId, startsAt, modality, format, preparationNote, obligationId: obligationId || null, policyContext } });
+      await api.request("/api/oaca/appointments", { method: "POST", body: { serviceLineId: selectedService.id, topic, providerId: requestedProviderId, startsAt, modality, format: "individual", durationMinutes: serviceKey === "peer_tutoring" ? tutoringDurationMinutes : selectedService.durationMinutes, preparationNote, obligationId: obligationId || null, policyContext } });
       setMessage("You will receive a notification when your appointment is confirmed."); setSubmitted(true);
       setPreparationNote(""); setObligationId(""); await reload();
     } catch (error) { setSubmitted(false); setMessage(error instanceof Error ? error.message : "The request could not be submitted."); }
@@ -454,7 +455,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
         <fieldset>
           <legend>1. Choose a service</legend>
           <div className="choice-grid">{services.map((service) => <label key={service.key} className={serviceKey === service.key ? "choice-card selected" : "choice-card"}>
-            <input type="radio" name="service" value={service.key} checked={serviceKey === service.key} onChange={() => { setServiceKey(service.key); setProviderId(""); setStartsAt(""); setObligationId(""); setReasonForVisit(""); setCustomReason(""); setAcademicVisitType("assigned"); setSubmitted(false); setMessage(""); }} />
+            <input type="radio" name="service" value={service.key} checked={serviceKey === service.key} onChange={() => { setServiceKey(service.key); setProviderId(""); setStartsAt(""); setObligationId(""); setReasonForVisit(""); setCustomReason(""); setAcademicVisitType("assigned"); setTutoringDurationMinutes(60); setSubmitted(false); setMessage(""); }} />
             <strong>{service.name}</strong><span>{oacaServiceLines.find((item) => item.key === service.key)?.description}</span>
           </label>)}</div>
         </fieldset>
@@ -496,7 +497,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
                 <label>
                   <span>Preferred date and time</span>
                   <input type="datetime-local" required value={startsAt} onChange={(event) => { setStartsAt(event.target.value); setSubmitted(false); setMessage(""); }} />
-                  <small>For privacy, Compass does not show another academic advisor's availability. Your preferred time will be confirmed or counterproposed after you submit.</small>
+                  <small>For privacy, Compass does not show another academic advisor&apos;s availability. Your preferred time will be confirmed or counterproposed after you submit.</small>
                 </label>
               </div>}
         </> : null}
@@ -504,7 +505,7 @@ function OacaStudent({ api, supabase, context, data, view, setView, reload }: { 
         {serviceKey === "peer_tutoring" ? <>
           <label><span>Exam block or upcoming exam</span><input required value={examBlockKey} onChange={(event) => setExamBlockKey(event.target.value)} placeholder="Used only to apply the between-exams limit" /></label>
           <label><span>Tutor</span><select required value={providerId} onChange={(event) => { setProviderId(event.target.value); setStartsAt(""); }}><option value="">Choose a tutor or compare below</option>{peerTutors.map((provider) => <option key={provider.id} value={provider.id}>{provider.displayName}</option>)}</select></label>
-          <label><span>Tutoring format</span><select value={format} onChange={(event) => setFormat(event.target.value)}><option value="individual">Individual</option><option value="small_group">Small group</option><option value="drop_in">Drop-in</option></select></label>
+          <label><span>Session length</span><select value={tutoringDurationMinutes} onChange={(event) => { setTutoringDurationMinutes(Number(event.target.value) as 30 | 45 | 60); setStartsAt(""); }}><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes · default</option></select><small>This request is for you only. Group reviews and drop-in rooms are listed separately when a Tutoring Manager publishes them.</small></label>
           <aside className="policy-rule-card policy-rule-card--compact"><strong>Before you book</strong><p>Maximum 2 hours per week, 1 hour per individual session, and 4 hours per course between exams. Book no more than 7 days ahead and cancel at least 24 hours before the session.</p>{!tutoringAcknowledged ? <div className="acknowledgment-box"><label><span>Type your full name</span><input value={typedName} onChange={(event) => setTypedName(event.target.value)} /></label><label className="check-row"><input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} /><span>I have reviewed and agree to the current Peer Tutoring Services Student Acknowledgement &amp; Agreement.</span></label><small>This versioned acknowledgment requires institutional approval before it can replace a signed form.</small></div> : <span className="policy-check policy-check--complete">Current agreement acknowledged</span>}</aside>
         </> : null}
         <fieldset><legend>Modality</legend><div className="segmented-control">{selectedService.modalities.map((item) => <label key={item}><input type="radio" name="modality" value={item} checked={modality === item} onChange={() => { setModality(item); setStartsAt(""); if (serviceKey === "peer_tutoring" || (serviceKey === "academic_advising" && academicVisitType === "drop_in")) setProviderId(""); }} /><span>{item === "teams" ? "Teams" : item === "in_person" ? "In person" : "Phone"}</span></label>)}</div></fieldset>
@@ -640,13 +641,18 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
   const [data, setData] = useState<Bootstrap>(emptyBootstrap);
   const [message, setMessage] = useState("Loading Compass…");
   const [view, setView] = useState<OacaView>("home");
-  const [mode, setMode] = useState<string>(membership.roles.includes("creator") ? "creator" : membership.roles.includes("student") ? "student" : membership.roles[0] || "staff");
+  const [mode, setMode] = useState<string>(previewPersona === "peer_tutor" ? "peer_tutor" : previewPersona === "tutoring_manager" ? "tutoring_manager" : membership.roles.includes("creator") ? "creator" : membership.roles.includes("student") ? "student" : membership.roles[0] || "staff");
   const load = useCallback(async () => { try { setData(await api.request<Bootstrap>("/api/oaca/bootstrap")); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "Compass could not be loaded."); } }, [api]);
   useEffect(() => { const task = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(task); }, [load]);
   useRememberWorkspace(api, "compass", previewMode);
   useCreatorPreviewTimeTracking(previewMode, previewPersona, "compass", `${mode}:${view}`);
   useCreatorTimeTracking(membership.roles.includes("creator"), `Compass · ${oacaRoleLabels[mode] || mode} · ${oacaViewLabels[view]}`);
-  const staff = mode !== "student";
+  const availableModes = [...new Set([
+    ...membership.roles,
+    ...(previewPersona === "peer_tutor" || data.currentProvider?.classification === "peer_tutor" ? ["peer_tutor"] : []),
+    ...(previewPersona === "tutoring_manager" || membership.capabilities.includes("oaca.tutoring.manage") ? ["tutoring_manager"] : []),
+  ])];
+  const staff = mode !== "student" && mode !== "peer_tutor";
   const studentData: Bootstrap = staff ? data : {
     ...data,
     appointments: data.appointments.filter((appointment) => appointment.studentId === context.userId),
@@ -667,10 +673,11 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
     <ExperienceHeader api={api} context={context} memberships={memberships} previewMode={previewMode} onSignOut={signOut} />
     <main className="platform-main">
       <nav className="experience-nav compass-role-nav" aria-label="Compass dashboard role">
-        {membership.roles.length > 1 ? <label><span>Viewing dashboard as</span><select value={mode} onChange={(event) => { setMode(event.target.value); setView("home"); }}>{membership.roles.map((role) => <option key={role} value={role}>{oacaRoleLabels[role] || role.replaceAll("_", " ")}</option>)}</select></label> : <span className="status-chip">{oacaRoleLabels[mode] || mode.replaceAll("_", " ")} dashboard</span>}
+        {availableModes.length > 1 ? <label><span>Viewing dashboard as</span><select value={mode} onChange={(event) => { setMode(event.target.value); setView("home"); }}>{availableModes.map((role) => <option key={role} value={role}>{oacaRoleLabels[role] || role.replaceAll("_", " ")}</option>)}</select></label> : <span className="status-chip">{oacaRoleLabels[mode] || mode.replaceAll("_", " ")} dashboard</span>}
       </nav>
       {message ? <p className="form-message" aria-live="polite">{message}</p> : null}
-      {staff ? view === "home"
+      {mode === "peer_tutor" || mode === "tutoring_manager" ? <PeerTutoringWorkspace api={api} mode={mode} />
+        : staff ? view === "home"
         ? <CompassAdvisorWorkspace api={api} data={data} roles={membership.roles} capabilities={membership.capabilities} reload={load} onOpenLegacy={setView} />
         : <OacaStaff api={api} supabase={supabase} context={context} data={data} mode={mode} reload={load} view={view} setView={setView} />
         : <OacaStudent api={api} supabase={supabase} context={context} data={studentData} view={view} setView={setView} reload={load} />}
