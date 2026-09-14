@@ -328,7 +328,7 @@ export function ReviewerWorkspace({
   onBack,
   onOpenWorkspace,
 }: {
-  mode: "advisor" | "admin";
+  mode: "advisor" | "pi" | "admin";
   onBack: () => void;
   onOpenWorkspace?: (workspace: WorkspaceId) => void;
 }) {
@@ -359,6 +359,38 @@ export function ReviewerWorkspace({
     setAdvisorReplies((current) => ({ ...current, [selectedStudent.id]: [...(current[selectedStudent.id] || []), comment.trim()] }));
     setComment("");
   };
+
+  if (mode === "pi") {
+    return (
+      <main className="feature-workspace reviewer-workspace">
+        <header className="workspace-header"><button className="text-button" onClick={onBack}>Back</button><div><p className="kicker">Fictional evaluation view</p><h1>Principal Investigator</h1></div></header>
+        <RosieGuide pose="idle" compact title="Review evidence without opening private student work." body="This demonstration uses fictional records to show evaluation readiness, cohort-level signals, and release safeguards." />
+        <section className="workspace-card workspace-card--wide">
+          <div className="reviewer-section-heading"><div><p className="kicker">Evaluation overview</p><h2>Pilot evidence at a glance</h2></div><p>Small groups are suppressed and no metric is used for admissions or predictive decisions.</p></div>
+          <div className="student-snapshot-grid">
+            <article><span>Fictional participants</span><strong>4</strong></article>
+            <article><span>Survey waves</span><strong>2</strong></article>
+            <article><span>Production records</span><strong>0</strong></article>
+            <article><span>Suppression rule</span><strong>Fewer than 10</strong></article>
+          </div>
+          <p className="workspace-safe">Only approved, de-identified evaluation fields are eligible for aggregate review or export.</p>
+        </section>
+        <section className="workspace-card workspace-card--wide">
+          <div className="reviewer-section-heading"><div><p className="kicker">PI review queue</p><h2>Items requiring research oversight</h2></div><p>Statuses are fictional and demonstrate the intended governance workflow.</p></div>
+          <div className="workspace-list">
+            <article><strong>Survey instrument wording and permissions</strong><span>Pending review</span><small>Confirm the instrument source, version, intended use, and permission record before activation.</small></article>
+            <article><strong>Consent and participant communications</strong><span>Draft</span><small>Review participant-facing language, voluntary participation, withdrawal, and contact information.</small></article>
+            <article><strong>De-identified export rules</strong><span>Approval required</span><small>Approve the minimum fields, cohort suppression, access purpose, and export recipient.</small></article>
+          </div>
+        </section>
+        <section className="workspace-card workspace-card--wide">
+          <div className="reviewer-section-heading"><div><p className="kicker">Release safeguards</p><h2>Before evidence leaves Pathway</h2></div></div>
+          <ul className="readiness-list"><li>Purpose and protocol are documented</li><li>Minimum necessary fields are selected</li><li>Direct identifiers are excluded from analysis exports</li><li>Small cohorts are suppressed</li><li>Reviewer and approval separation is recorded</li></ul>
+          <p className="workspace-warning">The PI can review approved evaluation configuration and de-identified outputs, but cannot browse private messages, unshared drafts, or bypass participant consent.</p>
+        </section>
+      </main>
+    );
+  }
 
   if (mode === "admin") {
     const intakeSummary = [
