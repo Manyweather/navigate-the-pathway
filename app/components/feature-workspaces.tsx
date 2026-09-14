@@ -342,6 +342,16 @@ export function ReviewerWorkspace({
   const selectedIntake = personaIntakes[selectedPreset];
   const selectedRecommendation = recommendRoute(selectedIntake);
   const selectedRoute = routeContent[selectedRecommendation.recommendedRoute];
+  const intakeSummary = [
+    ["Stage", selectedIntake.stage || "Not answered"],
+    ["First focus", selectedIntake.intention || "Not answered"],
+    ["Coursework", selectedIntake.coursework || "Not answered"],
+    ["Records", selectedIntake.records || "Not answered"],
+    ["Reflection", selectedIntake.reflection || "Not answered"],
+    ["Bandwidth", selectedIntake.bandwidth || "Not answered"],
+    ["Participation", selectedIntake.participation || "Not answered"],
+    ["Support roles", selectedIntake.supportRoles === null ? "Not answered" : String(selectedIntake.supportRoles)],
+  ];
 
   const previewRoute = (preset: PersonaPreset) => {
     setSelectedPreset(preset);
@@ -359,6 +369,23 @@ export function ReviewerWorkspace({
     setAdvisorReplies((current) => ({ ...current, [selectedStudent.id]: [...(current[selectedStudent.id] || []), comment.trim()] }));
     setComment("");
   };
+
+  const programAdministrationTools = <>
+    <section className="workspace-card workspace-card--wide">
+      <div className="reviewer-section-heading"><div><p className="kicker">Route testing</p><h2>Eight functional route previews</h2></div><p>Select any fictional profile to open its full explanation below.</p></div>
+      <div className="preset-grid">{presets.map((preset) => { const route = recommendRoute(personaIntakes[preset]); return <button key={preset} type="button" className={selectedPreset === preset ? "active" : ""} aria-pressed={selectedPreset === preset} onClick={() => previewRoute(preset)}><strong>{presetLabels[preset]}</strong><span>{routeContent[route.recommendedRoute].title}</span><small>{route.reasons[0]}</small><b>View route</b></button>; })}</div>
+    </section>
+    <section id="admin-route-preview" className="workspace-card workspace-card--wide route-preview" tabIndex={-1}>
+      <div className="route-preview-header"><div><p className="kicker">Recommended for {presetLabels[selectedPreset]}</p><h2>{selectedRoute.title}</h2><p>{selectedRoute.meaning}</p></div><span>{selectedRecommendation.recommendedRoute}</span></div>
+      <div className="student-snapshot-grid">{intakeSummary.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value.replaceAll("_", " ")}</strong></article>)}</div>
+      <div className="route-preview-columns">
+        <section><h3>Why this route appeared</h3><ul>{selectedRecommendation.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul><p><strong>Alternate routes:</strong> {selectedRecommendation.alternateRoutes.map((route) => routeContent[route].title).join(", ")}</p></section>
+        <section><h3>What the student sees next</h3><p>{selectedRoute.prompt}</p><p className="workspace-safe">The route uses readiness context only. It does not use GPA, MCAT, demographics, personality labels, or message volume.</p><button className="primary-button" type="button" onClick={() => onOpenWorkspace?.(destinationWorkspace[selectedRoute.destination])}>Open matching station tools</button></section>
+      </div>
+    </section>
+    <section className="workspace-card workspace-card--wide"><h2>Pilot readiness</h2><ul className="readiness-list"><li>Backup moderator named</li><li>Advising relationships confirmed</li><li>Content sources reviewed for accuracy</li><li>Access and invitation strategy decided</li><li>Privacy, evaluation, and possible IRB conversation completed</li></ul><p className="workspace-safe">The Supabase schema is an architecture reference only. No production persistence is active.</p></section>
+    <AdminPilotPanel />
+  </>;
 
   if (mode === "pi") {
     return (
@@ -388,39 +415,20 @@ export function ReviewerWorkspace({
           <ul className="readiness-list"><li>Purpose and protocol are documented</li><li>Minimum necessary fields are selected</li><li>Direct identifiers are excluded from analysis exports</li><li>Small cohorts are suppressed</li><li>Reviewer and approval separation is recorded</li></ul>
           <p className="workspace-warning">The PI can review approved evaluation configuration and de-identified outputs, but cannot browse private messages, unshared drafts, or bypass participant consent.</p>
         </section>
+        <section className="workspace-card workspace-card--wide">
+          <div className="reviewer-section-heading"><div><p className="kicker">Administrative access</p><h2>Program Administration</h2></div><p>The PI demonstration also includes program configuration, readiness, sessions, surveys, attendance, and curriculum review tools.</p></div>
+        </section>
+        {programAdministrationTools}
       </main>
     );
   }
 
   if (mode === "admin") {
-    const intakeSummary = [
-      ["Stage", selectedIntake.stage || "Not answered"],
-      ["First focus", selectedIntake.intention || "Not answered"],
-      ["Coursework", selectedIntake.coursework || "Not answered"],
-      ["Records", selectedIntake.records || "Not answered"],
-      ["Reflection", selectedIntake.reflection || "Not answered"],
-      ["Bandwidth", selectedIntake.bandwidth || "Not answered"],
-      ["Participation", selectedIntake.participation || "Not answered"],
-      ["Support roles", selectedIntake.supportRoles === null ? "Not answered" : String(selectedIntake.supportRoles)],
-    ];
     return (
       <main className="feature-workspace reviewer-workspace">
         <header className="workspace-header"><button className="text-button" onClick={onBack}>Back</button><div><p className="kicker">Fictional reviewer view</p><h1>Program Administration</h1></div></header>
         <RosieGuide pose="idle" compact title="Nothing here represents a real student." body="Select a route to inspect the student context, recommendation logic, and destination it opens." />
-        <section className="workspace-card workspace-card--wide">
-          <div className="reviewer-section-heading"><div><p className="kicker">Route testing</p><h2>Eight functional route previews</h2></div><p>Select any fictional profile to open its full explanation below.</p></div>
-          <div className="preset-grid">{presets.map((preset) => { const route = recommendRoute(personaIntakes[preset]); return <button key={preset} type="button" className={selectedPreset === preset ? "active" : ""} aria-pressed={selectedPreset === preset} onClick={() => previewRoute(preset)}><strong>{presetLabels[preset]}</strong><span>{routeContent[route.recommendedRoute].title}</span><small>{route.reasons[0]}</small><b>View route</b></button>; })}</div>
-        </section>
-        <section id="admin-route-preview" className="workspace-card workspace-card--wide route-preview" tabIndex={-1}>
-          <div className="route-preview-header"><div><p className="kicker">Recommended for {presetLabels[selectedPreset]}</p><h2>{selectedRoute.title}</h2><p>{selectedRoute.meaning}</p></div><span>{selectedRecommendation.recommendedRoute}</span></div>
-          <div className="student-snapshot-grid">{intakeSummary.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value.replaceAll("_", " ")}</strong></article>)}</div>
-          <div className="route-preview-columns">
-            <section><h3>Why this route appeared</h3><ul>{selectedRecommendation.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul><p><strong>Alternate routes:</strong> {selectedRecommendation.alternateRoutes.map((route) => routeContent[route].title).join(", ")}</p></section>
-            <section><h3>What the student sees next</h3><p>{selectedRoute.prompt}</p><p className="workspace-safe">The route uses readiness context only. It does not use GPA, MCAT, demographics, personality labels, or message volume.</p><button className="primary-button" type="button" onClick={() => onOpenWorkspace?.(destinationWorkspace[selectedRoute.destination])}>Open matching station tools</button></section>
-          </div>
-        </section>
-        <section className="workspace-card workspace-card--wide"><h2>Pilot readiness</h2><ul className="readiness-list"><li>Backup moderator named</li><li>Advising relationships confirmed</li><li>Content sources reviewed for accuracy</li><li>Access and invitation strategy decided</li><li>Privacy, evaluation, and possible IRB conversation completed</li></ul><p className="workspace-safe">The Supabase schema is an architecture reference only. No production persistence is active.</p></section>
-        <AdminPilotPanel />
+        {programAdministrationTools}
       </main>
     );
   }

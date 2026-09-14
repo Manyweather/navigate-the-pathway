@@ -17,4 +17,6 @@ test("Pathway demo offers a direct role selector and Principal Investigator view
 test("Principal Investigator copy states the protected-data boundary", () => {
   assert.match(workspaces, /cannot browse private messages, unshared drafts, or bypass participant consent/);
   assert.match(workspaces, /Small groups are suppressed/);
+  assert.match(workspaces, /PI demonstration also includes program configuration, readiness, sessions, surveys, attendance, and curriculum review tools/);
+  assert.match(workspaces, /\{programAdministrationTools\}/);
 });
