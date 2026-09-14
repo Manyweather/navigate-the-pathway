@@ -561,6 +561,10 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
 .advisor-context-grid h3, .route-preview-columns h3, .advisor-thread h3 { margin: 0 0 9px; color: var(--maroon-dark); font-family: Georgia, serif; font-size: 1rem; }
 .advisor-context-grid p, .advisor-context-grid ul, .route-preview-columns p, .route-preview-columns ul { margin: 0; color: var(--gray); font-size: 0.76rem; line-height: 1.5; }
 .advisor-context-grid ul, .route-preview-columns ul { padding-left: 18px; }
+.advisor-note-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; }
+.advisor-note-grid .workspace-field:last-child { grid-column: 1 / -1; }
+.advisor-note-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.advisor-note-actions .workspace-safe { margin: 0; }
 .advisor-thread { display: grid; gap: 8px; margin: 20px 0; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: #fbf7f0; }
 .advisor-thread article { padding: 10px 12px; border-radius: 13px 13px 13px 4px; background: white; }
 .advisor-thread article span { color: var(--maroon); font-size: 0.62rem; font-weight: 900; text-transform: uppercase; }
@@ -608,7 +612,8 @@ h1 { margin-bottom: 14px; font-family: Fraunces, Alverata, Georgia, serif; font-
   .workspace-card--wide { grid-column: auto; }
   .cohort-board, .preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .student-snapshot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .advisor-context-grid { grid-template-columns: 1fr; }
+  .advisor-context-grid, .advisor-note-grid { grid-template-columns: 1fr; }
+  .advisor-note-grid .workspace-field:last-child { grid-column: auto; }
   .entry-card .rosie-guide { grid-template-columns: 150px 1fr; padding: 18px; }
   .entry-card .rosie-guide img { height: 240px; }
   .quick-capture { right: 14px; bottom: 92px; }

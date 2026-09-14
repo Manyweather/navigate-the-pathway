@@ -20,3 +20,12 @@ test("Principal Investigator copy states the protected-data boundary", () => {
   assert.match(workspaces, /PI demonstration also includes program configuration, readiness, sessions, surveys, attendance, and curriculum review tools/);
   assert.match(workspaces, /\{programAdministrationTools\}/);
 });
+
+test("Advisor demo prompts for structured notes after a completed session", () => {
+  for (const label of ["Student Concerns", "Areas of Discussion", "Suggestions", "Resources", "Follow Up"]) {
+    assert.match(workspaces, new RegExp(`label="${label}"`));
+  }
+  assert.match(workspaces, /Session completed/);
+  assert.match(workspaces, /Save session notes/);
+  assert.match(workspaces, /not visible to the student/);
+});

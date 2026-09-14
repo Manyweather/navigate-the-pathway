@@ -81,6 +81,22 @@ const destinationWorkspace: Record<DestinationId, WorkspaceId> = {
   advisor: "application",
 };
 
+type AdvisorSessionNote = {
+  concerns: string;
+  discussion: string;
+  suggestions: string;
+  resources: string;
+  followUp: string;
+};
+
+const emptyAdvisorSessionNote: AdvisorSessionNote = {
+  concerns: "",
+  discussion: "",
+  suggestions: "",
+  resources: "",
+  followUp: "",
+};
+
 function useAutosavedDraft(
   key: string,
   workflow: WorkflowType,
@@ -335,6 +351,8 @@ export function ReviewerWorkspace({
   const [comment, setComment] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState(advisorDemoStudents[0].id);
   const [advisorReplies, setAdvisorReplies] = useState<Record<string, string[]>>({});
+  const [sessionNoteDrafts, setSessionNoteDrafts] = useState<Record<string, AdvisorSessionNote>>({});
+  const [sessionNoteSavedAt, setSessionNoteSavedAt] = useState<Record<string, string>>({});
   const [selectedPreset, setSelectedPreset] = useState<PersonaPreset>("sparse");
   const presets = Object.keys(personaIntakes) as PersonaPreset[];
   const selectedStudent = advisorDemoStudents.find((student) => student.id === selectedStudentId) ?? advisorDemoStudents[0];
@@ -342,6 +360,8 @@ export function ReviewerWorkspace({
   const selectedIntake = personaIntakes[selectedPreset];
   const selectedRecommendation = recommendRoute(selectedIntake);
   const selectedRoute = routeContent[selectedRecommendation.recommendedRoute];
+  const sessionNote = sessionNoteDrafts[selectedStudent.id] ?? emptyAdvisorSessionNote;
+  const sessionNoteHasContent = Object.values(sessionNote).some((value) => value.trim());
   const intakeSummary = [
     ["Stage", selectedIntake.stage || "Not answered"],
     ["First focus", selectedIntake.intention || "Not answered"],
@@ -368,6 +388,18 @@ export function ReviewerWorkspace({
     if (!comment.trim() || !packetIsActive) return;
     setAdvisorReplies((current) => ({ ...current, [selectedStudent.id]: [...(current[selectedStudent.id] || []), comment.trim()] }));
     setComment("");
+  };
+
+  const updateSessionNote = (field: keyof AdvisorSessionNote, value: string) => {
+    setSessionNoteDrafts((current) => ({
+      ...current,
+      [selectedStudent.id]: { ...(current[selectedStudent.id] ?? emptyAdvisorSessionNote), [field]: value },
+    }));
+  };
+
+  const saveSessionNote = () => {
+    if (!sessionNoteHasContent) return;
+    setSessionNoteSavedAt((current) => ({ ...current, [selectedStudent.id]: new Date().toISOString() }));
   };
 
   const programAdministrationTools = <>
@@ -444,6 +476,17 @@ export function ReviewerWorkspace({
       <section className="workspace-card workspace-card--wide advisor-student-overview">
         <div className="student-profile-header"><span>{selectedStudent.initials}</span><div><p className="kicker">Fictional student</p><h2>{selectedStudent.name}</h2><p>{selectedStudent.focus}</p></div><b className={`packet-state packet-state--${selectedStudent.packet.status}`}>{selectedStudent.packet.status}</b></div>
         <div className="student-snapshot-grid"><article><span>Stage</span><strong>{selectedStudent.stage}</strong></article><article><span>Application timing</span><strong>{selectedStudent.cycle}</strong></article><article><span>Last packet update</span><strong>{new Date(selectedStudent.lastUpdated).toLocaleDateString()}</strong></article><article><span>Student-selected items</span><strong>{packetIsActive ? selectedStudent.packet.items.length : 0}</strong></article></div>
+      </section>
+      <section className="workspace-card workspace-card--wide advisor-session-notes">
+        <div className="reviewer-section-heading"><div><p className="kicker">Session completed</p><h2>Complete session notes</h2></div><p>{sessionNoteSavedAt[selectedStudent.id] ? `Saved ${new Date(sessionNoteSavedAt[selectedStudent.id]).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Add the applicable details while the conversation is fresh."}</p></div>
+        <div className="advisor-note-grid">
+          <Field label="Student Concerns"><textarea value={sessionNote.concerns} onChange={(event) => updateSessionNote("concerns", event.target.value)} placeholder="Concerns the student raised" /></Field>
+          <Field label="Areas of Discussion"><textarea value={sessionNote.discussion} onChange={(event) => updateSessionNote("discussion", event.target.value)} placeholder="Topics covered during the session" /></Field>
+          <Field label="Suggestions"><textarea value={sessionNote.suggestions} onChange={(event) => updateSessionNote("suggestions", event.target.value)} placeholder="Strategies or recommendations discussed" /></Field>
+          <Field label="Resources"><textarea value={sessionNote.resources} onChange={(event) => updateSessionNote("resources", event.target.value)} placeholder="Resources provided or recommended" /></Field>
+          <Field label="Follow Up"><textarea value={sessionNote.followUp} onChange={(event) => updateSessionNote("followUp", event.target.value)} placeholder="Next steps, owner, and timing" /></Field>
+        </div>
+        <div className="advisor-note-actions"><button className="primary-button" type="button" disabled={!sessionNoteHasContent} onClick={saveSessionNote}>{sessionNoteSavedAt[selectedStudent.id] ? "Update session notes" : "Save session notes"}</button><p className="workspace-safe" aria-live="polite">{sessionNoteSavedAt[selectedStudent.id] ? "Session notes saved. Later changes remain attributable to the advisor." : "These are private advisor working notes and are not visible to the student."}</p></div>
       </section>
       {packetIsActive ? <section className="workspace-card workspace-card--wide advisor-packet-detail">
         <div className="packet-status"><strong>{selectedStudent.packet.meetingGoal}</strong><span>shared · Access ends {new Date(selectedStudent.packet.expiresAt).toLocaleDateString()}</span></div>
