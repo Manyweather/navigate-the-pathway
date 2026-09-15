@@ -229,6 +229,8 @@ function dateTime(value: string | null | undefined) {
 }
 
 function statusLabel(value: string) {
+  if (value === "teams") return "Teams";
+  if (value === "zoom") return "Zoom";
   return value.replaceAll("_", " ");
 }
 
@@ -603,6 +605,21 @@ export function CompassAdvisorWorkspace({
       appointment.status === "pending_approval" ||
       appointment.status === "counterproposed",
   );
+  const approvalAndCancellationQueue = workspaceAppointments
+    .filter((appointment) =>
+      ["pending_approval", "counterproposed", "cancelled"].includes(
+        appointment.status,
+      ),
+    )
+    .sort((left, right) => {
+      const leftPriority = left.status === "cancelled" ? 1 : 0;
+      const rightPriority = right.status === "cancelled" ? 1 : 0;
+      return (
+        leftPriority - rightPriority ||
+        new Date(left.startsAt || 0).getTime() -
+          new Date(right.startsAt || 0).getTime()
+      );
+    });
   const todayKey = new Date().toDateString();
   const todayAppointments = sortedAppointments.filter(
     (appointment) =>
@@ -1254,6 +1271,7 @@ export function CompassAdvisorWorkspace({
                     }
                   >
                     <option value="teams">Teams</option>
+                    <option value="zoom">Zoom</option>
                     <option value="in_person">In person</option>
                     <option value="phone">Phone</option>
                   </select>
@@ -2546,7 +2564,7 @@ export function CompassAdvisorWorkspace({
             <fieldset>
               <legend>Formats offered</legend>
               <div className="channel-options">
-                {[["in_person", "In person"], ["teams", "Teams"], ["phone", "Phone"]].map(([value, label]) => (
+                {[["in_person", "In person"], ["teams", "Teams"], ["zoom", "Zoom"], ["phone", "Phone"]].map(([value, label]) => (
                   <label key={value}>
                     <input
                       type="checkbox"
@@ -2724,12 +2742,32 @@ export function CompassAdvisorWorkspace({
             </div>
             <div className="form-row">
               <label><span>Visit length</span><select value={availabilityDuration} onChange={(event) => setAvailabilityDuration(event.target.value)}>{appointmentDurationOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></label>
-              <label><span>Format</span><select value={availabilityModalities[0] || "in_person"} onChange={(event) => setAvailabilityModalities([event.target.value])}><option value="in_person">In person</option><option value="teams">Teams</option><option value="phone">Phone</option></select></label>
+              <label><span>Format</span><select value={availabilityModalities[0] || "in_person"} onChange={(event) => setAvailabilityModalities([event.target.value])}><option value="in_person">In person</option><option value="teams">Teams</option><option value="zoom">Zoom</option><option value="phone">Phone</option></select></label>
             </div>
             <button className="primary-button" disabled={busy}>{availabilityMode === "date" ? "Add this day" : "Add weekly block"}</button>
           </form>
         </div>
         {message ? <p className="form-message" aria-live="polite">{message}</p> : null}
+      </section>
+      <section className="advisor-home-review-queue" data-tutorial-id="advisor-home-review-queue">
+        <div className="section-heading">
+          <div><p className="kicker">Students awaiting action</p><h2>Approvals and cancellations</h2></div>
+          <button className="text-button" type="button" onClick={() => setView("appointments")}>View all appointments</button>
+        </div>
+        <div className="advisor-home-review-queue__list">
+          {approvalAndCancellationQueue.slice(0, 4).map((appointment) => (
+            <button key={appointment.id} type="button" onClick={() => { setSelectedAppointmentId(appointment.id); setView("appointments"); }}>
+              <span><strong>{appointment.studentName || "Student"}</strong><small>{appointment.subject || appointment.serviceName}</small></span>
+              <time>{dateTime(appointment.startsAt)}</time>
+              <i className={`status-chip status-chip--${appointment.status}`}>{appointment.status === "cancelled" ? "Cancelled" : "Needs approval"}</i>
+            </button>
+          ))}
+          {!approvalAndCancellationQueue.length ? <p>No appointment approvals or recent cancellations need review.</p> : null}
+        </div>
+      </section>
+      <section className="advisor-home-options" aria-labelledby="advisor-options-title" data-tutorial-id="advisor-home-options">
+        <div><p className="kicker">Advisor tools</p><h2 id="advisor-options-title">What would you like to do?</h2></div>
+        <label><span>Advisor options</span><select value="" onChange={(event) => tiles.find((tile) => tile.key === event.target.value)?.action()}><option value="" disabled>Choose an option</option>{tiles.map((tile) => <option key={tile.key} value={tile.key}>{tile.title}</option>)}</select></label>
       </section>
       <div className="provider-home-work-grid">
         <section className="provider-home-task-list" data-tutorial-id="advisor-home-tasks">

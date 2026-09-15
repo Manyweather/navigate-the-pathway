@@ -1201,7 +1201,7 @@ function oacaBootstrap(assignedAvailability?: unknown) {
         name: "Academic advising",
         providerRule: "assigned",
         policyStatus: "sandbox_approved",
-        modalities: ["in_person", "phone", "teams"],
+        modalities: ["in_person", "phone", "teams", "zoom"],
         durationMinutes: 30,
       },
       {
@@ -1210,7 +1210,7 @@ function oacaBootstrap(assignedAvailability?: unknown) {
         name: "Career advising",
         providerRule: "choice_or_first",
         policyStatus: "sandbox_approved",
-        modalities: ["in_person", "phone", "teams"],
+        modalities: ["in_person", "phone", "teams", "zoom"],
         durationMinutes: 30,
       },
       {
@@ -1229,7 +1229,7 @@ function oacaBootstrap(assignedAvailability?: unknown) {
         displayName: "Bucket L. Manyweather, Ph.D.",
         classification: "staff",
         subjects: [],
-        modalities: ["in_person", "phone", "teams"],
+        modalities: ["in_person", "phone", "teams", "zoom"],
         serviceKeys: ["academic_advising"],
       },
       {
@@ -1237,7 +1237,7 @@ function oacaBootstrap(assignedAvailability?: unknown) {
         displayName: "Cameron Mastin, M.Ed.",
         classification: "staff",
         subjects: [],
-        modalities: ["in_person", "phone", "teams"],
+        modalities: ["in_person", "phone", "teams", "zoom"],
         serviceKeys: ["academic_advising"],
       },
       {
@@ -1245,7 +1245,7 @@ function oacaBootstrap(assignedAvailability?: unknown) {
         displayName: "Michael O'Leary, M.Ed.",
         classification: "staff",
         subjects: [],
-        modalities: ["in_person", "phone", "teams"],
+        modalities: ["in_person", "phone", "teams", "zoom"],
         serviceKeys: ["academic_advising"],
       },
       {
@@ -1253,7 +1253,7 @@ function oacaBootstrap(assignedAvailability?: unknown) {
         displayName: "Art Avila, M.Ed.",
         classification: "staff",
         subjects: [],
-        modalities: ["in_person", "teams"],
+        modalities: ["in_person", "teams", "zoom"],
         serviceKeys: ["career_advising"],
       },
       {
@@ -1318,6 +1318,20 @@ function oacaBootstrap(assignedAvailability?: unknown) {
         endsAt: isoAt(0, 14, 30),
         modality: "in_person",
         status: "pending_approval",
+        sandbox: true,
+        requestOrigin: "student",
+      },
+      {
+        id: "appointment-academic-cancelled",
+        studentId: "student-5",
+        studentName: "Avery Johnson",
+        serviceName: "Academic advising",
+        providerName: "Bucket L. Manyweather, Ph.D.",
+        subject: "Planning for the next academic block",
+        startsAt: isoAt(1, 15),
+        endsAt: isoAt(1, 15, 30),
+        modality: "zoom",
+        status: "cancelled",
         sandbox: true,
         requestOrigin: "student",
       },
@@ -1411,20 +1425,22 @@ function oacaBootstrap(assignedAvailability?: unknown) {
       displayName: "Bucket L. Manyweather, Ph.D.",
       classification: "staff",
       subjects: [],
-      modalities: ["in_person", "phone", "teams"],
+      modalities: ["in_person", "phone", "teams", "zoom"],
       serviceKeys: ["academic_advising"],
     },
     assignedStudents: [
       { id: "student-1", displayName: "Taylor Morgan" },
       { id: "student-2", displayName: "Riley Thompson" },
       { id: "student-3", displayName: "Cameron Ellis" },
+      { id: "student-5", displayName: "Avery Johnson" },
+      { id: "student-6", displayName: "Jordan Kim" },
     ],
     currentProvider: {
       id: "provider-academic",
       displayName: "Bucket L. Manyweather, Ph.D.",
       classification: "staff",
       subjects: [],
-      modalities: ["in_person", "phone", "teams"],
+      modalities: ["in_person", "phone", "teams", "zoom"],
       serviceKeys: ["academic_advising"],
     },
     policyDocuments: [],
@@ -1881,14 +1897,53 @@ function advisorPreviewBootstrap(
       campus: "Summerlin",
       assignedAdvisorName: "Cameron Mastin, M.Ed.",
     },
-  ].map((student, index) => {
+    {
+      id: "student-5",
+      displayName: "Avery Johnson",
+      cohortLabel: "Class of 2029",
+      phase: "Foundational phase",
+      year: "M2",
+      campus: "Summerlin",
+      assignedAdvisorName: "Bucket L. Manyweather, Ph.D.",
+    },
+    {
+      id: "student-6",
+      displayName: "Jordan Kim",
+      cohortLabel: "Class of 2030",
+      phase: "Foundational phase",
+      year: "M1",
+      campus: "Summerlin",
+      assignedAdvisorName: "Bucket L. Manyweather, Ph.D.",
+    },
+    {
+      id: "student-7",
+      displayName: "Maya Patel",
+      cohortLabel: "Class of 2028",
+      phase: "Clerkship phase",
+      year: "M3",
+      campus: "Henderson",
+      assignedAdvisorName: "Michael O'Leary, M.Ed.",
+    },
+    {
+      id: "student-8",
+      displayName: "Noah Williams",
+      cohortLabel: "Class of 2027",
+      phase: "Advanced phase",
+      year: "M4",
+      campus: "Henderson",
+      assignedAdvisorName: "Cameron Mastin, M.Ed.",
+    },
+  ].map((student) => {
     const visits = appointments.filter((item) => item.studentId === student.id);
+    const assignedToCurrent = ["student-1", "student-2", "student-5", "student-6"].includes(
+      student.id,
+    );
     const relationship =
       activeWorkspace === "career"
         ? "career_service"
-        : index < 2
+        : assignedToCurrent
           ? "assigned"
-          : index === 2
+          : student.id === "student-3"
             ? "drop_in"
             : "outside_caseload";
     return {

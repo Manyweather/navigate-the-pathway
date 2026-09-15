@@ -42,7 +42,7 @@ export const defaultAdvisorAvailabilitySettings: AdvisorAvailabilitySettings = {
       endsAt: "12:00",
       bufferMinutes: 10,
       durationMinutes: 30,
-      modalities: ["in_person", "teams"],
+      modalities: ["in_person", "teams", "zoom"],
       location: "Student Affairs Suite",
     },
     {
@@ -52,7 +52,7 @@ export const defaultAdvisorAvailabilitySettings: AdvisorAvailabilitySettings = {
       endsAt: "16:30",
       bufferMinutes: 10,
       durationMinutes: 30,
-      modalities: ["in_person", "phone", "teams"],
+      modalities: ["in_person", "phone", "teams", "zoom"],
       location: "Student Affairs Suite",
     },
   ],
