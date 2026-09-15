@@ -96,6 +96,44 @@ export const SYNTHETIC_PERSONAS: Array<{
   },
 ];
 
+export const IMPACT_DEMO_PERSONAS: Array<{
+  key: SyntheticPersonaKey;
+  label: string;
+  description: string;
+  demoSlug: "student" | "admin" | "liaison";
+  defaultPath: string;
+}> = [
+  {
+    key: "impact_student",
+    label: "Impact Student",
+    description: "Build an initiative, preserve your work, plan events, and prepare a handoff.",
+    demoSlug: "student",
+    defaultPath: "/app/compass/impact",
+  },
+  {
+    key: "impact_administrator",
+    label: "Impact Administrator",
+    description: "Verify access, review submitted work, and oversee Impact program activity.",
+    demoSlug: "admin",
+    defaultPath: "/app/compass/impact",
+  },
+  {
+    key: "community_liaison",
+    label: "Community Liaison",
+    description: "Coordinate community work, review affiliations, and make event decisions.",
+    demoSlug: "liaison",
+    defaultPath: "/app/compass/impact",
+  },
+];
+
+export function impactDemoPersonaForSlug(value: string | null) {
+  return IMPACT_DEMO_PERSONAS.find((item) => item.demoSlug === value)?.key || null;
+}
+
+export function impactDemoSlugForPersona(persona: SyntheticPersonaKey) {
+  return IMPACT_DEMO_PERSONAS.find((item) => item.key === persona)?.demoSlug || "student";
+}
+
 export function getSyntheticPreviewPersona(): SyntheticPersonaKey {
   if (typeof window === "undefined") return "platform_creator";
   const saved = window.localStorage.getItem(

@@ -38,6 +38,18 @@ test("tutorial progress and insights stay browser-local and guided tours never i
   assert.match(source, /Creator tutorial insights/);
 });
 
+test("Impact tutorial asks for a role and keeps Administrator and Liaison tours distinct", async () => {
+  const source = await readFile(new URL("../app/production/demo-workspace-tutorial.tsx", import.meta.url), "utf8");
+  assert.match(source, /Which Impact role would you like to explore\?/);
+  assert.match(source, /navigate\.demo-tutorial\.pending-role\.v1/);
+  assert.match(source, /window\.sessionStorage/);
+  const administrator = demoTutorialSteps("impact", "impact_administrator");
+  const liaison = demoTutorialSteps("impact", "community_liaison");
+  assert.notDeepEqual(administrator.map((step) => step.id), liaison.map((step) => step.id));
+  assert.ok(administrator.some((step) => /Administrator|administrative/i.test(`${step.title} ${step.body}`)));
+  assert.ok(liaison.some((step) => /Liaison|community/i.test(`${step.title} ${step.body}`)));
+});
+
 test("tutorial targets are stable data hooks where a workflow control is highlighted", async () => {
   const [compass, advisor, impact, pathway] = await Promise.all([
     readFile(new URL("../app/production/oaca-compass-app.tsx", import.meta.url), "utf8"),

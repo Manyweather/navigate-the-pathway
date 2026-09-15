@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import type { PilotApiClient } from "./api-client";
 import { DemoWorkspaceTutorial, type DemoTutorialWorkspace } from "./demo-workspace-tutorial";
 import { experiences, experienceToWorkspace, type ExperienceKey, type ExperienceMembership, type WorkspaceKey } from "./platform-model";
-import { SYNTHETIC_PERSONAS, type SyntheticPersonaKey } from "./synthetic-preview";
+import { IMPACT_DEMO_PERSONAS, impactDemoSlugForPersona, SYNTHETIC_PERSONAS, type SyntheticPersonaKey } from "./synthetic-preview";
 
 export function rememberWorkspace(api: PilotApiClient, workspaceKey: WorkspaceKey, previewMode: boolean) {
   if (typeof window === "undefined") return;
@@ -62,20 +62,30 @@ export function WorkspaceSwitcher({ memberships, current, api, previewMode }: { 
   }}>{active.map((item) => <option key={item.experienceKey} value={experienceToWorkspace[item.experienceKey]}>{workspaceLabel(item.experienceKey)}</option>)}</select></label>;
 }
 
-export function CreatorPreviewBanner({ persona, onPersona, onExit, scope = "creator", tutorialWorkspace = "compass" }: { persona: SyntheticPersonaKey | null; onPersona: (persona: SyntheticPersonaKey) => void; onExit: () => void; scope?: "creator" | "compass"; tutorialWorkspace?: DemoTutorialWorkspace }) {
+export function CreatorPreviewBanner({ persona, onPersona, onExit, scope = "creator", tutorialWorkspace = "compass" }: { persona: SyntheticPersonaKey | null; onPersona: (persona: SyntheticPersonaKey) => void; onExit: () => void; scope?: "creator" | "compass" | "impact"; tutorialWorkspace?: DemoTutorialWorkspace }) {
   if (!persona) return null;
-  const personaOptions = scope === "compass"
-    ? SYNTHETIC_PERSONAS.filter((item) => ["compass_student", "peer_tutor", "tutoring_manager", "academic_advisor", "career_advisor", "compass_director"].includes(item.key))
-    : SYNTHETIC_PERSONAS;
+  const personaOptions = scope === "impact"
+    ? IMPACT_DEMO_PERSONAS
+    : scope === "compass"
+      ? SYNTHETIC_PERSONAS.filter((item) => ["compass_student", "peer_tutor", "tutoring_manager", "academic_advisor", "career_advisor", "compass_director"].includes(item.key))
+      : SYNTHETIC_PERSONAS;
   const changePersona = (next: SyntheticPersonaKey) => {
+    const samePersona = next === persona;
+    if (scope === "impact") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("preview", "impact");
+      url.searchParams.set("demo", impactDemoSlugForPersona(next));
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
     onPersona(next);
     const target = SYNTHETIC_PERSONAS.find((item) => item.key === next)?.defaultPath || "/app/compass";
     if (window.location.pathname !== target) window.location.replace(target);
+    else if (scope === "impact" && samePersona) window.location.replace(`${window.location.pathname}${window.location.search}${window.location.hash}`);
   };
   return <aside className="creator-preview-shell" role="status" data-demo-guide="preview-banner">
-    <div><span className="creator-preview-shell__mark" aria-hidden="true">◇</span><span><strong>{scope === "compass" ? "Compass Demo" : "Creator Preview"}</strong><small>Fictional records · strict role-scoped responses</small></span></div>
+    <div><span className="creator-preview-shell__mark" aria-hidden="true">◇</span><span><strong>{scope === "impact" ? "Impact Demo" : scope === "compass" ? "Compass Demo" : "Creator Preview"}</strong><small>Fictional records · strict role-scoped responses</small></span></div>
     <label data-demo-guide="role-switcher"><span>Viewing as</span><select value={persona} onChange={(event) => changePersona(event.target.value as SyntheticPersonaKey)}>{personaOptions.map((item) => <option key={item.key} value={item.key}>{item.label.replace("Compass ", "")}</option>)}</select></label>
-    <DemoWorkspaceTutorial key={`${tutorialWorkspace}:${persona}`} workspace={tutorialWorkspace} persona={persona} />
-    <button className="text-button" onClick={onExit}>{scope === "compass" ? "Leave demo" : "Exit preview"}</button>
+    <DemoWorkspaceTutorial key={`${tutorialWorkspace}:${persona}`} workspace={tutorialWorkspace} persona={persona} roleOptions={scope === "impact" ? IMPACT_DEMO_PERSONAS : undefined} onPersona={scope === "impact" ? changePersona : undefined} />
+    <button className="text-button" onClick={onExit}>{scope === "creator" ? "Exit preview" : "Leave demo"}</button>
   </aside>;
 }

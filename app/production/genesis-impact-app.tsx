@@ -7,7 +7,7 @@ import { genesisEventCanPublish, genesisJourneySteps, type ExperienceMembership 
 import { organizationCollegeOrder, organizationsForSelect, type StudentOrganization } from "./student-organizations";
 import type { PilotApiClient } from "./api-client";
 import type { AuthorizationContext } from "./types";
-import type { SyntheticPersonaKey } from "./synthetic-preview";
+import { IMPACT_DEMO_PERSONAS, impactDemoPersonaForSlug, impactDemoSlugForPersona, type SyntheticPersonaKey } from "./synthetic-preview";
 
 type Portfolio = { id: string; title: string; organizationId: string; organizationName: string; currentVersion: number; status: string; content: Record<string, string>; mentorFeedback?: string };
 type ImpactAffiliation = { id: string; studentId: string; studentName: string; organizationId: string; organizationName: string; status: "pending" | "approved" | "declined" | "ended"; requestedAt: string; reviewedAt: string | null; reviewerName: string | null; reviewNote: string | null; requestContext?: string };
@@ -23,6 +23,22 @@ type GenesisBootstrap = {
 type View = "home" | "journey" | "review" | "snapshots" | "handoff" | "events" | "access";
 
 const initialData: GenesisBootstrap = { organizations: organizationsForSelect(), portfolios: [], reviews: [], snapshots: [], handoffs: [], events: [], calendarEvents: [], affiliations: [], approvedOrganizationIds: [], accessStatus: "pending", canEdit: false, accessQueue: [], notifications: [] };
+
+function ImpactDemoRoleChooser({ persona, onPersona, signOut }: { persona: SyntheticPersonaKey; onPersona: (persona: SyntheticPersonaKey) => void; signOut: () => Promise<void> }) {
+  const choose = (next: SyntheticPersonaKey) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("preview", "impact");
+    url.searchParams.set("demo", impactDemoSlugForPersona(next));
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    if (next === persona) window.location.replace(`${url.pathname}${url.search}${url.hash}`);
+    else onPersona(next);
+  };
+  return <div className="navigate-platform navigate-platform--genesis">
+    <CreatorPreviewBanner persona={persona} onPersona={onPersona} onExit={() => void signOut()} scope="impact" tutorialWorkspace="impact" />
+    <header className="platform-header platform-header--genesis"><a className="platform-wordmark" href="/app/compass/impact?preview=impact"><span className="platform-wordmark__logo" aria-hidden="true"><img src="/assets/brand/compass-emblem-v2.png" alt="" /></span><strong>Compass</strong></a><div className="experience-title"><span>Nested workspace</span><strong>Impact</strong></div></header>
+    <main className="platform-main impact-demo-entry"><section className="impact-demo-role-chooser" aria-labelledby="impact-demo-role-title"><p className="kicker">Impact demonstration</p><h1 id="impact-demo-role-title">Choose an Impact role.</h1><p>Explore fictional, role-scoped workflows. Switching roles changes the records and decisions available to the dashboard.</p><div className="impact-demo-role-grid">{IMPACT_DEMO_PERSONAS.map((item, index) => <button key={item.key} type="button" onClick={() => choose(item.key)}><span aria-hidden="true">{index === 0 ? "◈" : index === 1 ? "✓" : "◇"}</span><strong>{item.label}</strong><small>{item.description}</small><i>Open role</i></button>)}</div><small>No sign-in or access code is required. This demonstration contains fictional records only.</small></section></main>
+  </div>;
+}
 
 function ImpactHeader({ api, context, memberships, previewMode, signOut }: { api: PilotApiClient; context: AuthorizationContext; memberships: ExperienceMembership[]; previewMode: boolean; signOut: () => Promise<void> }) {
   const student = memberships.find((item) => item.experienceKey === "genesis")?.roles.includes("student");
@@ -74,7 +90,7 @@ function Sharing({ api, data, handoff, reload, onBack }: { api: PilotApiClient; 
   return <section className="experience-panel"><button className="workspace-back text-button" onClick={onBack}>← Impact home</button><p className="kicker">{handoff ? "Succession" : "Shared initiative space"}</p><h1>{handoff ? "Make the next steward and decisions explicit." : "Publish what others can build on."}</h1><div className="experience-form">{handoff ? <label><span>Next steward email</span><input type="email" value={nextSteward} onChange={(event) => setNextSteward(event.target.value)} /></label> : <label><span>Snapshot title</span><input value={title} onChange={(event) => setTitle(event.target.value)} /></label>}<button className="primary-button" disabled={!data.canEdit || (handoff ? !nextSteward : !data.portfolios[0])} onClick={() => void run()}>{handoff ? "Offer handoff" : "Publish reviewed snapshot"}</button></div><p className="form-message" aria-live="polite">{message}</p></section>;
 }
 
-function ImpactWorkspace({ api, context, membership, memberships, previewMode, previewPersona, setPreviewPersona, signOut }: { api: PilotApiClient; context: AuthorizationContext; membership: ExperienceMembership; memberships: ExperienceMembership[]; previewMode: boolean; previewPersona: SyntheticPersonaKey | null; setPreviewPersona: (persona: SyntheticPersonaKey) => void; signOut: () => Promise<void> }) {
+function ImpactWorkspace({ api, context, membership, memberships, previewMode, previewScope, previewPersona, setPreviewPersona, signOut }: { api: PilotApiClient; context: AuthorizationContext; membership: ExperienceMembership; memberships: ExperienceMembership[]; previewMode: boolean; previewScope: "creator" | "compass" | "impact" | null; previewPersona: SyntheticPersonaKey | null; setPreviewPersona: (persona: SyntheticPersonaKey) => void; signOut: () => Promise<void> }) {
   const [data, setData] = useState(initialData); const [view, setView] = useState<View>("home"); const [message, setMessage] = useState("Loading Impact…");
   const load = useCallback(async () => { try { const value = await api.request<GenesisBootstrap>("/api/genesis/bootstrap"); setData({ ...initialData, ...value, organizations: value.organizations?.length ? value.organizations : initialData.organizations }); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "Impact could not be loaded."); } }, [api]);
   useEffect(() => { const task = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(task); }, [load]);
@@ -88,11 +104,15 @@ function ImpactWorkspace({ api, context, membership, memberships, previewMode, p
   else if (view === "access") content = <AccessQueue api={api} data={data} reload={load} onBack={() => setView("home")} />;
   else if (view === "snapshots" || view === "handoff") content = <Sharing api={api} data={data} handoff={view === "handoff"} reload={load} onBack={() => setView("home")} />;
   else content = <section className="experience-panel"><div className="experience-hero experience-hero--genesis"><div><p className="kicker">Impact · nested in Compass</p><h1>{student ? "Carry community work forward." : "Review, coach, and connect the work."}</h1><p>Portfolios stay student-owned. Verified affiliations control organization publishing, and dual-approved events reach the Impact calendar.</p><button className="primary-button" onClick={() => setView(student ? "journey" : "access")}>{student ? "Continue my initiative" : "Open access queue"}</button></div><div className="hero-status"><strong>{student ? data.approvedOrganizationIds.length : data.accessQueue.length}</strong><p>{student ? "verified organization affiliations" : "affiliations awaiting review"}</p></div></div><div className="home-action-grid home-action-grid--experience">{student ? <><button data-tutorial-id="impact-journey" onClick={() => setView("journey")}><span>◈</span><strong>Initiative journey</strong><small>Reflect, research, design, sustain</small></button><button data-tutorial-id="impact-snapshots" onClick={() => setView("snapshots")}><span>▣</span><strong>Shared snapshots</strong><small>Immutable, attributed versions</small></button><button onClick={() => setView("handoff")}><span>⇢</span><strong>Handoff</strong><small>Successor, decisions, and next actions</small></button></> : null}<button data-tutorial-id="impact-events" onClick={() => setView("events")}><span>◷</span><strong>Impact calendar</strong><small>Events, decisions, and Liaison alerts</small></button>{reviewer ? <><button data-tutorial-id="impact-review" onClick={() => setView("review")}><span>✎</span><strong>Mentor review</strong><small>Preserved submitted versions</small></button><button data-tutorial-id="impact-access" onClick={() => setView("access")}><span>✓</span><strong>Access verification</strong><small>Approve or decline affiliations</small></button></> : null}</div></section>;
-  return <div className="navigate-platform navigate-platform--genesis"><CreatorPreviewBanner persona={previewPersona} onPersona={setPreviewPersona} onExit={() => void signOut()} tutorialWorkspace="impact" /><ImpactHeader api={api} context={context} memberships={memberships} previewMode={previewMode} signOut={signOut} /><main className="platform-main"><nav className="experience-nav" aria-label="Impact workspace"><span className="status-chip">{student ? "Student workspace" : membership.roles.map((role) => role.replaceAll("_", " ")).join(" · ")}</span><button className={view === "home" ? "active" : ""} onClick={() => setView("home")}>Home</button></nav>{message ? <p className="form-message" aria-live="polite">{message}</p> : null}{content}</main></div>;
+  return <div className="navigate-platform navigate-platform--genesis"><CreatorPreviewBanner persona={previewPersona} onPersona={setPreviewPersona} onExit={() => void signOut()} scope={previewScope === "impact" ? "impact" : "creator"} tutorialWorkspace="impact" /><ImpactHeader api={api} context={context} memberships={memberships} previewMode={previewMode} signOut={signOut} /><main className="platform-main"><nav className="experience-nav" aria-label="Impact workspace"><span className="status-chip">{student ? "Student workspace" : membership.roles.map((role) => role.replaceAll("_", " ")).join(" · ")}</span><button className={view === "home" ? "active" : ""} onClick={() => setView("home")}>Home</button></nav>{message ? <p className="form-message" aria-live="polite">{message}</p> : null}{content}</main></div>;
 }
 
 export function GenesisImpactApp() {
-  return <PlatformAccess experience="genesis">{({ api, context, memberships, previewMode, previewPersona, setPreviewPersona, signOut }) => <ImpactWorkspace key={previewPersona || context.userId} api={api} context={context} membership={memberships.find((item) => item.experienceKey === "genesis")!} memberships={memberships} previewMode={previewMode} previewPersona={previewPersona} setPreviewPersona={setPreviewPersona} signOut={signOut} />}</PlatformAccess>;
+  return <PlatformAccess experience="genesis">{({ api, context, memberships, previewMode, previewScope, previewPersona, setPreviewPersona, signOut }) => {
+    const requestedRole = typeof window === "undefined" ? null : impactDemoPersonaForSlug(new URLSearchParams(window.location.search).get("demo"));
+    if (previewMode && previewScope === "impact" && !requestedRole) return <ImpactDemoRoleChooser persona={previewPersona || "impact_student"} onPersona={setPreviewPersona} signOut={signOut} />;
+    return <ImpactWorkspace key={previewPersona || context.userId} api={api} context={context} membership={memberships.find((item) => item.experienceKey === "genesis")!} memberships={memberships} previewMode={previewMode} previewScope={previewScope} previewPersona={previewPersona} setPreviewPersona={setPreviewPersona} signOut={signOut} />;
+  }}</PlatformAccess>;
 }
 
 export { genesisEventCanPublish };

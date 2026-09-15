@@ -183,17 +183,36 @@ const impactStudentChapters: TutorialChapter[] = [
   { id: "impact-events", title: "Programs and events", minutes: 1, steps: [step("impact-events", "impact-calendar", "Follow Impact events", "Draft, submit, review, and track events in a calendar shared with the relevant organization and Community Liaisons.", "Dual approval protects publication", "Nothing reaches the shared calendar or future Outlook synchronization until both mentor and Liaison approval are recorded.", "[data-tutorial-id='impact-events']")] },
 ];
 
-const impactStaffChapters: TutorialChapter[] = [
+const impactAdministratorChapters: TutorialChapter[] = [
   orientation("impact"),
   {
-    id: "impact-review", title: "Review and access", minutes: 2,
+    id: "impact-admin-review", title: "Access and portfolio review", minutes: 2,
     steps: [
-      step("impact-review", "impact-review-home", "Review, coach, and connect", "This home gathers affiliation verification, mentor review, event decisions, and Liaison activity.", "Impact governance overview", "Review queues make ownership and next decisions visible without allowing reviewers to overwrite student-authored work.", ".experience-hero--genesis"),
-      step("impact-review", "impact-access", "Verify affiliation access", "Approve or decline each organization affiliation using the context supplied by the student.", "Least-privilege workspace access", "The first approved interest-group affiliation unlocks Impact; publishing remains limited to each separately verified organization.", "[data-tutorial-id='impact-access']"),
-      step("impact-review", "impact-mentor", "Coach a preserved version", "Review submitted versions and return feedback while the reviewed snapshot remains unchanged.", "Version-safe mentoring", "Mentor feedback stays attached to the exact submitted version, supporting auditability and longitudinal learning.", "[data-tutorial-id='impact-review']"),
+      step("impact-admin-review", "impact-admin-home", "Oversee the Impact workspace", "The Administrator home gathers affiliation verification, submitted portfolio review, and event oversight without changing student authorship.", "Impact governance overview", "Administrative tools coordinate access and program operations while student portfolios remain versioned and student-owned.", ".experience-hero--genesis"),
+      step("impact-admin-review", "impact-admin-access", "Verify affiliation access", "Approve or decline each organization affiliation using the context supplied by the student.", "Least-privilege workspace access", "The first approved interest-group affiliation unlocks Impact; publishing remains limited to each separately verified organization.", "[data-tutorial-id='impact-access']"),
+      step("impact-admin-review", "impact-admin-portfolio", "Review a preserved submission", "Read the exact submitted portfolio version and return coaching without overwriting later student revisions.", "Version-safe review", "Feedback remains attached to its source version so program leaders can trace decisions and preserve the student’s voice.", "[data-tutorial-id='impact-review']"),
     ],
   },
-  { id: "impact-event-approval", title: "Event decisions", minutes: 1, steps: [step("impact-event-approval", "impact-staff-events", "Move events through approval", "Review the event evidence and record the mentor or Liaison decision. This tour stops before any approval or publication action.", "Coordinated calendar controls", "Submitted events notify active Liaisons, conflicting decisions are prevented, and only dual-approved events publish.", "[data-tutorial-id='impact-events']")] },
+  { id: "impact-admin-events", title: "Program and event oversight", minutes: 1, steps: [step("impact-admin-events", "impact-admin-event-oversight", "Monitor event progress", "Review event evidence, approval state, reviewer feedback, and published activity from one workspace. This tour stops before any decision.", "Govern the approval path", "Administrators can oversee the workflow while the Community Liaison decision remains a distinct, attributed publication gate.", "[data-tutorial-id='impact-events']")] },
+];
+
+const impactLiaisonChapters: TutorialChapter[] = [
+  orientation("impact"),
+  {
+    id: "impact-liaison-coordination", title: "Community coordination", minutes: 2,
+    steps: [
+      step("impact-liaison-coordination", "impact-liaison-home", "Coordinate community-facing work", "The Liaison home brings verified affiliations, event alerts, and decisions into one community-focused workspace.", "Community stewardship overview", "Liaisons see the items that need community coordination without gaining control of the student’s canonical portfolio.", ".experience-hero--genesis"),
+      step("impact-liaison-coordination", "impact-liaison-access", "Verify an organization relationship", "Review the student’s affiliation context and approve or decline the request before organization publishing is allowed.", "Confirm accountable participation", "Every decision is attributed and shared with other authorized reviewers so duplicate or conflicting decisions can be prevented.", "[data-tutorial-id='impact-access']"),
+      step("impact-liaison-coordination", "impact-liaison-review", "Read the preserved initiative", "Review the submitted work and its community context before making an event decision or returning feedback.", "Connect evidence to implementation", "Preserved versions let Liaisons evaluate the exact rationale, partners, sustainability plan, and open decisions supporting the proposed work.", "[data-tutorial-id='impact-review']"),
+    ],
+  },
+  {
+    id: "impact-liaison-events", title: "Event decisions and calendar", minutes: 1,
+    steps: [
+      step("impact-liaison-events", "impact-liaison-alerts", "Respond to Liaison alerts", "Submitted events and material changes appear with the decision context needed for coordinated follow-up.", "Route community decisions", "Every active Community Liaison receives the alert; once one records a decision, all reviewers see the updated state.", "[data-tutorial-id='impact-events']"),
+      step("impact-liaison-events", "impact-liaison-publish", "Complete the publication gate", "Approve a mentor-reviewed event or request changes. This tutorial stops before the action is recorded.", "Protect the shared calendar", "Only dual-approved events publish to the Impact calendar, and later changes remain idempotent and attributed.", "[data-tutorial-id='impact-events']"),
+    ],
+  },
 ];
 
 const pathwayChapters: TutorialChapter[] = [
@@ -222,7 +241,11 @@ const pathwayCreatorChapters: TutorialChapter[] = [
 
 function tutorialChapters(workspace: DemoTutorialWorkspace, persona: SyntheticPersonaKey): TutorialChapter[] {
   if (workspace === "pathway") return persona === "pathway_student" ? pathwayChapters : pathwayCreatorChapters;
-  if (workspace === "impact") return persona === "impact_student" ? impactStudentChapters : impactStaffChapters;
+  if (workspace === "impact") {
+    if (persona === "impact_student") return impactStudentChapters;
+    if (persona === "community_liaison") return impactLiaisonChapters;
+    return impactAdministratorChapters;
+  }
   if (persona === "compass_student") return compassStudentChapters;
   if (persona === "peer_tutor") return peerTutorChapters;
   if (persona === "tutoring_manager") return tutoringManagerChapters;
@@ -246,13 +269,21 @@ function saveStore(store: TutorialStore) {
 }
 
 function roleKey(workspace: DemoTutorialWorkspace, persona: SyntheticPersonaKey) { return `${workspace}:${persona}`; }
+const pendingTutorialKey = "navigate.demo-tutorial.pending-role.v1";
 
-export function DemoWorkspaceTutorial({ workspace, persona }: { workspace: DemoTutorialWorkspace; persona: SyntheticPersonaKey }) {
+type TutorialRoleOption = {
+  key: SyntheticPersonaKey;
+  label: string;
+  description: string;
+};
+
+export function DemoWorkspaceTutorial({ workspace, persona, roleOptions, onPersona }: { workspace: DemoTutorialWorkspace; persona: SyntheticPersonaKey; roleOptions?: TutorialRoleOption[]; onPersona?: (persona: SyntheticPersonaKey) => void }) {
   const chapters = useMemo(() => tutorialChapters(workspace, persona), [persona, workspace]);
   const key = roleKey(workspace, persona);
   const storedAtMount = useMemo(() => loadStore().roles[key], [key]);
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [audience, setAudience] = useState<DemoTutorialAudience>(storedAtMount?.audience || "learn");
   const [chapterId, setChapterId] = useState(storedAtMount?.currentChapterId || chapters[0].id);
   const [stepIndex, setStepIndex] = useState(storedAtMount?.currentStepIndex || 0);
@@ -261,6 +292,7 @@ export function DemoWorkspaceTutorial({ workspace, persona }: { workspace: DemoT
   const titleId = useId();
   const bodyId = useId();
   const launchButton = useRef<HTMLButtonElement>(null);
+  const firstRoleButton = useRef<HTMLButtonElement>(null);
   const nextButton = useRef<HTMLButtonElement>(null);
   const openedAt = useRef(0);
   const chapter = chapters.find((item) => item.id === chapterId) || chapters[0];
@@ -297,7 +329,7 @@ export function DemoWorkspaceTutorial({ workspace, persona }: { workspace: DemoT
     window.setTimeout(() => launchButton.current?.focus(), 0);
   }, [recordElapsed]);
 
-  const start = () => {
+  const start = useCallback(() => {
     const stored = loadStore().roles[key];
     const storedChapter = chapters.find((item) => item.id === stored?.currentChapterId);
     setAudience(stored?.audience || "learn");
@@ -306,7 +338,41 @@ export function DemoWorkspaceTutorial({ workspace, persona }: { workspace: DemoT
     setCompleted(stored?.completedChapterIds || []);
     setMenu(false); setOpen(true); openedAt.current = Date.now();
     persist(undefined, (metric) => ({ ...metric, starts: metric.starts + 1, updatedAt: new Date().toISOString() }));
+  }, [chapters, key, persist]);
+
+  const launch = () => {
+    if (workspace === "impact" && roleOptions?.length && onPersona) {
+      setRoleMenuOpen(true);
+      window.setTimeout(() => firstRoleButton.current?.focus(), 0);
+      return;
+    }
+    start();
   };
+
+  const closeRoleMenu = () => {
+    setRoleMenuOpen(false);
+    window.setTimeout(() => launchButton.current?.focus(), 0);
+  };
+
+  const chooseTutorialRole = (nextPersona: SyntheticPersonaKey) => {
+    setRoleMenuOpen(false);
+    window.sessionStorage.setItem(pendingTutorialKey, roleKey(workspace, nextPersona));
+    onPersona?.(nextPersona);
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || window.sessionStorage.getItem(pendingTutorialKey) !== key) return;
+    window.sessionStorage.removeItem(pendingTutorialKey);
+    const task = window.setTimeout(start, 0);
+    return () => window.clearTimeout(task);
+  }, [key, start]);
+
+  useEffect(() => {
+    if (!roleMenuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") closeRoleMenu(); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [roleMenuOpen]);
 
   const selectChapter = (nextChapterId: string, restart = false) => {
     recordElapsed(false);
@@ -364,7 +430,20 @@ export function DemoWorkspaceTutorial({ workspace, persona }: { workspace: DemoT
   }, [back, close, currentStep.selector, menu, next, open]);
 
   return <>
-    <button ref={launchButton} className="demo-tutorial-button" type="button" onClick={start}><span aria-hidden="true">?</span> {hasProgress ? "Resume tutorial" : "Tutorial"}</button>
+    <button ref={launchButton} className="demo-tutorial-button" type="button" onClick={launch}><span aria-hidden="true">?</span> {roleOptions?.length ? "Tutorial" : hasProgress ? "Resume tutorial" : "Tutorial"}</button>
+    {roleMenuOpen ? <div className="demo-tutorial-layer">
+      <button className="demo-tutorial-scrim" type="button" aria-label="Close tutorial role chooser" onClick={closeRoleMenu} />
+      <section className="demo-tutorial-card demo-tutorial-role-card" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={bodyId}>
+        <div className="demo-tutorial-card__heading"><span>Impact tutorial</span><button type="button" onClick={closeRoleMenu} aria-label="Close tutorial role chooser">×</button></div>
+        <h2 id={titleId}>Which Impact role would you like to explore?</h2>
+        <p id={bodyId}>The dashboard will switch to that role before the guided tutorial begins.</p>
+        <div className="demo-tutorial-role-options">{roleOptions?.map((item, index) => {
+          const progress = loadStore().roles[roleKey(workspace, item.key)];
+          return <button ref={index === 0 ? firstRoleButton : undefined} type="button" key={item.key} onClick={() => chooseTutorialRole(item.key)}><span><strong>{item.label}</strong><small>{item.description}</small></span><i>{progress?.completedAt ? "Review" : progress ? "Resume" : "Start"}</i></button>;
+        })}</div>
+        <small>Each role keeps separate progress in this browser. No student information or entered content is collected.</small>
+      </section>
+    </div> : null}
     {open ? <div className="demo-tutorial-layer">
       <button className="demo-tutorial-scrim" type="button" aria-label="Close tutorial" onClick={() => close()} />
       <section className="demo-tutorial-card" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={bodyId}>

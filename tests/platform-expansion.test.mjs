@@ -16,7 +16,7 @@ import {
   suppressSmallGroup,
 } from "../app/production/platform-model.ts";
 import { organizationCollegeOrder, organizationsForSelect, studentOrganizations } from "../app/production/student-organizations.ts";
-import { SYNTHETIC_PERSONA_KEY, syntheticMembershipsForPersona, syntheticPreviewApi, syntheticPreviewContext, syntheticPreviewMemberships } from "../app/production/synthetic-preview.ts";
+import { IMPACT_DEMO_PERSONAS, impactDemoPersonaForSlug, impactDemoSlugForPersona, SYNTHETIC_PERSONA_KEY, syntheticMembershipsForPersona, syntheticPreviewApi, syntheticPreviewContext, syntheticPreviewMemberships } from "../app/production/synthetic-preview.ts";
 import { parseRecoveryCallback } from "../app/production/auth-recovery.ts";
 import { demoTutorialChapters, demoTutorialSteps } from "../app/production/demo-workspace-tutorial.tsx";
 
@@ -32,6 +32,25 @@ test("Compass is the parent for three isolated workspace destinations", () => {
   assert.equal(defaultWorkspaceFor(impactStudentMemberships, null), "impact");
   assert.equal(defaultWorkspaceFor(impactStudentMemberships, "compass"), "impact");
   for (const role of ["faculty", "staff", "administrator", "creator", "principal_investigator", "mentor", "community_liaison"]) assert.equal(staffMfaRoles.has(role), true);
+});
+
+test("Impact demo exposes exactly three no-code role destinations", async () => {
+  assert.deepEqual(IMPACT_DEMO_PERSONAS.map((item) => item.key), ["impact_student", "impact_administrator", "community_liaison"]);
+  assert.equal(impactDemoPersonaForSlug("student"), "impact_student");
+  assert.equal(impactDemoPersonaForSlug("admin"), "impact_administrator");
+  assert.equal(impactDemoPersonaForSlug("liaison"), "community_liaison");
+  assert.equal(impactDemoPersonaForSlug("creator"), null);
+  assert.equal(impactDemoSlugForPersona("community_liaison"), "liaison");
+  const [access, shell, impact] = await Promise.all([
+    readFile(new URL("../app/production/platform-access.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/compass-platform-shell.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/genesis-impact-app.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(access, /requestedPreview === "impact"/);
+  assert.match(access, /previewScope === "impact"/);
+  assert.match(shell, /Impact Demo/);
+  assert.match(impact, /Choose an Impact role/);
+  assert.match(impact, /url\.searchParams\.set\("preview", "impact"\)/);
 });
 
 test("synthetic creator preview exposes all workspaces without production identities", async () => {
