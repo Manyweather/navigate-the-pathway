@@ -38,5 +38,14 @@ test("advisor preview includes a larger fictional caseload and actionable cancel
     assert.match(source, new RegExp(student));
   }
   assert.match(source, /id: "appointment-academic-cancelled"[\s\S]*?status: "cancelled"/);
+  for (const appointment of [
+    "appointment-academic-request-jordan",
+    "appointment-academic-cancelled-taylor",
+    "appointment-career-request-cameron",
+    "appointment-career-request-maya",
+    "appointment-career-cancelled-noah",
+  ]) {
+    assert.match(source, new RegExp(`id: "${appointment}"`));
+  }
   assert.match(source, /\["student-1", "student-2", "student-5", "student-6"\]/);
 });
