@@ -1544,6 +1544,42 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
 }
 
 /* Compass advisor command desk */
+.staff-workspace-shell { --staff-accent:#2f688d; --staff-accent-dark:#183147; --staff-accent-soft:#eef7fa; --staff-border:#8fb6c7; --staff-item-border:#b8cdd6; }
+.staff-workspace-shell--peer-tutor { --staff-accent:#0f6685; --staff-accent-dark:#183642; --staff-accent-soft:#edfafa; --staff-border:#75b9bf; --staff-item-border:#abd0d3; }
+.staff-workspace-shell--administrator { --staff-accent:#791034; --staff-accent-dark:#4c1528; --staff-accent-soft:#fbf0f4; --staff-border:#bd8b9e; --staff-item-border:#d7b5c1; }
+.staff-workspace-shell .experience-panel>.section-heading,.staff-workspace-shell .staff-page-heading,.staff-workspace-shell .event-detail-header { margin:0 0 1.35rem; padding:1rem 1.15rem; border:2px solid var(--staff-border); border-left:6px solid var(--staff-accent); border-radius:18px; background:linear-gradient(110deg,var(--staff-accent-soft),#fff 72%); box-shadow:0 9px 24px rgba(33,58,71,.08); }
+.staff-workspace-shell .experience-panel>.section-heading h1,.staff-workspace-shell .staff-page-heading h1,.staff-workspace-shell .event-detail-header h1 { margin:.2rem 0; color:var(--staff-accent-dark); }
+.staff-workspace-shell .experience-panel>.kicker+h1 { margin:.25rem 0 1.25rem; padding:.9rem 1.1rem; border:2px solid var(--staff-border); border-left:6px solid var(--staff-accent); border-radius:16px; color:var(--staff-accent-dark); background:linear-gradient(110deg,var(--staff-accent-soft),#fff 72%); box-shadow:0 8px 22px rgba(33,58,71,.07); }
+.staff-workspace-shell .staff-page-heading .kicker,.staff-workspace-shell .staff-page-heading h1 { margin-left:0; }
+.staff-workspace-shell .staff-page-heading h1 { font:750 clamp(2rem,5vw,3.35rem)/1.05 Georgia,"Times New Roman",serif; }
+.staff-workspace-shell .staff-section-panel,.staff-workspace-shell .advisor-two-column>.advisor-stack,.staff-workspace-shell .advisor-form-stack>.experience-form,.staff-workspace-shell .advisor-student-snapshot,.staff-workspace-shell .advisor-session-context,.staff-workspace-shell .advisor-session-editor,.staff-workspace-shell .advisor-conversation,.staff-workspace-shell .advisor-saved-reports,.staff-workspace-shell .tutoring-two-column>.production-card,.staff-workspace-shell .outreach-primary,.staff-workspace-shell .outreach-secondary,.staff-workspace-shell .campaign-composer,.staff-workspace-shell .sms-composer,.staff-workspace-shell .event-builder,.staff-workspace-shell .event-admin-card,.staff-workspace-shell .event-delivery-card,.staff-workspace-shell .event-message-layout>aside,.staff-workspace-shell .event-message-layout>section { border:2px solid var(--staff-border); border-top:6px solid var(--staff-accent); border-radius:18px; background:#fff; box-shadow:0 10px 26px rgba(33,58,71,.08); }
+.staff-workspace-shell .staff-section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin:-1rem -1rem .3rem; padding:1rem; border-radius:10px 10px 0 0; background:var(--staff-accent-soft); }
+.staff-workspace-shell .staff-section-heading h2 { margin:.2rem 0 0; color:var(--staff-accent-dark); font:750 clamp(1.45rem,3vw,1.9rem)/1.12 Georgia,"Times New Roman",serif; }
+.staff-workspace-shell .staff-section-heading>span { align-self:center; padding:.35rem .6rem; border-radius:999px; color:var(--staff-accent-dark); background:#fff; font-size:.78rem; font-weight:850; }
+.staff-workspace-shell :is(.advisor-stack,.advisor-form-stack,.advisor-session-editor,.advisor-conversation,.production-card,.outreach-secondary,.event-admin-card,.event-delivery-card,.event-message-layout>aside,.event-message-layout>section) h2 { color:var(--staff-accent-dark); font:750 clamp(1.45rem,2.7vw,1.85rem)/1.15 Georgia,"Times New Roman",serif; }
+.staff-workspace-shell :is(.experience-form,.production-card,.event-admin-card,.event-delivery-card) :is(input,select,textarea),.staff-workspace-shell .event-message-layout :is(input,select,textarea) { border-width:1.5px; border-color:#98aeb8; }
+.staff-workspace-shell :is(.experience-form,.production-card,.event-admin-card,.event-delivery-card) :is(input,select,textarea):focus-visible,.staff-workspace-shell .event-message-layout :is(input,select,textarea):focus-visible { outline:3px solid var(--staff-accent); outline-offset:2px; border-color:var(--staff-accent); }
+.staff-workspace-shell .advisor-list-card,.staff-workspace-shell .tutoring-record,.staff-workspace-shell .campaign-insight-card,.staff-workspace-shell .outreach-secondary article,.staff-workspace-shell .notification-inbox>article,.staff-workspace-shell .attendance-list>article,.staff-workspace-shell .correction-stack>article { border:1.5px solid var(--staff-item-border); border-left:5px solid var(--staff-accent); box-shadow:0 5px 15px rgba(33,58,71,.055); }
+.staff-workspace-shell :is(.advisor-tile-grid,.tutoring-action-grid,.event-list)>button { border-width:2px; border-color:var(--staff-item-border); }
+.staff-workspace-shell :is(.advisor-tile-grid,.tutoring-action-grid,.event-list)>button:hover,.staff-workspace-shell :is(.advisor-tile-grid,.tutoring-action-grid,.event-list)>button:focus-visible { border-color:var(--staff-accent); box-shadow:0 12px 28px rgba(33,58,71,.14); }
+.staff-workspace-shell :is(.advisor-tile-grid,.tutoring-action-grid,.event-list)>button:active { transform:translateY(0); box-shadow:0 4px 10px rgba(33,58,71,.1); }
+.staff-workspace-shell .advisor-template-library { gap:1.25rem; align-items:start; }
+.staff-workspace-shell .advisor-template-library>.staff-section-panel { padding:1rem; }
+.staff-workspace-shell .advisor-template-library .advisor-list-card { background:#fff; }
+.staff-workspace-shell .advisor-template-library .staff-form-panel>.primary-button { margin-top:.25rem; }
+.staff-workspace-shell :is(.advisor-form-stack>.experience-form,.advisor-two-column>.advisor-stack,.tutoring-two-column>.production-card,.outreach-primary,.outreach-secondary,.event-admin-card,.event-delivery-card,.event-message-layout>aside,.event-message-layout>section)>h2:first-child { margin:-1rem -1rem .9rem; padding:.9rem 1rem; border-bottom:1px solid var(--staff-item-border); border-radius:10px 10px 0 0; background:var(--staff-accent-soft); }
+.staff-workspace-shell :is(.composer-heading,.event-builder__heading,.staff-event-inbox__heading) { margin:-1.1rem -1.1rem .9rem; padding:1rem 1.1rem; border-bottom:1px solid var(--staff-item-border); border-radius:10px 10px 0 0; background:var(--staff-accent-soft); }
+.staff-workspace-shell :is(.event-admin-card,.event-delivery-card)>summary { min-height:48px; padding:.8rem .1rem; color:var(--staff-accent-dark); font:750 clamp(1.25rem,2.5vw,1.6rem)/1.15 Georgia,"Times New Roman",serif; cursor:pointer; }
+.staff-workspace-shell--administrator .tutoring-workspace { --tutor-blue:#791034; --tutor-aqua:#fbf0f4; }
+.staff-workspace-shell--administrator .advisor-workspace-hero { border-color:#c798a8; background:radial-gradient(circle at 88% 18%,rgba(255,255,255,.82),transparent 24%),linear-gradient(125deg,#f7e8ee 0%,#fae6da 100%); }
+.staff-workspace-shell--administrator .advisor-workspace-hero h1 { color:#4c1528; }
+.staff-workspace-shell .provider-home-availability { border-width:2px; border-top:6px solid var(--staff-accent); }
+.staff-workspace-shell :is(.provider-home-task-list,.provider-home-agenda,.advisor-today-list,.advisor-attention-panel,.advisor-home-review-queue,.advisor-home-options,.staff-event-inbox) { border-width:2px; border-color:var(--staff-border); border-top:5px solid var(--staff-accent); box-shadow:0 8px 22px rgba(33,58,71,.07); }
+.staff-workspace-shell :is(.provider-home-task-list,.provider-home-agenda,.advisor-today-list,.advisor-attention-panel,.advisor-home-review-queue,.advisor-home-options) .section-heading h2 { color:var(--staff-accent-dark); font:750 clamp(1.45rem,2.8vw,1.85rem)/1.15 Georgia,"Times New Roman",serif; }
+.staff-workspace-shell :is(.home-action-grid,.advisor-tile-grid,.tutoring-action-grid)>button { border-width:2px; border-color:var(--staff-item-border); }
+.staff-workspace-shell :is(.record-editor,.review-card,.record-list>article) { border:2px solid var(--staff-border); border-left:5px solid var(--staff-accent); border-radius:16px; background:#fff; box-shadow:0 7px 20px rgba(33,58,71,.07); }
+.staff-workspace-shell .record-editor { padding:1rem; }
+.staff-workspace-shell .record-list>article { padding:1rem; }
 .advisor-workspace-home,.advisor-detail-page { --advisor-ink:#183147; --advisor-blue:#2f688d; --advisor-blue-soft:#eaf4f8; --advisor-peach:#f8e3d8; --advisor-line:#cbd8df; color:#27343c; }
 .advisor-workspace-hero { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(230px,.65fr); gap:clamp(1rem,4vw,3rem); align-items:end; padding:clamp(1.25rem,4vw,2.5rem); overflow:hidden; border:1px solid #b8d2dc; border-radius:24px; background:radial-gradient(circle at 88% 18%,rgba(255,255,255,.78),transparent 24%),linear-gradient(125deg,#dceff3 0%,#f8e3d8 100%); }
 .advisor-workspace-hero h1 { margin:.25rem 0; color:var(--advisor-ink); font:750 clamp(2rem,5vw,3.8rem)/1 Georgia,"Times New Roman",serif; letter-spacing:-.035em; }
@@ -1738,6 +1774,13 @@ button.production-brand { border: 0; padding: 0; background: transparent; cursor
   .provider-home-availability__schedule small { grid-column:auto; }
   .provider-home-task-list>button,.provider-home-agenda>button { grid-template-columns:1fr; }
   .advisor-home-options { align-items:stretch; flex-direction:column; }
+}
+@media(max-width:620px) {
+  .staff-workspace-shell .experience-panel>.section-heading,.staff-workspace-shell .staff-page-heading,.staff-workspace-shell .event-detail-header { padding:.9rem; border-left-width:5px; }
+  .staff-workspace-shell .staff-section-heading { align-items:flex-start; flex-direction:column; }
+  .staff-workspace-shell .staff-section-heading>span { align-self:flex-start; }
+  .staff-workspace-shell .advisor-template-library>.staff-section-panel { padding:.9rem; }
+  .staff-workspace-shell :is(.advisor-form-stack>.experience-form,.advisor-two-column>.advisor-stack,.tutoring-two-column>.production-card,.outreach-primary,.outreach-secondary,.event-admin-card,.event-delivery-card,.event-message-layout>aside,.event-message-layout>section)>h2:first-child { margin:-.9rem -.9rem .8rem; padding:.85rem .9rem; }
 }
 
 /* OACA event operations: dense enough for check-in, calm enough for advising. */

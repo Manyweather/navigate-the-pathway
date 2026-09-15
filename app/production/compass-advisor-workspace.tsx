@@ -2606,8 +2606,15 @@ export function CompassAdvisorWorkspace({
           </div>
           <span className="status-chip">Versioned and attributed</span>
         </div>
-        <div className="advisor-two-column">
-          <section className="advisor-stack">
+        <div className="advisor-two-column advisor-template-library">
+          <section className="advisor-stack staff-section-panel">
+            <div className="staff-section-heading">
+              <div>
+                <p className="kicker">Template library</p>
+                <h2>Available templates</h2>
+              </div>
+              <span>{advisor.templates.length} available</span>
+            </div>
             {advisor.templates.map((template) => (
               <article className="advisor-list-card" key={template.id}>
                 <div>
@@ -2624,7 +2631,7 @@ export function CompassAdvisorWorkspace({
             ))}
           </section>
           <form
-            className="experience-form advisor-compact-form"
+            className="experience-form advisor-compact-form staff-section-panel staff-form-panel"
             onSubmit={(event) => {
               event.preventDefault();
               void act(
@@ -2634,7 +2641,12 @@ export function CompassAdvisorWorkspace({
               );
             }}
           >
-            <h2>Add a template</h2>
+            <div className="staff-section-heading">
+              <div>
+                <p className="kicker">New library item</p>
+                <h2>Create a template</h2>
+              </div>
+            </div>
             <label>
               <span>Name</span>
               <input

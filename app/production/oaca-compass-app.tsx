@@ -784,6 +784,14 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
     ...(previewPersona === "tutoring_manager" || membership.capabilities.includes("oaca.tutoring.manage") ? ["tutoring_manager"] : []),
   ])];
   const staff = mode !== "student" && mode !== "peer_tutor";
+  const staffTone =
+    mode === "student"
+      ? ""
+      : mode === "peer_tutor"
+        ? "peer-tutor"
+        : ["tutoring_manager", "administrator", "creator"].includes(mode)
+          ? "administrator"
+          : "advisor";
   const studentData: Bootstrap = staff ? data : {
     ...data,
     appointments: data.appointments.filter((appointment) => appointment.studentId === context.userId),
@@ -802,7 +810,7 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
   return <div className="navigate-platform navigate-platform--oaca">
     <CreatorPreviewBanner persona={previewPersona} onPersona={setPreviewPersona} onExit={() => void signOut()} scope={previewScope || "creator"} tutorialWorkspace="compass" />
     <ExperienceHeader api={api} context={context} memberships={memberships} previewMode={previewMode} studentNavigation={mode === "student" ? { view, unreadCount: data.eventNotificationUnreadCount, onView: setView } : undefined} onSignOut={signOut} />
-    <main className="platform-main">
+    <main className={`platform-main${staffTone ? ` staff-workspace-shell staff-workspace-shell--${staffTone}` : ""}`}>
       <nav className="experience-nav compass-role-nav" aria-label="Compass dashboard role">
         {availableModes.length > 1 ? <label><span>Viewing dashboard as</span><select value={mode} onChange={(event) => { setMode(event.target.value); setView("home"); }}>{availableModes.map((role) => <option key={role} value={role}>{oacaRoleLabels[role] || role.replaceAll("_", " ")}</option>)}</select></label> : <span className="status-chip">{oacaRoleLabels[mode] || mode.replaceAll("_", " ")} dashboard</span>}
       </nav>
