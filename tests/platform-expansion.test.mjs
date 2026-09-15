@@ -20,13 +20,15 @@ import { IMPACT_DEMO_PERSONAS, impactDemoPersonaForSlug, impactDemoSlugForPerson
 import { parseRecoveryCallback } from "../app/production/auth-recovery.ts";
 import { demoTutorialChapters, demoTutorialSteps } from "../app/production/demo-workspace-tutorial.tsx";
 
-test("Compass is the parent for three isolated workspace destinations", () => {
-  assert.deepEqual(Object.keys(experiences), ["pathway", "oaca", "genesis"]);
+test("Compass is the parent for isolated workspace destinations", () => {
+  assert.deepEqual(Object.keys(experiences), ["pathway", "oaca", "genesis", "facilities"]);
   assert.equal(experiences.pathway.href, "/app/pathway");
   assert.equal(experiences.oaca.href, "/app/compass");
   assert.equal(experiences.oaca.name, "Compass");
   assert.equal(experiences.genesis.href, "/app/compass/impact");
   assert.equal(experiences.genesis.name, "Impact Workspace");
+  assert.equal(experiences.facilities.href, "/app/facilities");
+  assert.equal(experiences.facilities.name, "Facilities Dashboard");
   assert.equal(defaultWorkspaceFor(syntheticPreviewMemberships, null), "compass");
   const impactStudentMemberships = syntheticMembershipsForPersona("impact_student");
   assert.equal(defaultWorkspaceFor(impactStudentMemberships, null), "impact");
@@ -56,7 +58,7 @@ test("Impact demo exposes exactly three no-code role destinations", async () => 
 test("synthetic creator preview exposes all workspaces without production identities", async () => {
   assert.equal(syntheticPreviewContext.principalType, "creator");
   assert.equal(syntheticPreviewContext.aal, "aal2");
-  assert.equal(syntheticPreviewMemberships.length, 3);
+  assert.equal(syntheticPreviewMemberships.length, 4);
   assert.equal(syntheticPreviewMemberships.every((membership) => membership.roles.includes("creator")), true);
   const compass = await syntheticPreviewApi.request("/api/oaca/bootstrap");
   const impact = await syntheticPreviewApi.request("/api/genesis/bootstrap");

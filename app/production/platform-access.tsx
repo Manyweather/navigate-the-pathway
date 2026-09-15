@@ -11,6 +11,8 @@ import { staffMfaRoles, type ExperienceKey, type ExperienceMembership } from "./
 import type { AuthorizationContext } from "./types";
 import {
   getSyntheticPreviewPersona,
+  facilitiesDemoPersonaForSlug,
+  FACILITIES_DEMO_PERSONAS,
   impactDemoPersonaForSlug,
   IMPACT_DEMO_PERSONAS,
   setSyntheticPreviewPersona,
@@ -32,7 +34,7 @@ export type PlatformAccessValue = {
   context: AuthorizationContext;
   memberships: ExperienceMembership[];
   previewMode: boolean;
-  previewScope: "creator" | "compass" | "impact" | null;
+  previewScope: "creator" | "compass" | "impact" | "facilities" | null;
   previewPersona: SyntheticPersonaKey | null;
   setPreviewPersona: (persona: SyntheticPersonaKey) => void;
   signOut: () => Promise<void>;
@@ -49,7 +51,7 @@ export function PlatformAccess({ experience, children }: {
 }) {
   const [clientReady, setClientReady] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
-  const [previewScope, setPreviewScope] = useState<"creator" | "compass" | "impact" | null>(null);
+  const [previewScope, setPreviewScope] = useState<"creator" | "compass" | "impact" | "facilities" | null>(null);
   const [previewPersona, updatePreviewPersona] = useState<SyntheticPersonaKey>(() => getSyntheticPreviewPersona());
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -73,12 +75,14 @@ export function PlatformAccess({ experience, children }: {
       const storedScope = window.localStorage.getItem(SYNTHETIC_PREVIEW_SCOPE_KEY);
       const scope = requestedPreview === "compass"
         ? "compass"
+        : requestedPreview === "facilities"
+          ? "facilities"
         : requestedPreview === "impact"
           ? "impact"
         : requestedPreview === "creator"
           ? "creator"
           : storedPreview
-            ? storedScope === "compass" ? "compass" : storedScope === "impact" ? "impact" : "creator"
+            ? storedScope === "compass" ? "compass" : storedScope === "impact" ? "impact" : storedScope === "facilities" ? "facilities" : "creator"
             : null;
       if (requestedPreview === "compass") {
         const requestedPersona: SyntheticPersonaKey = requestedDemoRole === "admin"
@@ -100,6 +104,10 @@ export function PlatformAccess({ experience, children }: {
         updatePreviewPersona(requestedPersona);
       } else if (requestedPreview === "impact") {
         const requestedPersona = impactDemoPersonaForSlug(requestedDemoRole) || "impact_student";
+        window.localStorage.setItem(SYNTHETIC_PERSONA_KEY, requestedPersona);
+        updatePreviewPersona(requestedPersona);
+      } else if (requestedPreview === "facilities") {
+        const requestedPersona = facilitiesDemoPersonaForSlug(requestedDemoRole) || "facilities_administrator";
         window.localStorage.setItem(SYNTHETIC_PERSONA_KEY, requestedPersona);
         updatePreviewPersona(requestedPersona);
       }
@@ -192,10 +200,13 @@ export function PlatformAccess({ experience, children }: {
   if (previewMode && configured === "preview") {
     const compassPreviewRoles: SyntheticPersonaKey[] = ["compass_student", "peer_tutor", "tutoring_manager", "academic_advisor", "career_advisor", "compass_director"];
     const impactPreviewRoles = IMPACT_DEMO_PERSONAS.map((item) => item.key);
+    const facilitiesPreviewRoles = FACILITIES_DEMO_PERSONAS.map((item) => item.key);
     const scopedPersona = previewScope === "compass" && !compassPreviewRoles.includes(previewPersona)
       ? "academic_advisor"
       : previewScope === "impact" && !impactPreviewRoles.includes(previewPersona)
         ? "impact_student"
+        : previewScope === "facilities" && !facilitiesPreviewRoles.includes(previewPersona)
+          ? "facilities_administrator"
         : previewPersona;
     const previewMemberships = syntheticMembershipsForPersona(scopedPersona);
     const previewContext = syntheticContextForPersona(scopedPersona);

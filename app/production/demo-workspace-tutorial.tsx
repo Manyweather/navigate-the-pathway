@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { SyntheticPersonaKey } from "./synthetic-preview";
 
-export type DemoTutorialWorkspace = "compass" | "impact" | "pathway";
+export type DemoTutorialWorkspace = "compass" | "impact" | "pathway" | "facilities";
 export type DemoTutorialAudience = "learn" | "leadership";
 
 export type TutorialStep = {
@@ -47,7 +47,7 @@ const orientation = (workspace: DemoTutorialWorkspace): TutorialChapter => ({
   title: "Orientation",
   minutes: 1,
   steps: [
-    step("orientation", "role-boundary", "Learn this role safely", "Viewing as changes the fictional records and tools delivered to the dashboard. Student views never receive staff notes, rosters, or analytics.", "Demonstrate permission boundaries", "Use the role selector to show leaders that the same Compass shell returns a different, role-scoped response instead of hiding staff data only with styling.", "[data-demo-guide='role-switcher']"),
+    step("orientation", "role-boundary", "Learn this role safely", "Viewing as changes the fictional records and tools delivered to the dashboard. Restricted views never receive administrative queues, inventory controls, or protected records.", "Demonstrate permission boundaries", "Use the role selector to show leaders that the same Compass shell returns a different, role-scoped response instead of hiding protected data only with styling.", "[data-demo-guide='role-switcher']"),
     step("orientation", "workspace-boundary", "Open only assigned workspaces", `The workspace control lists only destinations this ${workspace} role is allowed to use. Switching never grants another membership.`, "Explain the parent-platform model", "Compass is the account gateway. Pathway and Impact remain permission-isolated workspaces, while shared identity and communication services avoid duplicate accounts.", "[data-demo-guide='workspace-switcher']"),
   ],
 });
@@ -239,8 +239,40 @@ const pathwayCreatorChapters: TutorialChapter[] = [
   },
 ];
 
+const facilitiesAdminChapters: TutorialChapter[] = [
+  orientation("facilities"),
+  {
+    id: "facilities-control", title: "Daily operations", minutes: 1,
+    steps: [
+      step("facilities-control", "facilities-priorities", "Start with explainable priorities", "See urgent work, low stock, license gaps, and recurring-use signals with the source rule visible beside every recommendation.", "Proactive, accountable operations", "The insight layer uses readable thresholds and trends rather than an unexplained score, so staff can verify why each item needs attention.", "[data-tutorial-id='facilities-priorities']"),
+      step("facilities-control", "facilities-workflow", "Move work through one connected flow", "Requests move from New request through Approvals, Prep, In progress, and Complete. Preparation can include checklists, parts, messages, and a linked reservation.", "One operational record", "Keeping approval, preparation, fulfillment, stock use, and communication together prevents duplicate tracking and makes bottlenecks visible.", "[data-tutorial-id='facilities-workflow']"),
+    ],
+  },
+  {
+    id: "facilities-resources", title: "Space, warehouse, and reports", minutes: 2,
+    steps: [
+      step("facilities-resources", "facilities-space", "Coordinate space and setup", "Approve room requests, check conflicts, track liquor-license status, and automatically create the preparation work order.", "Connect reservations to execution", "The room calendar remains authoritative in this demo while preserving a future synchronization boundary for Outlook.", "[data-tutorial-id='facilities-spaces']"),
+      step("facilities-resources", "facilities-stock", "Balance stock and custody", "Track on-hand quantities and reorder thresholds, then use lightweight check-out records for durable furniture or equipment.", "Avoid over- and under-buying", "Usage rates, reservations, open preparation, and current custody make future purchasing recommendations traceable.", "[data-tutorial-id='facilities-warehouse']"),
+      step("facilities-resources", "facilities-map", "Use the operations map", "Select a room to see its reservation, work-order, capacity, and assigned-asset context together.", "A shared location model", "Floor-plan rooms connect records by stable location rather than relying on inconsistent free text.", "[data-tutorial-id='facilities-floor-plan']"),
+    ],
+  },
+];
+
+const facilitiesRequesterChapters: TutorialChapter[] = [
+  orientation("facilities"),
+  {
+    id: "facilities-request", title: "Request and follow work", minutes: 2,
+    steps: [
+      step("facilities-request", "facilities-request-home", "Your department request home", "Submit a work order, office-supply request, or room reservation, then follow its current status and Facilities updates.", "Requester self-service", "Requesters see only their own department-facing records and do not receive approval queues, warehouse controls, or administrative reports.", "[data-tutorial-id='facilities-requester-home']"),
+      step("facilities-request", "facilities-new-request", "Give Facilities the right details", "Choose the request type, location, timing, priority, and description. The confirmation becomes the one record you follow through completion.", "Structured intake", "Consistent fields support routing and trend analysis while keeping the form quick enough for routine use.", "[data-tutorial-id='facilities-new-request']"),
+      step("facilities-request", "facilities-follow", "Follow approval and preparation", "Status, linked preparation, and messages stay together so you do not need to search a separate event or work-order inbox.", "Visible service status", "Every transition and notification is retained on the request without exposing other departments’ work.", "[data-tutorial-id='facilities-my-requests']"),
+    ],
+  },
+];
+
 function tutorialChapters(workspace: DemoTutorialWorkspace, persona: SyntheticPersonaKey): TutorialChapter[] {
   if (workspace === "pathway") return persona === "pathway_student" ? pathwayChapters : pathwayCreatorChapters;
+  if (workspace === "facilities") return persona === "facilities_requester" ? facilitiesRequesterChapters : facilitiesAdminChapters;
   if (workspace === "impact") {
     if (persona === "impact_student") return impactStudentChapters;
     if (persona === "community_liaison") return impactLiaisonChapters;
@@ -303,6 +335,7 @@ export function DemoWorkspaceTutorial({ workspace, persona, roleOptions, onPerso
   const completePercent = Math.round((completedSteps / totalSteps) * 100);
   const isCreator = persona === "platform_creator";
   const hasProgress = Boolean(storedAtMount) || completed.length > 0 || stepIndex > 0;
+  const roleQuestion = workspace === "facilities" ? "Which Facilities role would you like to explore?" : "Which Impact role would you like to explore?";
 
   const persist = useCallback((next?: Partial<SavedRoleProgress>, metricUpdate?: (metric: TutorialMetric) => TutorialMetric) => {
     const store = loadStore();
@@ -341,7 +374,7 @@ export function DemoWorkspaceTutorial({ workspace, persona, roleOptions, onPerso
   }, [chapters, key, persist]);
 
   const launch = () => {
-    if (workspace === "impact" && roleOptions?.length && onPersona) {
+    if ((workspace === "impact" || workspace === "facilities") && roleOptions?.length && onPersona) {
       setRoleMenuOpen(true);
       window.setTimeout(() => firstRoleButton.current?.focus(), 0);
       return;
@@ -434,14 +467,14 @@ export function DemoWorkspaceTutorial({ workspace, persona, roleOptions, onPerso
     {roleMenuOpen ? <div className="demo-tutorial-layer">
       <button className="demo-tutorial-scrim" type="button" aria-label="Close tutorial role chooser" onClick={closeRoleMenu} />
       <section className="demo-tutorial-card demo-tutorial-role-card" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={bodyId}>
-        <div className="demo-tutorial-card__heading"><span>Impact tutorial</span><button type="button" onClick={closeRoleMenu} aria-label="Close tutorial role chooser">×</button></div>
-        <h2 id={titleId}>Which Impact role would you like to explore?</h2>
+        <div className="demo-tutorial-card__heading"><span>{workspace === "facilities" ? "Facilities tutorial" : "Impact tutorial"}</span><button type="button" onClick={closeRoleMenu} aria-label="Close tutorial role chooser">×</button></div>
+        <h2 id={titleId}>{roleQuestion}</h2>
         <p id={bodyId}>The dashboard will switch to that role before the guided tutorial begins.</p>
         <div className="demo-tutorial-role-options">{roleOptions?.map((item, index) => {
           const progress = loadStore().roles[roleKey(workspace, item.key)];
           return <button ref={index === 0 ? firstRoleButton : undefined} type="button" key={item.key} onClick={() => chooseTutorialRole(item.key)}><span><strong>{item.label}</strong><small>{item.description}</small></span><i>{progress?.completedAt ? "Review" : progress ? "Resume" : "Start"}</i></button>;
         })}</div>
-        <small>Each role keeps separate progress in this browser. No student information or entered content is collected.</small>
+        <small>Each role keeps separate progress in this browser. No entered content or real institutional data is collected.</small>
       </section>
     </div> : null}
     {open ? <div className="demo-tutorial-layer">

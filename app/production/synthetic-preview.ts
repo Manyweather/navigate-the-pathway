@@ -32,6 +32,8 @@ export type SyntheticPersonaKey =
   | "impact_student"
   | "impact_administrator"
   | "community_liaison"
+  | "facilities_requester"
+  | "facilities_administrator"
   | "platform_creator";
 
 export const SYNTHETIC_PERSONAS: Array<{
@@ -90,6 +92,16 @@ export const SYNTHETIC_PERSONAS: Array<{
     defaultPath: "/app/compass/impact",
   },
   {
+    key: "facilities_requester",
+    label: "Facilities Requester",
+    defaultPath: "/app/facilities",
+  },
+  {
+    key: "facilities_administrator",
+    label: "Facilities Administrator",
+    defaultPath: "/app/facilities",
+  },
+  {
     key: "platform_creator",
     label: "Platform Creator",
     defaultPath: "/app/compass",
@@ -125,6 +137,37 @@ export const IMPACT_DEMO_PERSONAS: Array<{
     defaultPath: "/app/compass/impact",
   },
 ];
+
+export const FACILITIES_DEMO_PERSONAS: Array<{
+  key: SyntheticPersonaKey;
+  label: string;
+  description: string;
+  demoSlug: "requester" | "admin";
+  defaultPath: string;
+}> = [
+  {
+    key: "facilities_administrator",
+    label: "Facilities Administrator",
+    description: "Approve requests, coordinate preparation and work, manage space and stock, and act on operational insights.",
+    demoSlug: "admin",
+    defaultPath: "/app/facilities",
+  },
+  {
+    key: "facilities_requester",
+    label: "Department Requester",
+    description: "Submit work, supply, and space requests, then follow approvals, preparation, messages, and completion.",
+    demoSlug: "requester",
+    defaultPath: "/app/facilities",
+  },
+];
+
+export function facilitiesDemoPersonaForSlug(value: string | null) {
+  return FACILITIES_DEMO_PERSONAS.find((item) => item.demoSlug === value)?.key || null;
+}
+
+export function facilitiesDemoSlugForPersona(persona: SyntheticPersonaKey) {
+  return FACILITIES_DEMO_PERSONAS.find((item) => item.key === persona)?.demoSlug || "admin";
+}
 
 export function impactDemoPersonaForSlug(value: string | null) {
   return IMPACT_DEMO_PERSONAS.find((item) => item.demoSlug === value)?.key || null;
@@ -219,13 +262,21 @@ export const syntheticPreviewMemberships: ExperienceMembership[] = [
     status: "active",
     featureEnabled: true,
   },
+  {
+    experienceKey: "facilities",
+    experienceName: experiences.facilities.name,
+    roles: ["creator"],
+    capabilities: ["facilities.admin", "facilities.requests", "facilities.inventory", "facilities.reports"],
+    status: "active",
+    featureEnabled: true,
+  },
 ];
 
 export function syntheticMembershipsForPersona(
   persona: SyntheticPersonaKey,
 ): ExperienceMembership[] {
   const membership = (
-    experienceKey: "pathway" | "oaca" | "genesis",
+    experienceKey: "pathway" | "oaca" | "genesis" | "facilities",
     roles: ExperienceMembership["roles"],
     capabilities: string[] = [],
     launchState: ExperienceMembership["launchState"] = "active",
@@ -328,6 +379,10 @@ export function syntheticMembershipsForPersona(
         ["genesis.review", "genesis.events.decide"],
       ),
     ];
+  if (persona === "facilities_requester")
+    return [membership("facilities", ["requester"], ["facilities.requests.own", "facilities.reservations.own", "facilities.supplies.own"])];
+  if (persona === "facilities_administrator")
+    return [membership("facilities", ["administrator"], ["facilities.admin", "facilities.requests", "facilities.inventory", "facilities.reports"])];
   return clone(syntheticPreviewMemberships);
 }
 
@@ -339,6 +394,7 @@ export function syntheticContextForPersona(
     "compass_student",
     "peer_tutor",
     "impact_student",
+    "facilities_requester",
   ].includes(persona);
   const context = clone(syntheticPreviewContext);
   context.userId = isStudent
@@ -358,6 +414,10 @@ export function syntheticContextForPersona(
           ? "Taylor Morgan"
           : persona === "community_liaison"
             ? "Community Liaison preview"
+            : persona === "facilities_requester"
+              ? "Dana Lewis"
+              : persona === "facilities_administrator"
+                ? "Alex Rivera"
             : persona === "impact_administrator"
               ? "Impact Administrator preview"
               : persona === "career_advisor"

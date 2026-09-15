@@ -1,5 +1,5 @@
-export type ExperienceKey = "pathway" | "oaca" | "genesis";
-export type WorkspaceKey = "compass" | "pathway" | "impact";
+export type ExperienceKey = "pathway" | "oaca" | "genesis" | "facilities";
+export type WorkspaceKey = "compass" | "pathway" | "impact" | "facilities";
 
 export type ExperienceRole =
   | "student"
@@ -10,7 +10,8 @@ export type ExperienceRole =
   | "creator"
   | "principal_investigator"
   | "mentor"
-  | "community_liaison";
+  | "community_liaison"
+  | "requester";
 
 export type ExperienceMembership = {
   experienceKey: ExperienceKey;
@@ -27,7 +28,7 @@ export const experiences: Record<ExperienceKey, {
   shortName: string;
   href: string;
   description: string;
-  accent: "pathway" | "oaca" | "genesis";
+  accent: "pathway" | "oaca" | "genesis" | "facilities";
 }> = {
   pathway: {
     name: "Navigate the Pathway",
@@ -50,18 +51,27 @@ export const experiences: Record<ExperienceKey, {
     description: "Develop a grounded, sustainable community initiative with coaching and a clear handoff.",
     accent: "genesis",
   },
+  facilities: {
+    name: "Facilities Dashboard",
+    shortName: "Facilities",
+    href: "/app/facilities",
+    description: "Coordinate work orders, space, supplies, inventory, and proactive campus operations.",
+    accent: "facilities",
+  },
 };
 
 export const workspaceToExperience: Record<WorkspaceKey, ExperienceKey> = {
   compass: "oaca",
   pathway: "pathway",
   impact: "genesis",
+  facilities: "facilities",
 };
 
 export const experienceToWorkspace: Record<ExperienceKey, WorkspaceKey> = {
   oaca: "compass",
   pathway: "pathway",
   genesis: "impact",
+  facilities: "facilities",
 };
 
 export function authorizedWorkspaceKeys(memberships: ExperienceMembership[]) {
