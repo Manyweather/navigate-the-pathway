@@ -15,6 +15,7 @@ test("every synthetic demonstration workspace has an optional role-aware tutoria
     ["impact", "impact_administrator"],
     ["impact", "community_liaison"],
     ["facilities", "facilities_administrator"],
+    ["facilities", "facilities_staff"],
     ["facilities", "facilities_requester"],
   ];
   for (const [workspace, persona] of cases) {

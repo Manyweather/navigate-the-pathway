@@ -33,6 +33,7 @@ export type SyntheticPersonaKey =
   | "impact_administrator"
   | "community_liaison"
   | "facilities_requester"
+  | "facilities_staff"
   | "facilities_administrator"
   | "platform_creator";
 
@@ -97,6 +98,11 @@ export const SYNTHETIC_PERSONAS: Array<{
     defaultPath: "/app/facilities",
   },
   {
+    key: "facilities_staff",
+    label: "Facilities Staff",
+    defaultPath: "/app/facilities",
+  },
+  {
     key: "facilities_administrator",
     label: "Facilities Administrator",
     defaultPath: "/app/facilities",
@@ -142,7 +148,7 @@ export const FACILITIES_DEMO_PERSONAS: Array<{
   key: SyntheticPersonaKey;
   label: string;
   description: string;
-  demoSlug: "requester" | "admin";
+  demoSlug: "requester" | "staff" | "admin";
   defaultPath: string;
 }> = [
   {
@@ -150,6 +156,13 @@ export const FACILITIES_DEMO_PERSONAS: Array<{
     label: "Facilities Administrator",
     description: "Approve requests, coordinate preparation and work, manage space and stock, and act on operational insights.",
     demoSlug: "admin",
+    defaultPath: "/app/facilities",
+  },
+  {
+    key: "facilities_staff",
+    label: "Facilities Staff",
+    description: "Work assigned orders, manage preparation, receive urgency alerts, and update rooms and inventory in the field.",
+    demoSlug: "staff",
     defaultPath: "/app/facilities",
   },
   {
@@ -380,7 +393,9 @@ export function syntheticMembershipsForPersona(
       ),
     ];
   if (persona === "facilities_requester")
-    return [membership("facilities", ["requester"], ["facilities.requests.own", "facilities.reservations.own", "facilities.supplies.own"])];
+    return [membership("facilities", ["requester"], ["facilities.requests.own", "facilities.reservations.own", "facilities.supplies.own", "facilities.inventory.department", "facilities.inventory.request"] )];
+  if (persona === "facilities_staff")
+    return [membership("facilities", ["staff"], ["facilities.requests.work", "facilities.reservations.read", "facilities.inventory", "facilities.maps.read"] )];
   if (persona === "facilities_administrator")
     return [membership("facilities", ["administrator"], ["facilities.admin", "facilities.requests", "facilities.inventory", "facilities.reports"])];
   return clone(syntheticPreviewMemberships);
@@ -416,6 +431,8 @@ export function syntheticContextForPersona(
             ? "Community Liaison preview"
             : persona === "facilities_requester"
               ? "Dana Lewis"
+              : persona === "facilities_staff"
+                ? "Jordan Kim"
               : persona === "facilities_administrator"
                 ? "Alex Rivera"
             : persona === "impact_administrator"

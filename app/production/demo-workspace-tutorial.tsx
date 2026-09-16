@@ -252,6 +252,7 @@ const facilitiesAdminChapters: TutorialChapter[] = [
     id: "facilities-resources", title: "Space, warehouse, and reports", minutes: 2,
     steps: [
       step("facilities-resources", "facilities-space", "Coordinate space and setup", "Approve room requests, check conflicts, track liquor-license status, and automatically create the preparation work order.", "Connect reservations to execution", "The room calendar remains authoritative in this demo while preserving a future synchronization boundary for Outlook.", "[data-tutorial-id='facilities-spaces']"),
+      step("facilities-resources", "facilities-keys", "Manage keys and physical access", "Review requester, holder, sponsor, approver, access dates, locations, entry method, and separation controls in one tracked request.", "Preserve accountable access", "Key requests keep department approval and issuance history separate from ordinary work orders while sharing the Facilities shell.", "[data-tutorial-id='facilities-key-requests']"),
       step("facilities-resources", "facilities-stock", "Balance stock and custody", "Track on-hand quantities and reorder thresholds, then use lightweight check-out records for durable furniture or equipment.", "Avoid over- and under-buying", "Usage rates, reservations, open preparation, and current custody make future purchasing recommendations traceable.", "[data-tutorial-id='facilities-warehouse']"),
       step("facilities-resources", "facilities-map", "Use the operations map", "Select a room to see its reservation, work-order, capacity, and assigned-asset context together.", "A shared location model", "Floor-plan rooms connect records by stable location rather than relying on inconsistent free text.", "[data-tutorial-id='facilities-floor-plan']"),
     ],
@@ -265,14 +266,33 @@ const facilitiesRequesterChapters: TutorialChapter[] = [
     steps: [
       step("facilities-request", "facilities-request-home", "Your department request home", "Submit a work order, office-supply request, or room reservation, then follow its current status and Facilities updates.", "Requester self-service", "Requesters see only their own department-facing records and do not receive approval queues, warehouse controls, or administrative reports.", "[data-tutorial-id='facilities-requester-home']"),
       step("facilities-request", "facilities-new-request", "Give Facilities the right details", "Choose the request type, location, timing, priority, and description. The confirmation becomes the one record you follow through completion.", "Structured intake", "Consistent fields support routing and trend analysis while keeping the form quick enough for routine use.", "[data-tutorial-id='facilities-new-request']"),
+      step("facilities-request", "facilities-key-request", "Request keys or access", "Identify the key holder, sponsoring department, approver, locations, access dates, and whether access ends on separation.", "Separate physical-access workflow", "Approval and issuance remain traceable without mixing key-holder details into a general maintenance request.", "[data-tutorial-id='facilities-key-requests']"),
       step("facilities-request", "facilities-follow", "Follow approval and preparation", "Status, linked preparation, and messages stay together so you do not need to search a separate event or work-order inbox.", "Visible service status", "Every transition and notification is retained on the request without exposing other departments’ work.", "[data-tutorial-id='facilities-my-requests']"),
+    ],
+  },
+];
+
+const facilitiesStaffChapters: TutorialChapter[] = [
+  orientation("facilities"),
+  {
+    id: "facilities-field-work", title: "Assigned work and field updates", minutes: 2,
+    steps: [
+      step("facilities-field-work", "facilities-staff-home", "Start with assigned and urgent work", "See today’s assigned work, complete-by dates, urgency notifications, and preparation responsibilities before opening the full queue.", "Focused daily operations", "The staff view prioritizes work that needs action without exposing administrative reporting or configuration.", "[data-tutorial-id='facilities-staff-home']"),
+      step("facilities-field-work", "facilities-workflow", "Update one operational record", "Open an assigned work order to complete preparation steps, record parts, send an update, and advance active work.", "Shared, accountable history", "Every field update remains attached to the request and visible to the requester and administrator at the appropriate scope.", "[data-tutorial-id='facilities-workflow']"),
+    ],
+  },
+  {
+    id: "facilities-field-resources", title: "Rooms and inventory", minutes: 2,
+    steps: [
+      step("facilities-field-resources", "facilities-space", "Read room status from the map", "Use the campus and time filters to see available, tentative, and unavailable rooms plus hours of operation.", "Map-first coordination", "Room availability, existing holds, and event preparation stay connected.", "[data-tutorial-id='facilities-spaces']"),
+      step("facilities-field-resources", "facilities-stock", "Count and locate inventory", "Use department filters, barcode scanning, and reviewed photo-assisted drafts to keep field counts current.", "Human-reviewed assistance", "Photo suggestions never change inventory until a person confirms the draft.", "[data-tutorial-id='facilities-warehouse']"),
     ],
   },
 ];
 
 function tutorialChapters(workspace: DemoTutorialWorkspace, persona: SyntheticPersonaKey): TutorialChapter[] {
   if (workspace === "pathway") return persona === "pathway_student" ? pathwayChapters : pathwayCreatorChapters;
-  if (workspace === "facilities") return persona === "facilities_requester" ? facilitiesRequesterChapters : facilitiesAdminChapters;
+  if (workspace === "facilities") return persona === "facilities_requester" ? facilitiesRequesterChapters : persona === "facilities_staff" ? facilitiesStaffChapters : facilitiesAdminChapters;
   if (workspace === "impact") {
     if (persona === "impact_student") return impactStudentChapters;
     if (persona === "community_liaison") return impactLiaisonChapters;
