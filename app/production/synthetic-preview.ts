@@ -434,7 +434,7 @@ export function syntheticContextForPersona(
               : persona === "facilities_staff"
                 ? "Jordan Kim"
               : persona === "facilities_administrator"
-                ? "Alex Rivera"
+                ? "Mike Neary"
             : persona === "impact_administrator"
               ? "Impact Administrator preview"
               : persona === "career_advisor"

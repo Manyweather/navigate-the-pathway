@@ -50,15 +50,19 @@ test("room maps distinguish available, tentative, and unavailable time blocks", 
   assert.equal(roomAvailability("room-101", "2026-09-16", "10:30", "11:00", state.reservations), "unavailable");
   assert.equal(roomAvailability("room-h201", "2026-09-22", "13:30", "14:00", state.reservations), "tentative");
   assert.equal(roomAvailability("room-h202", "2026-09-22", "13:30", "14:00", state.reservations), "available");
+  assert.equal(state.rooms.some((room) => room.building === "South Jordan Campus"), false);
   assert.ok(state.rooms.some((room) => room.building === "Henderson Campus" && room.hours && room.features.length));
-  assert.ok(state.rooms.some((room) => room.building === "South Jordan Campus" && room.hours && room.features.length));
+  assert.equal(state.supplyRequests.length >= 6, true);
+  assert.equal(state.notifications.some((item) => item.audience === "administrator" && !item.read), true);
+  assert.equal(state.reservations.some((item) => item.specifications?.length), true);
+  assert.equal(state.reservations.some((item) => item.informationRequests?.length), true);
 });
 
 test("FacilitiesLink parity includes keys, related work records, venue paths, and account access", async () => {
   const state = cloneFacilitiesDemoState();
   assert.ok(state.keyRequests.some((item) => item.status === "approval" && item.revokeOnSeparation));
   assert.ok(state.accessRequests.some((item) => item.status === "pending"));
-  assert.equal(facilitiesVenueCatalogSummary.reduce((sum, item) => sum + item.count, 0), 175);
+  assert.equal(facilitiesVenueCatalogSummary.reduce((sum, item) => sum + item.count, 0), 84);
   const source = await readFile(new URL("../app/production/facilities-dashboard-app.tsx", import.meta.url), "utf8");
   for (const label of ["Keys & access", "Reserve by date", "Reserve by venue", "Quotes", "Invoices", "Request more access", "End access on separation"]) assert.match(source, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(source, /dental-equipment request/);
@@ -79,6 +83,9 @@ test("Facilities demo exposes Administrator, Staff, and Requester personas", asy
   assert.equal(requester.capabilities.includes("facilities.inventory.department"), true);
   assert.equal(staff.capabilities.includes("facilities.requests.work"), true);
   assert.equal(admin.capabilities.includes("facilities.inventory"), true);
+  const previewSource = await readFile(new URL("../app/production/synthetic-preview.ts", import.meta.url), "utf8");
+  assert.match(previewSource, /Mike Neary/);
+  assert.doesNotMatch(previewSource, /Alex Rivera/);
   const source = await readFile(new URL("../app/production/facilities-dashboard-app.tsx", import.meta.url), "utf8");
   assert.match(source, /url\.searchParams\.set\("preview", "facilities"\)/);
   assert.match(source, /Demo only: external email is simulated/);
@@ -86,4 +93,7 @@ test("Facilities demo exposes Administrator, Staff, and Requester personas", asy
   assert.match(source, /Take inventory photo/);
   assert.match(source, /Every submitted event, spreadsheet-style/);
   assert.match(source, /Green is available, yellow is tentative, and red is unavailable/);
+  assert.match(source, /Specifications and information requests/);
+  assert.match(source, /Request, reserve, pick, and deliver/);
+  assert.doesNotMatch(source, /South Jordan Campus/);
 });

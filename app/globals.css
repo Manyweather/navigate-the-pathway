@@ -2251,3 +2251,47 @@ details.event-admin-card>summary { min-height:44px; display:flex; align-items:ce
 .facilities-key-grid button { margin-top:.5rem; }
 @media(max-width:900px) { .facilities-venue-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:680px) { .facilities-emergency-strip { align-items:flex-start; flex-direction:column; } .facilities-booking-modes,.facilities-lifecycle.compact { grid-template-columns:1fr; } .facilities-venue-summary,.facilities-key-grid { grid-template-columns:1fr; } .facilities-record-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .facilities-record-tabs button { min-width:0; } }
+
+/* Facilities operations workflow expansion */
+.facilities-notification-wrap { position:relative; }
+.facilities-notification-button { position:relative; width:48px; height:48px; display:grid; place-items:center; border:1px solid #c7d7df; border-radius:14px; background:#fff; color:#15364b; }
+.facilities-notification-button svg { width:24px; height:24px; }
+.facilities-notification-button b { position:absolute; top:-7px; right:-7px; min-width:23px; height:23px; padding:0 6px; display:grid; place-items:center; border:2px solid #fff; border-radius:999px; background:#8a0d3c; color:#fff; font-size:.75rem; }
+.facilities-notification-panel { position:absolute; z-index:50; top:calc(100% + 10px); left:0; width:min(420px,calc(100vw - 28px)); max-height:70vh; overflow:auto; padding:18px; border:2px solid #244f68; border-radius:18px; background:#fff; box-shadow:0 24px 70px rgba(20,46,62,.24); }
+.facilities-notification-panel>header { display:flex; align-items:start; justify-content:space-between; gap:16px; margin-bottom:12px; }
+.facilities-notification-panel>header strong { display:block; font:700 1.25rem/1.2 Georgia,serif; color:#15364b; }
+.facilities-notification-filters { display:flex; gap:8px; margin-bottom:12px; }
+.facilities-notification-filters button { min-height:40px; padding:7px 12px; border:1px solid #bfd0d9; border-radius:999px; background:#f7fafb; text-transform:capitalize; }
+.facilities-notification-filters button.active { background:#173f57; color:#fff; }
+.facilities-notification-list { display:grid; gap:8px; margin-bottom:12px; }
+.facilities-notification-list>button { width:100%; min-height:58px; display:grid; grid-template-columns:28px 1fr; gap:10px; align-items:start; padding:12px; text-align:left; border:1px solid #cfdae0; border-radius:12px; background:#fff; }
+.facilities-notification-list>button.unread { border-left:5px solid #8a0d3c; background:#fff8fa; }
+.facilities-notification-list>button.urgency-urgent>span:first-child { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:#a11b2e; color:#fff; font-weight:800; }
+.facilities-notification-list strong,.facilities-notification-list small { display:block; }
+.facilities-notification-list small { margin-top:3px; color:#526a77; }
+.facilities-event-specifications { margin-top:24px; border-left:6px solid #8a0d3c; }
+.facilities-event-specifications>header { align-items:end; }
+.facilities-event-specifications>header label { min-width:min(380px,100%); }
+.facilities-info-needed { display:flex; gap:12px; align-items:center; padding:14px 16px; margin:14px 0; border:2px solid #d69a27; border-radius:12px; background:#fff8df; }
+.facilities-spec-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:22px; }
+.facilities-spec-list,.facilities-rfi-list { display:grid; gap:10px; }
+.facilities-spec-list article,.facilities-rfi-list article { padding:14px; border:1px solid #c9d6dc; border-radius:12px; background:#fff; }
+.facilities-spec-list article { display:grid; grid-template-columns:auto 1fr minmax(120px,auto); gap:12px; align-items:start; }
+.facilities-spec-list strong,.facilities-spec-list small { display:block; }
+.facilities-spec-list p,.facilities-rfi-list p { margin:4px 0 0; color:#536b77; }
+.facilities-spec-form,.facilities-rfi-form { display:grid; gap:12px; margin-top:18px; padding:16px; border:2px solid #c6d5dc; border-radius:14px; background:#f7fafb; }
+.facilities-spec-form label,.facilities-rfi-form label { display:grid; gap:6px; }
+.facilities-rfi-list blockquote { margin:12px 0; padding:12px; border-left:4px solid #24798b; background:#eef9fa; }
+.facilities-event-history { margin-top:20px; padding-top:16px; border-top:2px solid #d6e0e4; }
+.facilities-event-history p { margin:7px 0; }
+.facilities-event-history small { display:block; color:#657984; }
+.facilities-warehouse-workspace { display:grid; gap:20px; }
+.facilities-warehouse-tabs { position:sticky; top:0; z-index:10; display:flex; gap:8px; padding:10px; overflow-x:auto; border:1px solid #bed0d8; border-radius:14px; background:rgba(255,255,255,.97); box-shadow:0 8px 24px rgba(21,54,75,.08); }
+.facilities-warehouse-tabs a { min-height:42px; display:inline-flex; align-items:center; white-space:nowrap; padding:8px 14px; border-radius:10px; color:#15364b; font-weight:750; text-decoration:none; }
+.facilities-warehouse-tabs a:hover,.facilities-warehouse-tabs a:focus-visible { background:#e9f3f6; }
+.facilities-supply-workflow { border-left:6px solid #8a0d3c; }
+.facilities-supply-queue { display:grid; gap:10px; max-height:620px; overflow:auto; }
+.facilities-supply-queue>article { display:grid; grid-template-columns:1fr auto; gap:12px; padding:14px; border:1px solid #cad7dd; border-radius:12px; background:#fff; }
+.facilities-supply-queue article>div:last-of-type { display:grid; justify-items:end; gap:6px; }
+.facilities-supply-queue details { grid-column:1/-1; border-top:1px solid #d7e0e4; padding-top:8px; }
+@media(max-width:820px) { .facilities-notification-panel { position:fixed; top:86px; left:14px; right:14px; width:auto; } .facilities-spec-grid { grid-template-columns:1fr; } .facilities-spec-list article { grid-template-columns:1fr; } .facilities-supply-queue>article { grid-template-columns:1fr; } .facilities-supply-queue article>div:last-of-type { justify-items:start; } }

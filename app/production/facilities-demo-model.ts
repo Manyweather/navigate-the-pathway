@@ -10,6 +10,64 @@ export const facilitiesRequestStages: Array<{ key: FacilitiesRequestStatus; labe
 
 export const facilitiesEventStages = ["draft", "submitted", "under_review", "approved", "prep", "ready", "in_progress", "completed", "cancelled"] as const;
 
+export type FacilitiesEventSpecification = {
+  id: string;
+  section: "Room layout" | "Furniture and equipment" | "AV and technology" | "Catering and deliveries" | "Accessibility" | "Security and access" | "Cleaning and reset" | "Staffing and deadlines";
+  requirement: string;
+  status: "required" | "optional" | "completed" | "not_applicable";
+  owner: string;
+  dueOn: string;
+  version: number;
+};
+
+export type FacilitiesInformationRequest = {
+  id: string;
+  eventId: string;
+  affectedStep: "approval" | "preparation";
+  question: string;
+  dueOn: string;
+  requestedFields: string[];
+  attachmentNames: string[];
+  status: "open" | "responded" | "accepted";
+  requestedBy: string;
+  requestedAt: string;
+  response: string | null;
+  responseAttachmentNames: string[];
+  respondedAt: string | null;
+};
+
+export type FacilitiesSupplyStatus = "submitted" | "auto_approved" | "approval_required" | "reserved" | "picking" | "ready" | "delivered" | "partially_fulfilled" | "backordered" | "declined" | "cancelled";
+
+export type FacilitiesSupplyRequest = {
+  id: string;
+  itemId: string;
+  itemName: string;
+  requester: string;
+  department: string;
+  deliveryLocation: string;
+  quantity: number;
+  fulfilledQuantity: number;
+  neededBy: string;
+  status: FacilitiesSupplyStatus;
+  owner: string | null;
+  restricted: boolean;
+  crossDepartment: boolean;
+  history: Array<{ id: string; text: string; at: string; actor: string }>;
+};
+
+export type FacilitiesNotification = {
+  id: string;
+  audience: "administrator" | "staff" | "requester";
+  type: "urgent" | "overdue" | "unassigned" | "approval" | "response" | "delivery" | "status";
+  title: string;
+  detail: string;
+  recordId: string;
+  recordType: "work_request" | "event" | "supply" | "key";
+  urgency: "routine" | "attention" | "urgent";
+  read: boolean;
+  createdAt: string;
+};
+
 export type FacilitiesRequest = {
   id: string;
   title: string;
@@ -53,7 +111,7 @@ export type FacilitiesKeyRequest = {
   sponsoringDepartment: string;
   approver: string;
   notes: string;
-  status: "request" | "approval" | "ready" | "issued";
+  status: "request" | "approval" | "ready" | "issued" | "declined";
   createdAt: string;
 };
 
@@ -82,7 +140,7 @@ export type FacilitiesReservation = {
   requestedBy: string;
   setupNotes: string;
   linkedRequestId: string | null;
-  campus?: "Summerlin Campus" | "Henderson Campus" | "South Jordan Campus";
+  campus?: "Summerlin Campus" | "Henderson Campus";
   coordinator?: string;
   coordinatorEmail?: string;
   lifecycleStage?: "draft" | "submitted" | "under_review" | "approved" | "prep" | "ready" | "in_progress" | "completed" | "cancelled";
@@ -91,6 +149,11 @@ export type FacilitiesReservation = {
   security?: string;
   communications?: string;
   attendanceStatus?: "not_started" | "open" | "complete";
+  specifications?: FacilitiesEventSpecification[];
+  specificationVersion?: number;
+  informationRequests?: FacilitiesInformationRequest[];
+  pausedSteps?: Array<"approval" | "preparation">;
+  activityHistory?: Array<{ id: string; text: string; at: string; actor: string }>;
   createdAt?: string;
 };
 
@@ -107,7 +170,7 @@ export type FacilitiesStockItem = {
   averageWeeklyUse: number;
   lastCounted: string;
   ownerDepartment?: string;
-  campus?: "Summerlin Campus" | "Henderson Campus" | "South Jordan Campus";
+  campus?: "Summerlin Campus" | "Henderson Campus";
   shareable?: boolean;
   condition?: "new" | "good" | "worn" | "needs_attention";
   photoName?: string | null;
@@ -144,6 +207,8 @@ export type FacilitiesDemoState = {
   keyRequests: FacilitiesKeyRequest[];
   accessRequests: FacilitiesAccessRequest[];
   reservations: FacilitiesReservation[];
+  supplyRequests: FacilitiesSupplyRequest[];
+  notifications: FacilitiesNotification[];
   stock: FacilitiesStockItem[];
   custody: FacilitiesCustody[];
   dashboardSections: string[];
@@ -166,42 +231,53 @@ export const facilitiesRooms: FacilitiesRoom[] = [
   { id: "room-h201", name: "Henderson Conference 201", building: "Henderson Campus", floor: "Second floor", capacity: 18, type: "Conference room", x: 8, y: 10, width: 38, height: 28, hours: "7:00 AM–8:00 PM", features: ["Display", "Zoom", "Whiteboard"] },
   { id: "room-h202", name: "Henderson Training 202", building: "Henderson Campus", floor: "Second floor", capacity: 54, type: "Classroom", x: 52, y: 10, width: 40, height: 45, hours: "6:30 AM–9:00 PM", features: ["Lecture capture", "AV", "Accessible seating"] },
   { id: "room-h203", name: "Henderson Commons", building: "Henderson Campus", floor: "Second floor", capacity: 80, type: "Event space", x: 8, y: 64, width: 84, height: 25, hours: "7:00 AM–9:00 PM", features: ["Flexible furniture", "AV", "Catering access"] },
-  { id: "room-sj100", name: "South Jordan Classroom 100", building: "South Jordan Campus", floor: "First floor", capacity: 180, type: "Classroom", x: 7, y: 10, width: 54, height: 48, hours: "6:30 AM–9:00 PM", features: ["Lecture capture", "AV", "Breakout rooms", "Accessible seating"] },
-  { id: "room-sj110", name: "South Jordan Classroom 110", building: "South Jordan Campus", floor: "First floor", capacity: 120, type: "Classroom", x: 65, y: 10, width: 29, height: 48, hours: "6:30 AM–9:00 PM", features: ["Lecture capture", "AV", "Breakout rooms"] },
-  { id: "room-sjcommons", name: "South Jordan Student Commons", building: "South Jordan Campus", floor: "First floor", capacity: 100, type: "Multi-purpose", x: 7, y: 66, width: 87, height: 24, hours: "7:00 AM–9:00 PM", features: ["Flexible furniture", "AV", "Catering access"] },
 ];
 
 export const facilitiesVenueCatalogSummary = [
   { campus: "Henderson Campus", count: 53, examples: "Classrooms, breakout rooms, lounges, parking, and outdoor space" },
   { campus: "Summerlin Campus", count: 25, examples: "Classrooms, study rooms, lobbies, commons, courtyards, and parking" },
-  { campus: "South Jordan Campus", count: 91, examples: "Classrooms, library rooms, dental spaces, commons, courtyards, and parking" },
   { campus: "Other and off-campus", count: 6, examples: "Administrative, component, and special-purpose spaces" },
 ];
 
 export const facilitiesDirectory = [
-  { id: "contact-1", name: "Alex Rivera", role: "Facilities Manager", group: "Leadership", campus: "Both campuses", specialty: "Approvals and escalation", email: "alex.rivera@example.edu", phone: "702-555-0140" },
+  { id: "contact-1", name: "Mike Neary", role: "Facilities Administrator", group: "Leadership", campus: "Both campuses", specialty: "Approvals, event specifications, and escalation", email: "mike.neary@example.edu", phone: "702-555-0140" },
   { id: "contact-2", name: "Jordan Kim", role: "Facilities Coordinator", group: "Work Orders", campus: "Summerlin Campus", specialty: "Events and room preparation", email: "jordan.kim@example.edu", phone: "702-555-0141" },
   { id: "contact-3", name: "Sam Patel", role: "Warehouse Specialist", group: "Warehouse", campus: "Summerlin Campus", specialty: "Inventory and receiving", email: "sam.patel@example.edu", phone: "702-555-0142" },
   { id: "contact-4", name: "Morgan Chen", role: "Campus Events Coordinator", group: "Events and Spaces", campus: "Both campuses", specialty: "Reservations and event lifecycle", email: "morgan.chen@example.edu", phone: "702-555-0143" },
   { id: "contact-5", name: "Facilities Help Desk", role: "Request support", group: "Help Desk", campus: "Both campuses", specialty: "Routing and urgent calls", email: "facilities@example.edu", phone: "702-555-0100" },
   { id: "contact-6", name: "Nina Foster", role: "Facilities Technician", group: "Work Orders", campus: "Henderson Campus", specialty: "Electrical and room systems", email: "nina.foster@example.edu", phone: "702-555-0144" },
   { id: "contact-7", name: "Leo Martinez", role: "Facilities Technician", group: "Work Orders", campus: "Summerlin Campus", specialty: "Furniture and preventative maintenance", email: "leo.martinez@example.edu", phone: "702-555-0145" },
-  { id: "contact-8", name: "Maya Thompson", role: "Facilities Director", group: "Leadership", campus: "South Jordan Campus", specialty: "Campus escalation and emergency response", email: "maya.thompson@example.edu", phone: "801-555-0125" },
-  { id: "contact-9", name: "Elliot Brooks", role: "Venue Scheduler", group: "Events and Spaces", campus: "South Jordan Campus", specialty: "Venue calendars and room support", email: "elliot.brooks@example.edu", phone: "801-555-0126" },
+];
+
+const whiteCoatSpecifications: FacilitiesEventSpecification[] = [
+  { id: "spec-1", section: "Room layout", requirement: "18 rounds with accessible aisles and two registration tables", status: "completed", owner: "Jordan Kim", dueOn: "2026-09-17", version: 2 },
+  { id: "spec-2", section: "Furniture and equipment", requirement: "Stage podium, 144 chairs, and coat-rack staging", status: "required", owner: "Jordan Kim", dueOn: "2026-09-18", version: 2 },
+  { id: "spec-3", section: "AV and technology", requirement: "Lectern microphone and confidence monitor sound check", status: "required", owner: "Nina Foster", dueOn: "2026-09-18", version: 2 },
+  { id: "spec-4", section: "Accessibility", requirement: "Reserved seating and continuous accessible route", status: "required", owner: "Morgan Chen", dueOn: "2026-09-17", version: 2 },
+  { id: "spec-5", section: "Cleaning and reset", requirement: "Post-event reset to standard hall configuration", status: "optional", owner: "Facilities queue", dueOn: "2026-09-19", version: 2 },
+];
+
+const alumniInformationRequests: FacilitiesInformationRequest[] = [
+  { id: "RFI-18", eventId: "RSV-2206", affectedStep: "approval", question: "Please provide the catering vendor, certificate of insurance, and final alcohol-service window.", dueOn: "2026-09-18", requestedFields: ["Catering vendor", "Insurance certificate", "Service window"], attachmentNames: ["insurance-requirements.pdf"], status: "open", requestedBy: "Mike Neary", requestedAt: "2026-09-15T09:10:00-07:00", response: null, responseAttachmentNames: [], respondedAt: null },
 ];
 
 export const initialFacilitiesDemoState: FacilitiesDemoState = {
   requests: [
     { id: "WO-1048", title: "Repair leaking sink in student commons", category: "work_order", requester: "Dana Lewis", department: "Student Affairs", location: "Student Commons", priority: "urgent", status: "approval", description: "Water is collecting beneath the east sink cabinet.", requestedFor: "2026-09-15", assignedTo: null, prepTasks: [], parts: [], reservationId: null, createdAt: "2026-09-15T07:42:00-07:00", updatedAt: "2026-09-15T07:42:00-07:00", messages: [] },
     { id: "WO-1047", title: "Prepare Community Hall for White Coat reception", category: "event_setup", requester: "Morgan Chen", department: "Campus Events", location: "Community Hall", priority: "soon", status: "prep", description: "Set 18 rounds, podium, two registration tables, and accessible aisle.", requestedFor: "2026-09-18", assignedTo: "Jordan Kim", prepTasks: [{ id: "task-1", label: "Confirm final room diagram", complete: true }, { id: "task-2", label: "Pull 144 chairs", complete: false }, { id: "task-3", label: "Stage podium and microphone", complete: false }], parts: [{ itemId: "stock-chair", name: "Stacking chair", quantity: 144 }], reservationId: "RSV-2204", createdAt: "2026-09-10T10:20:00-07:00", updatedAt: "2026-09-15T08:10:00-07:00", messages: [{ id: "msg-1", channel: "email", body: "Setup plan confirmed with event coordinator.", sentAt: "2026-09-15T08:10:00-07:00", sender: "Jordan Kim" }] },
-    { id: "WO-1046", title: "Replace flickering corridor light", category: "work_order", requester: "Riley Moore", department: "College of Medicine", location: "North corridor", priority: "routine", status: "in_progress", description: "Fixture outside Classroom 106 flickers intermittently.", requestedFor: "2026-09-16", assignedTo: "Alex Rivera", prepTasks: [{ id: "task-4", label: "Confirm fixture model", complete: true }], parts: [{ itemId: "stock-led", name: "LED tube lamp", quantity: 2 }], reservationId: null, createdAt: "2026-09-12T13:05:00-07:00", updatedAt: "2026-09-15T08:30:00-07:00", messages: [] },
+    { id: "WO-1046", title: "Replace flickering corridor light", category: "work_order", requester: "Riley Moore", department: "College of Medicine", location: "North corridor", priority: "routine", status: "in_progress", description: "Fixture outside Classroom 106 flickers intermittently.", requestedFor: "2026-09-16", assignedTo: "Mike Neary", prepTasks: [{ id: "task-4", label: "Confirm fixture model", complete: true }], parts: [{ itemId: "stock-led", name: "LED tube lamp", quantity: 2 }], reservationId: null, createdAt: "2026-09-12T13:05:00-07:00", updatedAt: "2026-09-15T08:30:00-07:00", messages: [] },
     { id: "WO-1045", title: "Deliver printer paper to Admissions", category: "office_supplies", requester: "Taylor Grant", department: "Admissions", location: "Admissions Suite", priority: "routine", status: "new_request", description: "Two cases of letter-size copy paper.", requestedFor: "2026-09-17", assignedTo: null, prepTasks: [], parts: [{ itemId: "stock-paper", name: "Copy paper case", quantity: 2 }], reservationId: null, createdAt: "2026-09-14T15:20:00-07:00", updatedAt: "2026-09-14T15:20:00-07:00", messages: [] },
     { id: "WO-1044", title: "Reset conference room seating", category: "event_setup", requester: "Avery Brooks", department: "Academic Affairs", location: "Conference Room 101", priority: "routine", status: "complete", description: "Return room to standard 14-seat layout.", requestedFor: "2026-09-12", assignedTo: "Jordan Kim", prepTasks: [{ id: "task-5", label: "Reset tables and chairs", complete: true }], parts: [], reservationId: "RSV-2201", createdAt: "2026-09-11T08:00:00-07:00", updatedAt: "2026-09-12T16:15:00-07:00", messages: [] },
+    { id: "WO-1043", title: "Inspect Henderson training-room HVAC", category: "work_order", requester: "Morgan Chen", department: "Campus Events", location: "Henderson Training 202", priority: "soon", status: "prep", description: "Verify airflow before the community training program.", requestedFor: "2026-09-17", assignedTo: "Nina Foster", prepTasks: [{ id: "task-6", label: "Review service history", complete: true }, { id: "task-7", label: "Pull replacement filter", complete: false }], parts: [{ itemId: "stock-filter", name: "HVAC filter 20×25", quantity: 1 }], reservationId: null, createdAt: "2026-09-13T09:00:00-07:00", updatedAt: "2026-09-15T09:00:00-07:00", messages: [] },
+    { id: "WO-1042", title: "Replace damaged lobby bench", category: "work_order", requester: "Casey Bell", department: "University Advancement", location: "Summerlin exterior/grounds", priority: "routine", status: "new_request", description: "Bench has a cracked support and should remain out of service.", requestedFor: "2026-09-28", assignedTo: null, prepTasks: [], parts: [], reservationId: null, createdAt: "2026-09-14T10:00:00-07:00", updatedAt: "2026-09-14T10:00:00-07:00", messages: [] },
+    { id: "WO-1041", title: "Restore classroom door closer", category: "work_order", requester: "Riley Moore", department: "College of Medicine", location: "Classroom 106", priority: "urgent", status: "in_progress", description: "Door is not closing completely.", requestedFor: "2026-09-14", assignedTo: "Leo Martinez", prepTasks: [], parts: [], reservationId: null, createdAt: "2026-09-13T07:30:00-07:00", updatedAt: "2026-09-15T09:05:00-07:00", messages: [] },
   ],
   keyRequests: [
     { id: "KR-307", requester: "Dana Lewis", holder: "Dana Lewis", employeeId: "E10427", jobTitle: "Program Coordinator", department: "Student Affairs", context: "additional_keys", locations: ["Innovation Hall", "Student Affairs storage"], startsOn: "2026-09-18", endsOn: null, revokeOnSeparation: true, exteriorAccess: false, entryMethod: "card_or_fob", priority: "routine", fundSource: "Student Affairs operations", billingCode: "SA-210", sponsoringDepartment: "Student Affairs", approver: "Avery Brooks", notes: "Evening event support requires storage access.", status: "approval", createdAt: "2026-09-14T11:20:00-07:00" },
-    { id: "KR-306", requester: "Riley Moore", holder: "Riley Moore", employeeId: "E09881", jobTitle: "Faculty", department: "College of Medicine", context: "new_access", locations: ["South Jordan Classroom 100"], startsOn: "2026-09-08", endsOn: null, revokeOnSeparation: true, exteriorAccess: true, entryMethod: "card_or_fob", priority: "soon", fundSource: "College operations", billingCode: "COM-100", sponsoringDepartment: "College of Medicine", approver: "Program Administration", notes: "Instructional access for recurring sessions.", status: "ready", createdAt: "2026-09-03T09:10:00-07:00" },
+    { id: "KR-306", requester: "Riley Moore", holder: "Riley Moore", employeeId: "E09881", jobTitle: "Faculty", department: "College of Medicine", context: "new_access", locations: ["Henderson Training 202"], startsOn: "2026-09-08", endsOn: null, revokeOnSeparation: true, exteriorAccess: true, entryMethod: "card_or_fob", priority: "soon", fundSource: "College operations", billingCode: "COM-100", sponsoringDepartment: "College of Medicine", approver: "Program Administration", notes: "Instructional access for recurring sessions.", status: "ready", createdAt: "2026-09-03T09:10:00-07:00" },
     { id: "KR-301", requester: "Taylor Grant", holder: "Taylor Grant", employeeId: "E08731", jobTitle: "Admissions Specialist", department: "Admissions", context: "key_exchange", locations: ["Admissions Suite"], startsOn: "2026-08-20", endsOn: null, revokeOnSeparation: true, exteriorAccess: false, entryMethod: "physical_key", priority: "routine", fundSource: "Admissions", billingCode: "ADM-115", sponsoringDepartment: "Admissions", approver: "Admissions Director", notes: "Exchange completed after lock change.", status: "issued", createdAt: "2026-08-18T14:30:00-07:00" },
+    { id: "KR-299", requester: "Casey Bell", holder: "Contract caterer", employeeId: "N/A", jobTitle: "Vendor", department: "University Advancement", context: "new_access", locations: ["Community Hall catering entrance"], startsOn: "2026-09-24", endsOn: "2026-09-24", revokeOnSeparation: true, exteriorAccess: true, entryMethod: "card_or_fob", priority: "routine", fundSource: "University Advancement", billingCode: "UA-410", sponsoringDepartment: "University Advancement", approver: "Mike Neary", notes: "Declined until insurance documentation is received.", status: "declined", createdAt: "2026-09-12T14:30:00-07:00" },
+    { id: "KR-298", requester: "Morgan Chen", holder: "Temporary event assistant", employeeId: "E10998", jobTitle: "Event Assistant", department: "Campus Events", context: "new_access", locations: ["Community Hall"], startsOn: "2026-09-01", endsOn: "2026-09-20", revokeOnSeparation: true, exteriorAccess: false, entryMethod: "card_or_fob", priority: "routine", fundSource: "Campus Events", billingCode: "EVT-205", sponsoringDepartment: "Campus Events", approver: "Mike Neary", notes: "Access ends after the White Coat reception.", status: "issued", createdAt: "2026-08-28T08:30:00-07:00" },
   ],
   accessRequests: [
     { id: "AR-41", requester: "Dana Lewis", requestedAccess: "Event reservation reporting for Student Affairs", status: "pending", createdAt: "2026-09-15T08:15:00-07:00" },
@@ -213,6 +289,28 @@ export const initialFacilitiesDemoState: FacilitiesDemoState = {
     { id: "RSV-2206", title: "Alumni networking reception", organization: "University Advancement", roomId: "room-103", roomName: "Community Hall", date: "2026-09-24", startsAt: "18:00", endsAt: "20:30", eventType: "Reception", attendees: 90, alcohol: true, liquorLicenseStatus: "needed", status: "pending", requestedBy: "Casey Bell", setupNotes: "Cocktail rounds, check-in, stage, and catering access.", linkedRequestId: null, campus: "Summerlin Campus", coordinator: "Casey Bell", coordinatorEmail: "casey.bell@example.edu", lifecycleStage: "under_review", accessibility: "Accessible entrance requested", catering: "Vendor details pending", security: "Review required", communications: "Invitation draft", attendanceStatus: "not_started", createdAt: "2026-09-11T09:30:00-07:00" },
     { id: "RSV-2202", title: "Student Council planning", organization: "Student Council", roomId: "room-102", roomName: "Collaboration Room 102", date: "2026-09-15", startsAt: "15:00", endsAt: "16:00", eventType: "Student organization", attendees: 8, alcohol: false, liquorLicenseStatus: "not_required", status: "approved", requestedBy: "Taylor Morgan", setupNotes: "No special setup.", linkedRequestId: null, campus: "Summerlin Campus", coordinator: "Taylor Morgan", coordinatorEmail: "taylor.morgan@example.edu", lifecycleStage: "in_progress", accessibility: "Standard accessible route", catering: "None", security: "Not required", communications: "Reminder delivered", attendanceStatus: "open", createdAt: "2026-09-10T11:00:00-07:00" },
     { id: "RSV-2207", title: "Henderson community partner briefing", organization: "Community Engagement", roomId: "room-h201", roomName: "Henderson Conference 201", date: "2026-09-22", startsAt: "13:00", endsAt: "14:30", eventType: "Community event", attendees: 16, alcohol: false, liquorLicenseStatus: "not_required", status: "pending", requestedBy: "Dana Lewis", setupNotes: "Hybrid meeting with accessible seating.", linkedRequestId: null, campus: "Henderson Campus", coordinator: "Dana Lewis", coordinatorEmail: "dana.lewis@example.edu", lifecycleStage: "submitted", accessibility: "Accessible seating", catering: "Coffee service requested", security: "Guest list due", communications: "Not started", attendanceStatus: "not_started", createdAt: "2026-09-15T08:00:00-07:00" },
+    { id: "RSV-2210", title: "White Coat reception setup review", organization: "College of Medicine", roomId: "room-103", roomName: "Community Hall", date: "2026-09-18", startsAt: "12:00", endsAt: "16:00", eventType: "Reception", attendees: 110, alcohol: false, liquorLicenseStatus: "not_required", status: "approved", requestedBy: "Morgan Chen", setupNotes: "Final operational review before guest arrival.", linkedRequestId: "WO-1047", campus: "Summerlin Campus", coordinator: "Morgan Chen", coordinatorEmail: "morgan.chen@example.edu", lifecycleStage: "prep", accessibility: "Accessible aisle and reserved seating", catering: "Delivery at 3:30 PM", security: "Exterior doors staffed", communications: "Guest reminder scheduled", attendanceStatus: "not_started", specifications: whiteCoatSpecifications, specificationVersion: 2, informationRequests: [], pausedSteps: [], activityHistory: [{ id: "evt-act-1", text: "Specification version 2 published", at: "2026-09-15T08:20:00-07:00", actor: "Mike Neary" }], createdAt: "2026-09-01T10:00:00-07:00" },
+    { id: "RSV-2209", title: "New employee orientation", organization: "Human Resources", roomId: "room-h202", roomName: "Henderson Training 202", date: "2026-09-30", startsAt: "08:30", endsAt: "12:00", eventType: "Training", attendees: 35, alcohol: false, liquorLicenseStatus: "not_required", status: "pending", requestedBy: "Jamie Ortiz", setupNotes: "Classroom seating with two welcome tables.", linkedRequestId: null, campus: "Henderson Campus", coordinator: "Jamie Ortiz", coordinatorEmail: "jamie.ortiz@example.edu", lifecycleStage: "draft", accessibility: "To be confirmed", catering: "Coffee and pastries", security: "Not required", communications: "Draft", attendanceStatus: "not_started", specifications: [], specificationVersion: 0, informationRequests: [], pausedSteps: [], activityHistory: [], createdAt: "2026-09-15T10:00:00-07:00" },
+    { id: "RSV-2206A", title: "Alumni networking reception review", organization: "University Advancement", roomId: "room-103", roomName: "Community Hall", date: "2026-09-24", startsAt: "18:00", endsAt: "20:30", eventType: "Reception", attendees: 90, alcohol: true, liquorLicenseStatus: "needed", status: "pending", requestedBy: "Dana Lewis", setupNotes: "Cocktail rounds, check-in, stage, and catering access.", linkedRequestId: null, campus: "Summerlin Campus", coordinator: "Casey Bell", coordinatorEmail: "casey.bell@example.edu", lifecycleStage: "under_review", accessibility: "Accessible entrance requested", catering: "Vendor details pending", security: "Review required", communications: "Information request delivered", attendanceStatus: "not_started", specifications: [], specificationVersion: 0, informationRequests: alumniInformationRequests, pausedSteps: ["approval"], activityHistory: [{ id: "evt-act-2", text: "Information requested from Dana Lewis", at: "2026-09-15T09:10:00-07:00", actor: "Mike Neary" }], createdAt: "2026-09-11T09:30:00-07:00" },
+    { id: "RSV-2198", title: "Admissions open house", organization: "Admissions", roomId: "room-103", roomName: "Community Hall", date: "2026-09-05", startsAt: "09:00", endsAt: "13:00", eventType: "Open house", attendees: 84, alcohol: false, liquorLicenseStatus: "not_required", status: "approved", requestedBy: "Taylor Grant", setupNotes: "Welcome tables, presentation seating, and tour staging.", linkedRequestId: null, campus: "Summerlin Campus", coordinator: "Taylor Grant", coordinatorEmail: "taylor.grant@example.edu", lifecycleStage: "completed", accessibility: "Accessible route confirmed", catering: "Boxed lunches", security: "Guest check-in completed", communications: "Follow-up sent", attendanceStatus: "complete", specifications: [], specificationVersion: 1, informationRequests: [], pausedSteps: [], activityHistory: [{ id: "evt-act-3", text: "Event completed and room reset", at: "2026-09-05T15:00:00-07:00", actor: "Jordan Kim" }], createdAt: "2026-08-12T09:00:00-07:00" },
+    { id: "RSV-2197", title: "Department planning retreat", organization: "Academic Affairs", roomId: "room-h203", roomName: "Henderson Commons", date: "2026-09-08", startsAt: "09:00", endsAt: "15:00", eventType: "Retreat", attendees: 40, alcohol: false, liquorLicenseStatus: "not_required", status: "cancelled", requestedBy: "Avery Brooks", setupNotes: "Cancelled by department.", linkedRequestId: null, campus: "Henderson Campus", coordinator: "Avery Brooks", coordinatorEmail: "avery.brooks@example.edu", lifecycleStage: "cancelled", accessibility: "Not applicable", catering: "Cancelled", security: "Not applicable", communications: "Cancellation delivered", attendanceStatus: "not_started", specifications: [], specificationVersion: 1, informationRequests: [], pausedSteps: [], activityHistory: [{ id: "evt-act-4", text: "Event cancelled by requester", at: "2026-09-02T11:00:00-07:00", actor: "Avery Brooks" }], createdAt: "2026-08-20T09:00:00-07:00" },
+  ],
+  supplyRequests: [
+    { id: "SUP-318", itemId: "stock-paper", itemName: "Copy paper case", requester: "Taylor Grant", department: "Admissions", deliveryLocation: "Admissions Suite", quantity: 2, fulfilledQuantity: 0, neededBy: "2026-09-17", status: "auto_approved", owner: "Sam Patel", restricted: false, crossDepartment: false, history: [{ id: "sup-h-1", text: "Automatically approved within routine quantity limit", at: "2026-09-15T08:00:00-07:00", actor: "Warehouse rules" }] },
+    { id: "SUP-317", itemId: "stock-markers", itemName: "Presentation marker set", requester: "Dana Lewis", department: "Student Affairs", deliveryLocation: "Student Affairs Suite", quantity: 2, fulfilledQuantity: 0, neededBy: "2026-09-18", status: "reserved", owner: "Sam Patel", restricted: false, crossDepartment: false, history: [{ id: "sup-h-2", text: "Two sets reserved", at: "2026-09-15T08:15:00-07:00", actor: "Sam Patel" }] },
+    { id: "SUP-316", itemId: "stock-paper", itemName: "Copy paper case", requester: "Riley Moore", department: "College of Medicine", deliveryLocation: "Faculty workroom", quantity: 8, fulfilledQuantity: 0, neededBy: "2026-09-19", status: "approval_required", owner: null, restricted: false, crossDepartment: false, history: [{ id: "sup-h-3", text: "Quantity exceeds automatic-approval limit", at: "2026-09-15T08:25:00-07:00", actor: "Warehouse rules" }] },
+    { id: "SUP-315", itemId: "stock-markers", itemName: "Presentation marker set", requester: "Taylor Grant", department: "Admissions", deliveryLocation: "Admissions Suite", quantity: 5, fulfilledQuantity: 2, neededBy: "2026-09-16", status: "partially_fulfilled", owner: "Sam Patel", restricted: false, crossDepartment: true, history: [{ id: "sup-h-4", text: "Two sets issued; three await department approval", at: "2026-09-15T08:40:00-07:00", actor: "Sam Patel" }] },
+    { id: "SUP-314", itemId: "stock-paper", itemName: "Copy paper case", requester: "Morgan Chen", department: "Campus Events", deliveryLocation: "Events Office", quantity: 6, fulfilledQuantity: 0, neededBy: "2026-09-16", status: "backordered", owner: "Sam Patel", restricted: false, crossDepartment: false, history: [{ id: "sup-h-5", text: "Insufficient unreserved stock; purchasing review opened", at: "2026-09-15T08:50:00-07:00", actor: "Warehouse rules" }] },
+    { id: "SUP-313", itemId: "stock-paper", itemName: "Copy paper case", requester: "Avery Brooks", department: "Academic Affairs", deliveryLocation: "Academic Affairs", quantity: 1, fulfilledQuantity: 1, neededBy: "2026-09-12", status: "delivered", owner: "Sam Patel", restricted: false, crossDepartment: false, history: [{ id: "sup-h-6", text: "Delivered and inventory deducted", at: "2026-09-12T14:00:00-07:00", actor: "Sam Patel" }] },
+  ],
+  notifications: [
+    { id: "NOT-51", audience: "administrator", type: "urgent", title: "Urgent sink repair awaits approval", detail: "WO-1048 · Student Commons", recordId: "WO-1048", recordType: "work_request", urgency: "urgent", read: false, createdAt: "2026-09-15T07:42:00-07:00" },
+    { id: "NOT-50", audience: "administrator", type: "response", title: "Event information is still needed", detail: "RSV-2206A · catering and insurance", recordId: "RSV-2206A", recordType: "event", urgency: "attention", read: false, createdAt: "2026-09-15T09:10:00-07:00" },
+    { id: "NOT-49", audience: "administrator", type: "delivery", title: "Supply request moved to backorder", detail: "SUP-314 · six copy-paper cases", recordId: "SUP-314", recordType: "supply", urgency: "attention", read: false, createdAt: "2026-09-15T08:50:00-07:00" },
+    { id: "NOT-48", audience: "staff", type: "overdue", title: "Door-closer repair is overdue", detail: "WO-1041 · assigned to Leo Martinez", recordId: "WO-1041", recordType: "work_request", urgency: "urgent", read: false, createdAt: "2026-09-15T08:30:00-07:00" },
+    { id: "NOT-47", audience: "staff", type: "status", title: "White Coat preparation updated", detail: "Room-layout task was completed", recordId: "WO-1047", recordType: "work_request", urgency: "routine", read: true, createdAt: "2026-09-15T08:10:00-07:00" },
+    { id: "NOT-46", audience: "requester", type: "response", title: "Facilities needs event information", detail: "Alumni reception · response due September 18", recordId: "RSV-2206A", recordType: "event", urgency: "attention", read: false, createdAt: "2026-09-15T09:10:00-07:00" },
+    { id: "NOT-45", audience: "requester", type: "delivery", title: "Supply request partially fulfilled", detail: "SUP-315 · two of five marker sets ready", recordId: "SUP-315", recordType: "supply", urgency: "attention", read: false, createdAt: "2026-09-15T08:40:00-07:00" },
   ],
   stock: [
     { id: "stock-chair", sku: "FUR-CHAIR-01", name: "Stacking chair", category: "Furniture", onHand: 176, reorderPoint: 40, target: 220, unit: "each", location: "Warehouse A", averageWeeklyUse: 68, lastCounted: "2026-09-14", ownerDepartment: "Facilities", campus: "Summerlin Campus", shareable: true, condition: "good", photoName: null },
