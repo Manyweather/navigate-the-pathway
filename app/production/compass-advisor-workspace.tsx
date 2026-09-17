@@ -7,6 +7,7 @@ import {
   allowedAdvisorWorkspaces,
   attentionTotal,
   careerRoadmap,
+  upcomingAdvisorVisits,
   type AdvisorAttentionReason,
   type AdvisorRelationship,
   type AdvisorWorkspaceKey,
@@ -627,6 +628,9 @@ export function CompassAdvisorWorkspace({
       new Date(appointment.startsAt).toDateString() === todayKey,
   );
   const openTasks = advisor.tasks.filter((task) => task.status === "open");
+  const agendaAppointments = todayAppointments.length
+    ? todayAppointments
+    : upcomingAdvisorVisits(sortedAppointments, new Date());
   const unreadMessages = advisor.messages.filter((item) => item.unread);
   const elevated = roles.some(
     (role) => role === "administrator" || role === "creator",
@@ -1656,10 +1660,15 @@ export function CompassAdvisorWorkspace({
                 <h3>Shared advising timeline</h3>
                 {allAppointments
                   .filter((item) => item.studentId === selectedStudent.id)
+                  .sort((left, right) =>
+                    (right.startsAt ? Date.parse(right.startsAt) : 0) -
+                    (left.startsAt ? Date.parse(left.startsAt) : 0),
+                  )
                   .map((item) => (
                     <button key={item.id} onClick={() => openSession(item.id)}>
                       <span>{dateTime(item.startsAt)}</span>
                       <strong>{item.serviceName}</strong>
+                      {item.subject ? <span>{item.subject}</span> : null}
                       <small>
                         {statusLabel(item.status)} · {item.providerName}
                       </small>
@@ -2805,10 +2814,7 @@ export function CompassAdvisorWorkspace({
               Full calendar
             </button>
           </div>
-          {(todayAppointments.length
-            ? todayAppointments
-            : sortedAppointments.slice(0, 3)
-          ).map((appointment) => (
+          {agendaAppointments.map((appointment) => (
             <button
               key={appointment.id}
               onClick={() => openSession(appointment.id)}
@@ -2823,8 +2829,8 @@ export function CompassAdvisorWorkspace({
               </i>
             </button>
           ))}
-          {!sortedAppointments.length ? (
-            <p>No appointments are currently in your {workspace} scope.</p>
+          {!agendaAppointments.length ? (
+            <p>No upcoming appointments are currently in your {workspace} scope.</p>
           ) : null}
         </section>
       </div>

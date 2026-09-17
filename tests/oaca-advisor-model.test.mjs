@@ -6,7 +6,29 @@ import {
   attentionTotal,
   careerRoadmap,
   isReportCellVisible,
+  upcomingAdvisorVisits,
 } from "../app/production/oaca-advisor-model.ts";
+
+test("next-up fallback excludes historical and cancelled visits and returns the nearest three", () => {
+  const now = new Date("2026-09-17T12:00:00Z");
+  const visit = (id, startsAt, status = "confirmed") => ({ id, startsAt, status });
+  const history = [
+    visit("history", "2026-07-09T12:00:00Z", "completed"),
+    visit("past-confirmed", "2026-09-16T12:00:00Z"),
+    visit("cancelled", "2026-09-18T12:00:00Z", "cancelled"),
+    visit("no-show", "2026-09-18T12:00:00Z", "no_show"),
+    visit("unscheduled", null),
+    visit("invalid", "invalid-date"),
+  ];
+  assert.deepEqual(upcomingAdvisorVisits(history, now), []);
+  assert.deepEqual(upcomingAdvisorVisits([
+    ...history,
+    visit("fourth", "2026-09-21T12:00:00Z"),
+    visit("third", "2026-09-20T12:00:00Z", "counterproposed"),
+    visit("first", "2026-09-18T12:00:00Z", "pending_approval"),
+    visit("second", "2026-09-19T12:00:00Z"),
+  ], now).map((item) => item.id), ["first", "second", "third"]);
+});
 
 test("advisor workspace capabilities stay service-specific", () => {
   assert.deepEqual(

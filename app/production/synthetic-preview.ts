@@ -2,6 +2,7 @@
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import type { PilotApiClient } from "./api-client";
+import { mergeMissingExamples, syntheticAdvisingHistories } from "./synthetic-advising-histories";
 import {
   appointmentDurationOptions,
   defaultAdvisorAvailabilitySettings,
@@ -1307,6 +1308,7 @@ function defaultSyntheticEventState(): SyntheticEventState {
 }
 
 function oacaBootstrap(assignedAvailability?: unknown) {
+  const histories = syntheticAdvisingHistories(isoAt);
   const events = oacaEvents();
   return {
     services: [
@@ -1565,12 +1567,14 @@ function oacaBootstrap(assignedAvailability?: unknown) {
         sandbox: true,
         requestOrigin: "student",
       },
+      ...histories.appointments,
     ],
     encounterRecords: [
+      ...histories.encounterRecords,
       {
         appointmentId: "appointment-completed-1",
         workingNotes:
-          "Reviewed the student's weekly study schedule and recent use of practice questions. The student identified that review was crowding out retrieval practice. We reorganized the week around two protected study blocks and a brief daily question set. Student was engaged and selected the next actions.",
+          "Taylor returned with the weekly calendar discussed at the previous visit and examples of both full and shortened practice routines. The shorter task remained useful after interruptions, but lecture review was again crowding out retrieval practice as the current block became busier. We compared the planned blocks with the time actually used and identified where optional review had expanded. Taylor selected two study periods to protect and practiced placing a brief question set before reviewing the relevant material. The student will record one correction after each attempt and bring the updated calendar to the Foundations check-in. At that visit, we will assess whether the sequence fits longer class days and whether the fallback task still supports restarting without extending the evening workload.",
         studentRecap:
           "For the next seven days, use a short retrieval-practice block before reviewing notes, protect two focused study periods, and bring the updated weekly plan to the next check-in.",
         structuredData: {
@@ -1591,7 +1595,7 @@ function oacaBootstrap(assignedAvailability?: unknown) {
       {
         appointmentId: "appointment-career-completed",
         workingNotes:
-          "Student reviewed CiM reflection results and identified two areas for further exploration. Discussed informational interviews and ways to compare day-to-day specialty practice without prematurely narrowing options.",
+          "Cameron returned with preliminary CiM reflections and the two specialty questions prepared at the previous career visit. The discussion connected an interest in continuity with observations from the earlier clinician conversation, while recognizing that different settings may offer different experiences within the same specialty. We reviewed the reflection material available so far and identified two areas for further exploration rather than treating the preliminary results as a final career choice. Cameron will complete the remaining interest-inventory prompts, review two specialty profiles, and refine the questions for another informational conversation. At the next visit, we will compare those examples with the original observations and check whether the planned exploration still fits the protected coursework schedule. The student remains open to multiple directions.",
         studentRecap:
           "Complete the CiM interest inventory and bring two specialty questions to the next visit.",
         structuredData: {
@@ -2135,9 +2139,11 @@ function advisorPreviewBootstrap(
       ...student,
       relationship,
       lastVisitAt:
-        visits.find((item) => item.status === "completed")?.startsAt || null,
+        visits.filter((item) => item.status === "completed" && item.startsAt)
+          .sort((left, right) => Date.parse(right.startsAt!) - Date.parse(left.startsAt!))[0]?.startsAt || null,
       nextVisitAt:
-        visits.find((item) => item.status === "confirmed")?.startsAt || null,
+        visits.filter((item) => item.status === "confirmed" && item.startsAt)
+          .sort((left, right) => Date.parse(left.startsAt!) - Date.parse(right.startsAt!))[0]?.startsAt || null,
       openMilestones: student.id === "student-1" ? 1 : 0,
       openTasks: state.tasks.filter(
         (item) => item.studentId === student.id && item.status === "open",
@@ -2848,7 +2854,8 @@ class SyntheticPilotApi {
       const saved = JSON.parse(
         window.localStorage.getItem(syntheticEncounterStorageKey) || "null",
       ) as SyntheticEncounterRecord[] | null;
-      if (Array.isArray(saved)) this.encounterRecords = saved;
+      if (Array.isArray(saved))
+        this.encounterRecords = mergeMissingExamples(saved, this.encounterRecords, (item) => item.appointmentId);
     } catch {
       this.encounterRecords = oacaBootstrap().encounterRecords;
     }
@@ -2898,7 +2905,7 @@ class SyntheticPilotApi {
           plans: Array.isArray(saved.plans) ? saved.plans : defaults.plans,
         };
         if (Array.isArray(saved.appointments))
-          this.appointments = saved.appointments;
+          this.appointments = mergeMissingExamples(saved.appointments, this.appointments, (item) => item.id);
       }
     } catch {
       this.advisorState = defaultSyntheticAdvisorState();
@@ -3342,6 +3349,7 @@ class SyntheticPilotApi {
       return clone({ ok: true, audited: true }) as T;
     }
     if (route === "/api/oaca/advisor/bootstrap") {
+      this.ensureEncountersLoaded();
       const requested =
         new URL(path, "https://preview.local").searchParams.get("workspace") ===
         "career"

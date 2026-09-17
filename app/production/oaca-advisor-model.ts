@@ -1,5 +1,12 @@
 export type AdvisorWorkspaceKey = "academic" | "career";
 
+export function upcomingAdvisorVisits<T extends { startsAt: string | null; status: string }>(visits: T[], now: Date) {
+  return visits.filter((visit) =>
+    visit.startsAt && Date.parse(visit.startsAt) >= now.getTime() &&
+    ["confirmed", "pending_approval", "counterproposed"].includes(visit.status),
+  ).sort((left, right) => Date.parse(left.startsAt!) - Date.parse(right.startsAt!)).slice(0, 3);
+}
+
 export type AdvisorRelationship =
   | "assigned"
   | "drop_in"
