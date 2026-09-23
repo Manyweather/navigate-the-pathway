@@ -208,7 +208,9 @@ export function PlatformAccess({ experience, children }: {
         return;
       }
       setAccountLoadFailed(true);
-      setMessage("The secure workspace update is not connected yet.");
+      setMessage(error instanceof PilotApiError
+        ? `${error.message} (${error.code})`
+        : error instanceof Error ? error.message : "The pilot service could not be reached.");
     }
   }, [api, recoveryMode, session]);
 
