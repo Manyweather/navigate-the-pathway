@@ -83,8 +83,9 @@ export function parseCsvHeader(text: string) {
 export function suggestImportMapping(dataset: OacaImportDataset, headers: string[]): OacaImportMapping {
   const normalized = headers.map((header) => ({ header, normalized: normalizeImportHeader(header) }));
   return Object.fromEntries(oacaImportDatasets[dataset].fields.map((field) => {
-    const candidates = [field.key, field.label, ...field.aliases].map(normalizeImportHeader);
-    const exact = normalized.find((item) => candidates.includes(item.normalized));
+    const penji: Record<string, string[]> = { source_session_id: ["Unique ID"], student_external_id: ["Student ID"], session_start_at: ["Scheduled Start At Date"], session_end_at: ["Scheduled End At Date"], session_created_at: ["Requested At Date"], cancelled_at: ["Cancelled At Date"], duration_minutes: ["Scheduled Length"], cohort_label: ["Agenda - Cohort"], format: ["Kind"] };
+    const candidates = [field.key, ...(dataset === "penji_sessions" ? penji[field.key] || [] : []), field.label, ...field.aliases].map(normalizeImportHeader);
+    const exact = candidates.map((candidate) => normalized.find((item) => item.normalized === candidate)).find(Boolean);
     return [field.key, exact?.header || null];
   }));
 }

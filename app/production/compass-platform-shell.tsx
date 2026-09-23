@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import type { PilotApiClient } from "./api-client";
 import { DemoWorkspaceTutorial, type DemoTutorialWorkspace } from "./demo-workspace-tutorial";
 import { experiences, experienceToWorkspace, type ExperienceKey, type ExperienceMembership, type WorkspaceKey } from "./platform-model";
@@ -46,7 +46,7 @@ function workspaceLabel(key: ExperienceKey) {
   return key === "oaca" ? "Compass" : key === "genesis" ? "Impact Workspace" : key === "facilities" ? "Facilities Dashboard" : "Navigate the Pathway";
 }
 
-export function WorkspaceSwitcher({ memberships, current, api, previewMode }: { memberships: ExperienceMembership[]; current: WorkspaceKey; api: PilotApiClient; previewMode: boolean }) {
+function WorkspaceSwitcherControl({ memberships, current, api, previewMode }: { memberships: ExperienceMembership[]; current: WorkspaceKey; api: PilotApiClient; previewMode: boolean }) {
   const active = memberships.filter((item) => item.status === "active" && item.featureEnabled);
   const currentExperience = active.find((item) => experienceToWorkspace[item.experienceKey] === current);
   const pathwayOnly = active.length === 1 && currentExperience?.experienceKey === "pathway" && currentExperience.roles.includes("student");
@@ -90,4 +90,12 @@ export function CreatorPreviewBanner({ persona, onPersona, onExit, scope = "crea
     <DemoWorkspaceTutorial key={`${tutorialWorkspace}:${persona}`} workspace={tutorialWorkspace} persona={persona} roleOptions={scope === "impact" ? IMPACT_DEMO_PERSONAS : scope === "facilities" ? FACILITIES_DEMO_PERSONAS : undefined} onPersona={scope === "impact" || scope === "facilities" ? changePersona : undefined} />
     <button className="text-button" onClick={onExit}>{scope === "creator" ? "Exit preview" : "Leave demo"}</button>
   </aside>;
+}
+
+const OperationsDialog = lazy(()=>import("./pilot-operations-panel").then(m=>({default:m.OperationsDialog})));
+export function WorkspaceSwitcher(props: { memberships: ExperienceMembership[]; current: WorkspaceKey; api: PilotApiClient; previewMode: boolean }) {
+  const [open,setOpen]=useState(false);
+  const creator=props.memberships.some(m=>m.roles.includes("creator"));
+  const staff=props.memberships.some(m=>m.roles.some(r=>!["student","requester"].includes(r)));
+  return <><WorkspaceSwitcherControl {...props}/><button className="text-button" onClick={()=>setOpen(true)}>Support / Request a Feature</button>{creator?<button className="text-button" onClick={()=>setOpen(true)}>Creator operations</button>:null}{open?<Suspense fallback={<span role="status">Opening support…</span>}><OperationsDialog api={props.api} workspace={props.current} creator={creator} staff={staff} previewMode={props.previewMode} onClose={()=>setOpen(false)}/></Suspense>:null}</>;
 }

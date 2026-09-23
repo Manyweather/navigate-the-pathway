@@ -24,6 +24,9 @@ export type OacaImportBatch = {
   periodStartsOn: string | null;
   periodEndsOn: string | null;
   containsRealStudentData: boolean;
+  datasetMode?: "demo" | "live";
+  timezone?: string;
+  narrativeProcessing?: boolean;
   sourceHeaders: string[];
   columnMapping: OacaImportMapping;
   status: string;
@@ -49,7 +52,7 @@ export type OacaAggregateAnalytics = {
   cohorts?: Array<{ cohortLabel: string; studentCount: number; sessions: number | null; hours: number | null; noShowRate: number | null; suppressed: boolean }>;
 };
 
-function MappingEditor({ batch, api, reload }: { batch: OacaImportBatch; api: PilotApiClient; reload: () => Promise<void> }) {
+export function MappingEditor({ batch, api, reload }: { batch: OacaImportBatch; api: PilotApiClient; reload: () => Promise<void> }) {
   const suggested = useMemo(() => ({ ...suggestImportMapping(batch.datasetType, batch.sourceHeaders), ...batch.columnMapping }), [batch]);
   const [mapping, setMapping] = useState<OacaImportMapping>(suggested);
   const [message, setMessage] = useState("");

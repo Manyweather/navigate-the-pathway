@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { RosieGuide } from "../components/rosie-guide";
-import { PilotApiClient } from "./api-client";
+import { PilotApiClient, PilotApiError } from "./api-client";
 import { ConfigurationRequired, MfaGate, PasswordRecovery, PasswordRecoveryProblem, SignIn } from "./production-pilot-app";
 import { parseRecoveryCallback } from "./auth-recovery";
+import { clearStoredPreview, hasAuthenticationCallback } from "./auth-intent";
 import { getSupabaseBrowserClient, loadProductionConfiguration } from "./supabase-client";
 import { staffMfaRoles, type ExperienceKey, type ExperienceMembership } from "./platform-model";
 import type { AuthorizationContext } from "./types";
@@ -63,11 +64,18 @@ export function PlatformAccess({ experience, children }: {
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [authInitializationFailed, setAuthInitializationFailed] = useState(false);
+  const [accessPending, setAccessPending] = useState(false);
   const [mfaVerified, setMfaVerified] = useState(false);
   const api = useMemo(() => previewMode ? syntheticPreviewApi : supabase ? new PilotApiClient(supabase, undefined, experience) : null, [experience, previewMode, supabase]);
 
   useEffect(() => {
     const task = window.setTimeout(() => {
+      if (hasAuthenticationCallback(window.location.search, window.location.hash)) {
+        clearStoredPreview(window.localStorage);
+        window.location.replace(`/app/auth/callback${window.location.search}${window.location.hash}`);
+        return;
+      }
       const query = new URLSearchParams(window.location.search);
       const requestedPreview = query.get("preview");
       const requestedDemoRole = query.get("demo");
@@ -149,7 +157,12 @@ export function PlatformAccess({ experience, children }: {
   useEffect(() => {
     if (!supabase || previewMode) return;
     let active = true;
-    const readinessTask = window.setTimeout(() => { if (active) setAuthReady(false); }, 0);
+    const readinessTask = window.setTimeout(() => {
+      if (active) {
+        setAuthReady(true);
+        setAuthInitializationFailed(true);
+      }
+    }, 15_000);
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
       setSession(nextSession);
@@ -165,13 +178,14 @@ export function PlatformAccess({ experience, children }: {
         if (active) { setSession(null); setAuthReady(true); }
         return;
       }
-      const initialized = await supabase.auth.initialize();
       const current = await supabase.auth.getSession();
       if (!active) return;
+      window.clearTimeout(readinessTask);
       const nextSession = current.data.session;
       setSession(nextSession);
       setAuthReady(true);
-      if (recoveryMode && (initialized.error || current.error || !nextSession)) {
+      if (current.error) setAuthInitializationFailed(true);
+      if (recoveryMode && (current.error || !nextSession)) {
         setRecoveryMode(false);
         setRecoveryError("Compass could not validate a recovery session from that link. This does not necessarily mean the email was old; request one new email and use only its latest reset link.");
       }
@@ -183,10 +197,16 @@ export function PlatformAccess({ experience, children }: {
     if (!api || !session || recoveryMode) return;
     setMessage("Opening your Navigate account…");
     setAccountLoadFailed(false);
+    setAccessPending(false);
     try {
       const value = await api.request<{ context: AuthorizationContext; memberships: ExperienceMembership[] }>("/api/platform/experiences");
       setContext(value.context); setMemberships(value.memberships); setMessage("");
-    } catch {
+    } catch (error) {
+      if (error instanceof PilotApiError && error.code === "access_pending") {
+        setAccessPending(true);
+        setMessage(error.message);
+        return;
+      }
       setAccountLoadFailed(true);
       setMessage("The secure workspace update is not connected yet.");
     }
@@ -214,10 +234,8 @@ export function PlatformAccess({ experience, children }: {
     if (previewPersona === "impact_student" && experience === "oaca") return <PreviewWorkspaceRedirect href="/app/compass/impact" />;
     if (experience && !membership) return <main className="production-auth"><section className="production-auth-card"><h1>Preview unavailable</h1><a className="secondary-button" href="/app">Return to Navigate</a></section></main>;
     const exitPreview = async () => {
-      window.localStorage.removeItem(SYNTHETIC_PREVIEW_KEY);
-      window.localStorage.removeItem(SYNTHETIC_PERSONA_KEY);
-      window.localStorage.removeItem(SYNTHETIC_PREVIEW_SCOPE_KEY);
-      window.location.assign("/app");
+      clearStoredPreview(window.localStorage);
+      window.location.assign("/app?signin=1");
     };
     return <>{children({ session: syntheticPreviewSession, supabase: syntheticPreviewSupabase, api: syntheticPreviewApi, context: previewContext, memberships: previewMemberships, previewMode: true, previewScope, previewPersona: scopedPersona, setPreviewPersona: setSyntheticPreviewPersona, signOut: exitPreview })}</>;
   }
@@ -225,6 +243,7 @@ export function PlatformAccess({ experience, children }: {
   if (configured === "error") return <ConfigurationRequired />;
   if (!supabase || configured === "loading") return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate" title="Connecting your secure account…" /></section></main>;
   if (recoveryError) return <PasswordRecoveryProblem supabase={supabase} detail={recoveryError} />;
+  if (authInitializationFailed) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Compass" title="Secure sign-in did not finish." body="The identity service did not respond within 15 seconds." priority /><button className="primary-button" onClick={() => window.location.reload()}>Retry</button><a className="secondary-button" href="/app?signin=1">Return to sign in</a></section></main>;
   if (!authReady) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Compass" title="Validating your secure link…" /></section></main>;
   if (!session) return <SignIn supabase={supabase} />;
   if (recoveryMode) return <PasswordRecovery supabase={supabase} onComplete={() => {
@@ -234,6 +253,7 @@ export function PlatformAccess({ experience, children }: {
     setContext(null);
     setMessage("Opening your Navigate account…");
   }} />;
+  if (accessPending) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Roseman access" title="Your sign-in is verified and access is pending." body="A Compass Creator must match this Roseman identity to one approved staff roster entry before any workspace data is available." priority /><p className="form-message" role="status">{message}</p><button className="secondary-button" onClick={() => void supabase.auth.signOut()}>Sign out</button></section></main>;
   if (accountLoadFailed) return <main className="production-auth"><section className="production-auth-card">
     <RosieGuide pose="idle" compact eyebrow="Account connected" title="Your password was accepted." body="The expanded secure workspace is still being connected to this pilot. You can explore every new dashboard now with fictional records." priority />
     <a className="preview-entry" href="/app?preview=creator"><span><strong>Open the Creator preview</strong><small>Compass, Navigate the Pathway, and Impact Studio with synthetic data only.</small></span><span aria-hidden="true">→</span></a>
@@ -244,7 +264,7 @@ export function PlatformAccess({ experience, children }: {
 
   const membership = experience ? memberships.find((item) => item.experienceKey === experience && item.status === "active" && item.featureEnabled) : null;
   if (experience && !membership) return <main className="production-auth"><section className="production-auth-card"><p className="kicker">Membership required</p><h1>This experience is not assigned to your account.</h1><p>Return to the Navigate hub or ask an administrator to review your membership.</p><a className="secondary-button" href="/app">Return to Navigate</a></section></main>;
-  const needsMfa = membership?.roles.some((role) => staffMfaRoles.has(role)) && context.aal !== "aal2" && !mfaVerified;
+  const needsMfa = membership?.roles.some((role) => staffMfaRoles.has(role)) && !context.mfaSatisfied && context.aal !== "aal2" && !mfaVerified;
   if (needsMfa) return <MfaGate supabase={supabase} onVerified={() => { setMfaVerified(true); void load(); }} />;
 
   const signOut = async () => { try { await api.request("/api/activity/signout", { method: "POST", body: {} }); } finally { await supabase.auth.signOut(); } };

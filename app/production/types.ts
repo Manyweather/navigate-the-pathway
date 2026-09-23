@@ -16,6 +16,9 @@ export type AuthorizationContext = {
   activeCohortId: string | null;
   capabilities: string[];
   aal: "aal1" | "aal2";
+  authMethod?: string;
+  ssoProviderId?: string | null;
+  mfaSatisfied?: boolean;
   environment: "staging" | "production";
   principalType?: "creator" | "principal_investigator" | null;
   principalAcknowledged?: boolean;

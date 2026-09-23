@@ -320,7 +320,7 @@ test("phone-first pilot screens include the required privacy and approval guardr
     readFile(new URL("../app/production/compass-platform-shell.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/asset-url.ts", import.meta.url), "utf8"),
   ]);
-  const signIn = signInSource.slice(signInSource.indexOf("export function SignIn"), signInSource.indexOf("export function MfaGate"));
+  const signIn = signInSource.slice(signInSource.indexOf("export function SignIn"), signInSource.indexOf("export function PasswordRecovery"));
   assert.doesNotMatch(signIn, /One Roseman account|Three experiences\. One sign-in\.|Your roles determine which separate workspaces appear/);
   assert.match(signIn, /Compass/);
   assert.doesNotMatch(signIn, /Available Roseman experiences|Navigate the Pathway<|Impact Studio</);
@@ -328,8 +328,10 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.doesNotMatch(signIn, /GENESIS/);
   assert.doesNotMatch(signIn, /ExperienceGraphic/);
   assert.match(signIn, /Roseman Microsoft SSO/);
-  assert.match(signIn, /Coming soon/);
-  assert.match(signIn, /Sign-in is taking too long/);
+  assert.match(signIn, /Staff pilot/);
+  assert.match(signIn, /sign-in is taking too long/i);
+  assert.match(signIn, /\/app\/auth\/callback/);
+  assert.doesNotMatch(signIn, /signInWithPassword|resetPasswordForEmail/);
   assert.doesNotMatch(signIn, /navigate-pathway-mark/);
   assert.match(signIn, /compass-emblem-v2\.png/);
   assert.match(signIn, /Roseman University student support/);
@@ -343,7 +345,7 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.match(oaca, /Protected staff working notes/);
   assert.match(oaca, /student-facing recap/i);
   assert.match(oaca, /Secure data imports/);
-  assert.match(oaca, /OacaImportCenter/);
+  assert.match(oaca, /OacaSessionCenter/);
   assert.match(oaca, /Request an Appointment/);
   assert.match(oaca, /Reason for visit/);
   assert.match(oaca, /General advising/);

@@ -1,4 +1,5 @@
 import type { AuthorizationContext } from "../app/production/types";
+import { normalizeSessionCsv, type SessionImportOptions } from "../app/production/oaca-session-import";
 import type {
   ExperienceKey,
   ExperienceMembership,
@@ -17,6 +18,7 @@ import {
 
 type ExperienceServices = WorkspaceServices & {
   context(): Promise<AuthorizationContext>;
+  readImportFile?(path: string): Promise<string>;
 };
 
 async function memberships(services: ExperienceServices) {
@@ -736,6 +738,10 @@ async function oacaBootstrap(
       periodStartsOn: item.period_starts_on,
       periodEndsOn: item.period_ends_on,
       containsRealStudentData: item.contains_real_student_data,
+      datasetMode: item.dataset_mode || "live",
+      timezone: item.import_timezone || "America/Los_Angeles",
+      narrativeProcessing: item.narrative_processing || false,
+      themeRuleVersion: item.theme_rule_version,
       sourceHeaders: item.source_headers || [],
       columnMapping: item.column_mapping || {},
       status: item.status,
@@ -1717,6 +1723,29 @@ export async function experienceRoute(
           payload: await workspaceBody(request),
         }),
       );
+    }
+    if (url.pathname === "/api/oaca/imports/retry" && request.method === "POST") {
+      requireCapability(membership, "oaca.import.manage");
+      return workspaceJson(await services.rpc("oaca_retry_session_import", { payload: await workspaceBody(request) }));
+    }
+    if (url.pathname === "/api/oaca/imports/preview" && request.method === "POST") {
+      requireCapability(membership, "oaca.import.manage");
+      const metadata = await services.rpc<SessionImportOptions & { storagePath: string; originalName: string }>("oaca_import_preview_source", { payload: await workspaceBody(request) });
+      if (!services.readImportFile || !metadata.originalName.toLowerCase().endsWith(".csv")) throw new WorkspaceError(400, "Export session history as CSV before previewing.");
+      try {
+        const preview = normalizeSessionCsv(await services.readImportFile(metadata.storagePath), metadata);
+        // No student keys or narratives are sent in the aggregate preview response.
+        return workspaceJson({ summary: preview.summary, issues: preview.issues, mapping: preview.mapping, headers: preview.headers });
+      } catch { throw new WorkspaceError(400, "The CSV could not be interpreted. Check its structure and timezone."); }
+    }
+    if (url.pathname === "/api/oaca/imports/narratives" && request.method === "POST") {
+      return workspaceJson(await services.rpc("oaca_imported_narratives", { payload: await workspaceBody(request) }));
+    }
+    if (url.pathname === "/api/oaca/imports/narrative-list" && request.method === "POST") {
+      return workspaceJson(await services.rpc("oaca_narrative_review_list", { payload: await workspaceBody(request) }));
+    }
+    if (url.pathname === "/api/oaca/imports/themes" && request.method === "POST") {
+      return workspaceJson(await services.rpc("oaca_review_session_themes", { payload: await workspaceBody(request) }));
     }
     if (
       url.pathname === "/api/oaca/appointments/on-behalf" &&

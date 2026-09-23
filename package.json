@@ -20,7 +20,8 @@
     "pilot-api:deploy:staging": "wrangler deploy -c cloudflare/wrangler.pilot.jsonc --env staging",
     "pilot-api:deploy:production": "wrangler deploy -c cloudflare/wrangler.pilot.jsonc --env production",
     "pilot-api:types": "wrangler types cloudflare/worker-configuration.pilot.d.ts -c cloudflare/wrangler.pilot.jsonc --env staging",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "creator:worker": "node --import tsx scripts/creator-worker.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
@@ -36,6 +37,7 @@
     "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "9.39.4",
     "@next/eslint-plugin-next": "16.2.6",
+    "@openai/codex-sdk": "^0.155.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/qrcode": "^1.5.6",
@@ -50,6 +52,7 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "16.4.0",
     "react-server-dom-webpack": "19.2.6",
+    "supabase": "2.117.0",
     "tailwindcss": "4.2.1",
     "tsx": "4.20.6",
     "typescript": "5.9.3",

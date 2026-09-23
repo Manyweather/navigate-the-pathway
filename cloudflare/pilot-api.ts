@@ -1,8 +1,11 @@
+import { deliverPilotEmail } from "./pilot-email";
+import { pilotOperationsRoute, workerRequest } from "./pilot-operations-api";
 import { modeAllowsPath, principalMode, surveysForAudience, type DashboardMode } from "../app/production/dashboard-mode";
 import { workspaceRoute, workspaceScheduled, WorkspaceError, type WorkspaceServices } from "./workspace-api";
 import { calendarPublicRoute, type CalendarServices } from "./workspace-calendars";
 import { experienceRoute } from "./experience-api";
 import { normalizePenjiEventExports } from "../app/production/oaca-event-model";
+import { boundedCsvText, processSessionImport } from "./oaca-session-processor";
 import type { AuthorizationContext as ProductionAuthorizationContext } from "../app/production/types";
 
 type AuthenticatedUser = {
@@ -11,6 +14,9 @@ type AuthenticatedUser = {
   email: string;
   token: string;
   aal: "aal1" | "aal2";
+  authMethod: string;
+  ssoProviderId: string | null;
+  mfaSatisfied: boolean;
   sessionId: string;
   mode?: DashboardMode;
 };
@@ -25,6 +31,9 @@ type AuthorizationContext = {
   roles: string[];
   capabilities: string[];
   aal: "aal1" | "aal2";
+  authMethod?: string;
+  ssoProviderId?: string | null;
+  mfaSatisfied?: boolean;
   activeOrganizationId: string | null;
   activeProgramId: string | null;
   activeCohortId?: string | null;
@@ -65,10 +74,18 @@ function tokenClaims(token: string) {
   try {
     const payload = token.split(".")[1];
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
-    return JSON.parse(atob(normalized)) as { aal?: "aal1" | "aal2"; session_id?: string };
+    return JSON.parse(atob(normalized)) as { aal?: "aal1" | "aal2"; session_id?: string; amr?: Array<{ method?: string; provider?: string }> };
   } catch {
     return {};
   }
+}
+
+function authenticationFacts(claims: { aal?: "aal1" | "aal2"; amr?: Array<{ method?: string; provider?: string }> }, config: { trustedProviderId?: string; trustRosemanSamlAsMfa?: boolean }) {
+  const methodRecord = [...(claims.amr || [])].reverse().find((entry) => entry.method) || {};
+  const authMethod = methodRecord.method || "unknown";
+  const ssoProviderId = authMethod === "sso/saml" ? methodRecord.provider || null : null;
+  const trustedSaml = Boolean(config.trustRosemanSamlAsMfa && config.trustedProviderId && ssoProviderId === config.trustedProviderId);
+  return { authMethod, ssoProviderId, mfaSatisfied: claims.aal === "aal2" || trustedSaml };
 }
 
 async function authenticate(request: Request, env: Env): Promise<AuthenticatedUser> {
@@ -79,9 +96,13 @@ async function authenticate(request: Request, env: Env): Promise<AuthenticatedUs
     headers: { apikey: env.SUPABASE_ANON_KEY, authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new HttpError(401, "Your session has ended. Sign in again.", "invalid_session");
-  const user = await response.json() as { id: string; email?: string };
+  const user = await response.json() as { id: string; email?: string; user_metadata?: { display_name?: string; full_name?: string; name?: string } };
   const claims = tokenClaims(token);
-  return { id: user.id, authUserId: user.id, email: user.email || "", token, aal: claims.aal || "aal1", sessionId: claims.session_id || user.id };
+  const config = env as unknown as Record<string, string | undefined>;
+  const assurance = authenticationFacts(claims, { trustedProviderId: config.ROSEMAN_SSO_PROVIDER_ID, trustRosemanSamlAsMfa: config.TRUST_ROSEMAN_SAML_AS_MFA === "true" });
+  const authenticated = { id: user.id, authUserId: user.id, email: (user.email || "").toLowerCase(), token, aal: claims.aal || "aal1", ...assurance, sessionId: claims.session_id || user.id };
+  (authenticated as AuthenticatedUser & { displayName?: string }).displayName = user.user_metadata?.display_name || user.user_metadata?.full_name || user.user_metadata?.name;
+  return authenticated;
 }
 
 async function rpc<T>(env: Env, token: string, fn: string, body: unknown = {}, mode?: string): Promise<T> {
@@ -109,11 +130,14 @@ async function rpc<T>(env: Env, token: string, fn: string, body: unknown = {}, m
 async function authorization(env: Env, user: AuthenticatedUser) {
   const context = await rpc<AuthorizationContext>(env, user.token, "pilot_authorization_context");
   if (context.userId) user.id = context.userId;
+  context.authMethod = user.authMethod;
+  context.ssoProviderId = user.ssoProviderId;
+  context.mfaSatisfied = user.mfaSatisfied;
   return context;
 }
 
 function requireStaffMfa(user: AuthenticatedUser) {
-  if (user.aal !== "aal2") throw new HttpError(403, "Verify your second factor to continue.", "mfa_required");
+  if (!(user.mfaSatisfied ?? user.aal === "aal2")) throw new HttpError(403, "Verify your second factor to continue.", "mfa_required");
 }
 
 function requireRole(context: AuthorizationContext, role: string) {
@@ -263,7 +287,7 @@ async function privatePlatformFile(env: Env, storagePath: string) {
   const safePath=storagePath.split("/").map(encodeURIComponent).join("/");
   const response=await fetch(`${env.SUPABASE_URL}/storage/v1/object/authenticated/platform-files/${safePath}`,{headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`}});
   if(!response.ok)throw new Error("private_file_unavailable");
-  return response.text();
+  return boundedCsvText(response);
 }
 
 async function processOacaEventImports(env: Env) {
@@ -298,6 +322,83 @@ async function canonicalizeAuthenticatedUser(env: Env, user: AuthenticatedUser) 
   const identities = await optionalServiceRest<Array<{ canonical_user_id: string }>>(env, `account_auth_identities?auth_user_id=eq.${encodeURIComponent(user.authUserId)}&select=canonical_user_id&limit=1`, []);
   if (identities[0]?.canonical_user_id) user.id = identities[0].canonical_user_id;
   return user;
+}
+
+async function prepareAuthenticatedUser(env: Env, user: AuthenticatedUser) {
+  const config = env as unknown as Record<string, string | undefined>;
+  const trustedProvider = config.ROSEMAN_SSO_PROVIDER_ID || "";
+  const breakGlassEmail = (config.BREAK_GLASS_CREATOR_EMAIL || "").trim().toLowerCase();
+  if (!trustedProvider) return canonicalizeAuthenticatedUser(env, user);
+
+  if (user.authMethod === "sso/saml") {
+    if (user.ssoProviderId !== trustedProvider) {
+      await optionalServiceMutation(env, "audit_events", { method: "POST", body: JSON.stringify({ actor_id: user.authUserId, event_type: "sso_provider_rejected", subject_type: "auth_user", subject_id: user.authUserId, metadata: { providerId: user.ssoProviderId } }) });
+      throw new HttpError(403, "This identity provider is not approved for Compass staff access.", "sso_provider_not_allowed");
+    }
+    const displayName = (user as AuthenticatedUser & { displayName?: string }).displayName || user.email.split("@")[0] || "Roseman staff member";
+    await serviceRest(env, "pilot_auth_configuration?on_conflict=singleton", {
+      method: "POST",
+      headers: { prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ singleton: true, roseman_sso_provider_id: trustedProvider, trust_roseman_saml_as_mfa: config.TRUST_ROSEMAN_SAML_AS_MFA === "true", updated_at: new Date().toISOString() }),
+    });
+    const seen = await serviceRest<Array<{ auth_user_id: string }>>(env, `pilot_pending_sso_identities?auth_user_id=eq.${encodeURIComponent(user.authUserId)}&select=auth_user_id&limit=1`);
+    if (seen.length) {
+      await serviceRest(env, `pilot_pending_sso_identities?auth_user_id=eq.${encodeURIComponent(user.authUserId)}`, { method: "PATCH", body: JSON.stringify({ email: user.email, sso_provider_id: trustedProvider, display_name: displayName, last_seen_at: new Date().toISOString() }) });
+    } else {
+      await serviceRest(env, "pilot_pending_sso_identities", { method: "POST", body: JSON.stringify({ auth_user_id: user.authUserId, email: user.email, sso_provider_id: trustedProvider, display_name: displayName }) });
+    }
+  } else if (!breakGlassEmail || user.email !== breakGlassEmail) {
+    await optionalServiceMutation(env, "audit_events", { method: "POST", body: JSON.stringify({ actor_id: user.authUserId, event_type: "creator_recovery_rejected", subject_type: "auth_user", subject_id: user.authUserId, metadata: { authMethod: user.authMethod } }) });
+    throw new HttpError(403, "This sign-in method is not available for Compass staff access.", "sign_in_method_not_allowed");
+  }
+
+  await canonicalizeAuthenticatedUser(env, user);
+  const profiles = await optionalServiceRest<Array<{ user_id: string }>>(env, `profiles?user_id=eq.${encodeURIComponent(user.id)}&status=in.(active,invited)&select=user_id&limit=1`, []);
+  if (!profiles.length) {
+    if (user.authMethod === "sso/saml") throw new HttpError(403, "Your Roseman sign-in is verified and awaiting Creator approval against the staff roster.", "access_pending");
+    throw new HttpError(403, "Creator recovery is not configured for this identity.", "creator_recovery_unavailable");
+  }
+  if (user.authMethod !== "sso/saml") {
+    await optionalServiceMutation(env, "audit_events", { method: "POST", body: JSON.stringify({ actor_id: user.id, event_type: user.mfaSatisfied ? "creator_recovery_verified" : "creator_recovery_started", subject_type: "user_session", subject_id: user.sessionId, metadata: { authMethod: user.authMethod } }) });
+  }
+  return user;
+}
+
+async function ssoAccessOverview(env: Env, user: AuthenticatedUser, context: AuthorizationContext) {
+  requireStaffMfa(user); requireCapability(context, "platform.creator"); requireCapability(context, "accounts.manage");
+  if (!context.activeOrganizationId) throw new HttpError(409, "Choose an active organization.", "active_organization_required");
+  const [pending, roster] = await Promise.all([
+    serviceRest(env, "pilot_pending_sso_identities?select=auth_user_id,email,sso_provider_id,display_name,status,matched_roster_entry_id,first_seen_at,last_seen_at,reviewed_at&order=last_seen_at.desc"),
+    serviceRest(env, `pilot_staff_roster_entries?organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&select=id,email,display_name,roles,workspace_roles,status,source_id,provenance,approved_at,updated_at&order=display_name`),
+  ]);
+  return { pending, roster };
+}
+
+async function upsertSsoRosterEntry(request: Request, env: Env, user: AuthenticatedUser, context: AuthorizationContext) {
+  requireStaffMfa(user); requireCapability(context, "platform.creator"); requireCapability(context, "accounts.manage");
+  if (!context.activeOrganizationId) throw new HttpError(409, "Choose an active organization.", "active_organization_required");
+  const body = await readBody(request);
+  const email = String(body.email || "").trim().toLowerCase();
+  const displayName = String(body.displayName || "").trim();
+  const roles = Array.isArray(body.roles) ? [...new Set(body.roles.map(String))] : [];
+  const workspaceRoles = body.workspaceRoles && typeof body.workspaceRoles === "object" ? body.workspaceRoles : { oaca: ["advisor"] };
+  const allowedRoles = new Set(["advisor", "administrator", "faculty", "staff", "creator"]);
+  if (!email.endsWith("@roseman.edu") || !displayName || !roles.length || roles.some((role) => !allowedRoles.has(role))) throw new HttpError(400, "Enter one Roseman email, display name, and approved staff role.", "invalid_roster_entry");
+  const rows = await serviceRest(env, "pilot_staff_roster_entries?on_conflict=organization_id,email&select=id,email,display_name,roles,workspace_roles,status", {
+    method: "POST",
+    headers: { prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify({ organization_id: context.activeOrganizationId, program_id: context.activeProgramId, cohort_id: context.activeCohortId || null, email, display_name: displayName, roles, workspace_roles: workspaceRoles, status: "approved", source_id: body.sourceId || null, provenance: { source: "creator_roster", ...(typeof body.provenance === "object" && body.provenance ? body.provenance : {}) }, approved_by: user.id, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+  });
+  return rows;
+}
+
+async function approveSsoIdentity(request: Request, env: Env, user: AuthenticatedUser, context: AuthorizationContext) {
+  requireStaffMfa(user); requireCapability(context, "platform.creator"); requireCapability(context, "accounts.manage");
+  const body = await readBody(request);
+  const pendingUserId = String(body.pendingUserId || "");
+  const rosterEntryId = String(body.rosterEntryId || "");
+  if (![pendingUserId, rosterEntryId].every((value) => /^[0-9a-f-]{36}$/i.test(value))) throw new HttpError(400, "Choose one pending identity and one roster entry.", "invalid_sso_approval");
+  return serviceRest(env, "rpc/pilot_approve_sso_identity", { method: "POST", body: JSON.stringify({ pending_user_id: pendingUserId, roster_entry_id: rosterEntryId, actor_user_id: user.id }) });
 }
 
 type AccessEventType = "user_session_opened" | "user_session_heartbeat" | "user_session_signed_out";
@@ -1697,7 +1798,7 @@ async function mergeAccountIdentities(request: Request, env: Env, user: Authenti
   if (!/^[0-9a-f-]{36}$/i.test(primaryUserId) || !/^[0-9a-f-]{36}$/i.test(secondaryUserId)) throw new HttpError(400, "Choose two valid accounts.", "invalid_merge_accounts");
   const backupReference = typeof body.backupReference === "string" ? body.backupReference.trim() : "";
   if (backupReference.length < 8) throw new HttpError(400, "Enter the verified recoverable backup reference.", "backup_required");
-  return serviceRest<Record<string, unknown>>(env, "rpc/pathway_merge_accounts", {
+  return serviceRest<Record<string, unknown>>(env, "rpc/pilot_merge_canonical_accounts", {
     method: "POST",
     headers: { prefer: "return=representation" },
     body: JSON.stringify({ primary_user_id: primaryUserId, secondary_user_id: secondaryUserId, actor_user_id: user.id, backup_reference: backupReference }),
@@ -1711,10 +1812,14 @@ async function route(request: Request, env: Env) {
   if (url.pathname === "/api/webhooks/oaca/sms" && request.method === "POST") return json(await receiveOacaSmsWebhook(request, env));
   if (url.pathname === "/api/webhooks/oaca/delivery" && request.method === "POST") return json(await receiveNotificationDeliveryWebhook(request, env));
 
+  if (url.pathname === "/api/pilot-worker" && request.method === "POST") {
+    const config = env as unknown as Record<string,string>;
+    return workerRequest(request,{token:config.PILOT_WORKER_TOKEN,organizationId:config.PILOT_WORKER_ORGANIZATION_ID},{rest:(path,options)=>serviceRest(env,path,options)});
+  }
   const calendarPublic = await calendarPublicRoute(request, calendarServices(env));
   if (calendarPublic) return calendarPublic;
 
-  const user = await canonicalizeAuthenticatedUser(env, await authenticate(request, env));
+  const user = await prepareAuthenticatedUser(env, await authenticate(request, env));
   const requestedMode = request.headers.get("x-navigate-mode");
   if (requestedMode) {
     const context=await enrichPrincipalContext(env,user,await authorization(env,user));
@@ -1723,6 +1828,10 @@ async function route(request: Request, env: Env) {
     user.mode=requestedMode as DashboardMode;
     if(user.mode!=="student")requireStaffMfa(user);
     if(!modeAllowsPath(user.mode,url.pathname,request.method))throw new HttpError(403,"This feature is not available in your current dashboard. Switch to an assigned role that includes it.","dashboard_mode_required");
+  }
+  if (url.pathname.startsWith("/api/pilot/")) {
+    const response=await pilotOperationsRoute(request,workspaceServices(env,user));
+    if(response)return response;
   }
   if (url.pathname.startsWith("/api/platform/") || url.pathname.startsWith("/api/oaca/") || url.pathname.startsWith("/api/genesis/")) {
     const response = await experienceRoute(request, experienceServices(env, user));
@@ -1813,6 +1922,18 @@ async function route(request: Request, env: Env) {
   }
 
   if(url.pathname==="/api/admin/accounts" && request.method==="POST") return json(await manuallyCreateAccount(request,env,user,await enrichPrincipalContext(env,user,await authorization(env,user))));
+  if (url.pathname === "/api/admin/sso-access" && request.method === "GET") {
+    const context = await enrichPrincipalContext(env, user, await authorization(env, user));
+    return json(await ssoAccessOverview(env, user, context));
+  }
+  if (url.pathname === "/api/admin/sso-access/roster" && request.method === "POST") {
+    const context = await enrichPrincipalContext(env, user, await authorization(env, user));
+    return json(await upsertSsoRosterEntry(request, env, user, context));
+  }
+  if (url.pathname === "/api/admin/sso-access/approve" && request.method === "POST") {
+    const context = await enrichPrincipalContext(env, user, await authorization(env, user));
+    return json(await approveSsoIdentity(request, env, user, context));
+  }
   if (url.pathname === "/api/admin/invitations" && request.method === "POST") {
     const context = await authorization(env, user);
     return inviteAccount(request, env, user, context);
@@ -1907,12 +2028,16 @@ async function route(request: Request, env: Env) {
 
 export default {
   async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(Promise.all([
+    ctx.waitUntil(Promise.allSettled([
+      deliverPilotEmail((()=>{const c=env as unknown as Record<string,string>;return {enabled:c.PILOT_EMAIL_ENABLED,endpoint:c.AZURE_EMAIL_ENDPOINT,key:c.AZURE_EMAIL_KEY,sender:c.AZURE_EMAIL_SENDER,allowlist:c.PILOT_EMAIL_ALLOWLIST,appUrl:c.PILOT_APP_URL};})(),{rest:(path,options)=>serviceRest(env,path,options)}),
       workspaceScheduled(calendarServices(env)),
       serviceRest(env,"rpc/oaca_enqueue_due_event_notifications",{method:"POST",body:"{}"}),
       serviceRest(env,"rpc/oaca_enqueue_event_coordinator_digests",{method:"POST",body:"{}"}),
       processOacaEventImports(env),
-    ]).then(()=>undefined));
+      processSessionImport({ rest: (path, options) => serviceRest(env, path, options), readFile: (path) => privatePlatformFile(env, path) }),
+    ]).then((results) => {
+      results.forEach((result, task) => { if (result.status === "rejected") console.warn(JSON.stringify({ event: "scheduled_task_failed", task })); });
+    }));
   },
   async fetch(request: Request, env: Env) {
     const requestId = crypto.randomUUID();
@@ -1960,6 +2085,7 @@ function workspaceServices(env:Env,user:AuthenticatedUser):WorkspaceServices {
 function experienceServices(env: Env, user: AuthenticatedUser) {
   return {
     ...workspaceServices(env, user),
+    readImportFile: (path: string) => privatePlatformFile(env, path),
     context: async () => (await enrichPrincipalContext(env, user, await authorization(env, user))) as unknown as ProductionAuthorizationContext,
   };
 }
@@ -1991,3 +2117,4 @@ async function manuallyCreateAccount(request:Request,env:Env,user:AuthenticatedU
 }
 
 export const pilotAccountTestHelpers = {adminUserAccessLog};
+export const pilotAuthTestHelpers = { authenticationFacts };

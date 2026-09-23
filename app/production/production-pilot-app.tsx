@@ -57,29 +57,24 @@ export function ConfigurationRequired() {
 }
 
 export function SignIn({ supabase }: { supabase: SupabaseClient }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const signIn = async (event: React.FormEvent) => {
-    event.preventDefault(); setBusy(true); setMessage("");
+  const signIn = async () => {
+    setBusy(true); setMessage("");
     try {
       const { error } = await Promise.race([
-        supabase.auth.signInWithPassword({ email, password }),
+        supabase.auth.signInWithSSO({
+          domain: "roseman.edu",
+          options: { redirectTo: `${window.location.origin}/app/auth/callback` },
+        }),
         new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("timeout")), 15000)),
       ]);
-      setMessage(error ? "We could not sign you in. If this email has not been activated, choose Set or reset password." : "Signed in.");
+      if (error) setMessage("Roseman sign-in could not be started. Try again or contact the Compass Creator.");
     } catch {
-      setMessage("Sign-in is taking too long. Check your connection, then try again or choose Set or reset password.");
+      setMessage("Roseman sign-in is taking too long. Check your connection and try again.");
     } finally { setBusy(false); }
   };
-  const reset = async () => {
-    if (!email.trim()) { setMessage("Enter your invited email address first."); return; }
-    setBusy(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/app` });
-    setBusy(false); setMessage(error ? "The reset message could not be sent." : "Check your email for a secure password link.");
-  };
-  return <main className="production-auth"><section className="production-auth-card compass-signin"><div className="compass-signin__identity"><div className="compass-signin__emblem" aria-hidden="true"><img src={assetUrl("/assets/brand/compass-emblem-v2.png")} alt="" /></div><div className="compass-signin__hero-copy"><p className="compass-signin__eyebrow">Roseman University student support</p><h1>Compass</h1><p className="compass-signin__services">Advising <span>·</span> Tutoring <span>·</span> Events</p><p className="compass-signin__introduction">Sign in once to reach your assigned support and workspaces.</p></div></div><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Coming soon</span><small>Authentication and calendar permission will remain separate choices.</small></div><div className="auth-divider" aria-hidden="true"><span>sign in with invited email</span></div><form className="production-form" onSubmit={signIn}><label><span>Email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="primary-button" disabled={busy}>{busy ? "Checking..." : "Sign in with email"}</button><button type="button" className="text-button" onClick={reset} disabled={busy}>Set or reset password</button><p className="form-message" aria-live="polite">{message}</p></form><div className="pathway-invite-note"><strong>Joining from another university?</strong><p>External pre-med students enter through an approved Pathway invitation. An email domain never creates access automatically.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Creator Preview</strong><small>Use fictional, role-scoped records while live integrations remain inactive.</small></span><span aria-hidden="true">→</span></a><p className="privacy-note">Signing in does not grant a workspace, calendar access, or a staff role. Those permissions are approved separately.</p></section></main>;
+  return <main className="production-auth"><section className="production-auth-card compass-signin"><div className="compass-signin__identity"><div className="compass-signin__emblem" aria-hidden="true"><img src={assetUrl("/assets/brand/compass-emblem-v2.png")} alt="" /></div><div className="compass-signin__hero-copy"><p className="compass-signin__eyebrow">Roseman University student support</p><h1>Compass</h1><p className="compass-signin__services">Advising <span>·</span> Tutoring <span>·</span> Events</p><p className="compass-signin__introduction">Sign in once to reach your assigned support and workspaces.</p></div></div><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Staff pilot</span><small>Your Roseman identity and the approved Compass roster are separate access checks.</small></div><div className="production-form"><button type="button" className="primary-button" onClick={() => void signIn()} disabled={busy}>{busy ? "Opening Microsoft…" : "Sign in with Roseman Microsoft"}</button><p className="form-message" aria-live="polite">{message}</p></div><div className="pathway-invite-note"><strong>Joining from another university?</strong><p>External pre-med students enter through an approved Pathway invitation. An email domain never creates access automatically.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Creator Preview</strong><small>Use fictional, role-scoped records while live integrations remain inactive.</small></span><span aria-hidden="true">→</span></a><p className="privacy-note">Signing in does not grant a workspace, calendar access, or a staff role. Those permissions are approved separately.</p><a className="text-button" href="/app/creator-recovery">Creator recovery</a></section></main>;
 }
 
 export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseClient; onComplete: () => void }) {
@@ -140,7 +135,7 @@ export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseC
       setMessage("Enter the email address for your Compass account.");
       return;
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/app` });
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/app/auth/callback` });
     setBusy(false);
     setMessage(error ? `A new link could not be sent: ${error.message}` : `A fresh password-reset link was sent to ${email.trim()}. Use only the newest email.`);
   };
@@ -165,7 +160,7 @@ export function PasswordRecoveryProblem({ supabase, detail }: { supabase: Supaba
     event.preventDefault();
     setBusy(true); setMessage("");
     await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/app` });
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/app/auth/callback` });
     setBusy(false);
     setMessage(error ? `A new reset email could not be sent: ${error.message}` : "A new reset email was requested. Use only the newest message; earlier links stop working.");
   };

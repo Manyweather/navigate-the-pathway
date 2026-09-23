@@ -1,3 +1,4 @@
+import { demoOperations } from "./pilot-operations-demo";
 "use client";
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
@@ -3073,6 +3074,12 @@ class SyntheticPilotApi {
     const method = (options.method || "GET").toUpperCase();
     const persona = getSyntheticPreviewPersona();
     const context = syntheticContextForPersona(persona);
+    if(route==="/api/pilot/reports"){
+      if(!context.experienceMemberships?.some(m=>m.roles.some(r=>["advisor","administrator","creator","staff","faculty"].includes(r)))&&context.principalType!=="creator"&&!context.roles.some(r=>r!=="student"))throw new Error("Staff reporting required.");
+      const rows=this.appointments.map(a=>({id:a.id,kind:"visit",studentId:a.studentId,studentName:a.studentName,providerId:a.providerName||null,providerName:a.providerName||"",service:a.serviceName,topic:a.subject||"",campus:"Summerlin",location:a.modality==="in_person"?"Summerlin · pending verification":a.modality,startsAt:a.startsAt,status:a.status,attendance:null,scheduledMinutes:a.startsAt&&a.endsAt?(Date.parse(a.endsAt)-Date.parse(a.startsAt))/60000:0,reportedMinutes:null,source:"fictional demo",occurrenceId:null}));
+      return {rows,generatedAt:new Date().toISOString(),offeredMinutes:null} as T;
+    }
+    if(route.startsWith("/api/pilot/"))return demoOperations(path,method,(options.body || {}) as Record<string,unknown>,context) as T;
     const personaMemberships = syntheticMembershipsForPersona(persona);
     const requiredExperience = route.startsWith("/api/oaca/")
       ? "oaca"

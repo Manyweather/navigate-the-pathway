@@ -5,6 +5,10 @@ import { productionConfiguration } from "./supabase-client";
 
 type RequestOptions = Omit<RequestInit, "body"> & { body?: unknown };
 
+export class PilotApiError extends Error {
+  constructor(message: string, public readonly code: string, public readonly status: number) { super(message); }
+}
+
 export class PilotApiClient {
   constructor(private readonly supabase: SupabaseClient, private readonly mode?: string, private readonly experience?: string) {}
 
@@ -26,7 +30,10 @@ export class PilotApiClient {
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
     const payload = await response.json().catch(() => ({ error: "The server returned an unreadable response." }));
-    if (!response.ok) throw new Error((payload as {error?:string}|null)?.error || "The request could not be completed.");
+    if (!response.ok) {
+      const problem = payload as { error?: string; code?: string } | null;
+      throw new PilotApiError(problem?.error || "The request could not be completed.", problem?.code || "request_failed", response.status);
+    }
     return payload as T;
   }
 

@@ -12,13 +12,14 @@
     "traces": { "enabled": true }
   },
   "vars": {
-    "PILOT_ENVIRONMENT": "staging"
+    "PILOT_ENVIRONMENT": "staging",
+    "TRUST_ROSEMAN_SAML_AS_MFA": "true"
   },
   "triggers": { "crons": ["*/15 * * * *"] },
   "env": {
     "staging": {
       "name": "navigate-pathway-pilot-api-staging",
-      "vars": { "PILOT_ENVIRONMENT": "staging" },
+      "vars": { "PILOT_ENVIRONMENT": "staging", "TRUST_ROSEMAN_SAML_AS_MFA": "true" },
       "triggers": { "crons": ["*/15 * * * *"] },
       "secrets": {
         "required": [
@@ -34,14 +35,16 @@
           "SURVEY_ACCS",
           "SURVEY_ENCRYPTION_KEY",
           "EVENT_SMS_WEBHOOK_SECRET",
-          "CREATOR_BOOTSTRAP_EMAIL"
+          "CREATOR_BOOTSTRAP_EMAIL",
+          "ROSEMAN_SSO_PROVIDER_ID",
+          "BREAK_GLASS_CREATOR_EMAIL"
         ]
       }
     },
     "production": {
       "name": "navigate-pathway-pilot-api-production",
       "preview_urls": false,
-      "vars": { "PILOT_ENVIRONMENT": "production" },
+      "vars": { "PILOT_ENVIRONMENT": "production", "TRUST_ROSEMAN_SAML_AS_MFA": "true" },
       "triggers": { "crons": ["*/15 * * * *"] },
       "secrets": {
         "required": [
@@ -51,7 +54,9 @@
           "EVENT_SMS_WEBHOOK_SECRET",
           "ALLOWED_ORIGINS",
           "INVITE_REDIRECT_URL",
-          "CREATOR_BOOTSTRAP_EMAIL"
+          "CREATOR_BOOTSTRAP_EMAIL",
+          "ROSEMAN_SSO_PROVIDER_ID",
+          "BREAK_GLASS_CREATOR_EMAIL"
         ]
       }
     }

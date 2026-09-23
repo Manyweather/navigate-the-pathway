@@ -17,7 +17,8 @@ import {
 } from "./platform-model";
 import type { PilotApiClient } from "./api-client";
 import type { AuthorizationContext } from "./types";
-import { OacaAnalyticsPanel, OacaImportCenter, type OacaAggregateAnalytics, type OacaImportBatch } from "./oaca-import-center";
+import { type OacaAggregateAnalytics, type OacaImportBatch } from "./oaca-import-center";
+import { OacaSessionCenter, OacaSessionInsights } from "./oaca-session-center";
 import {
   OacaEventsAndOutreach,
   OacaStudentEvents,
@@ -750,8 +751,8 @@ function OacaStaff({ api, supabase, context, data, mode, reload, view, setView }
       <p className="form-message" aria-live="polite">{message}</p>
     </div>
   </section>;
-  if (view === "analytics") return <OacaAnalyticsPanel analytics={data.analytics} onBack={() => setView("home")} />;
-  if (view === "imports") return <OacaImportCenter api={api} supabase={supabase} context={context} batches={data.importBatches} reload={reload} onBack={() => setView("home")} />;
+  if (view === "analytics") return <OacaSessionInsights api={api} onBack={() => setView("home")} />;
+  if (view === "imports") return <OacaSessionCenter api={api} supabase={supabase} context={context} batches={data.importBatches} reload={reload} onBack={() => setView("home")} />;
   if (view === "events" || view === "outreach") return <OacaEventsAndOutreach key={view} initialSection={view === "events" ? "event" : "nudge"} api={api} supabase={supabase} context={context} canManageOutreach={data.canManageOutreach} canManageImports={data.canManageImports} events={data.events} campaigns={data.campaigns} nudges={data.nudges} students={data.assignedStudents} providers={data.providers} services={data.services} audienceOptions={data.audienceOptions} reload={reload} onBack={() => setView("home")} />;
   if (view === "settings") return <section className="experience-panel"><button className="workspace-back text-button" onClick={() => setView("home")}>← Staff home</button><p className="kicker">Service configuration</p><h1>Policies received; operations still gated.</h1><div className="record-list">{(data.services.length ? data.services : fallbackServices).map((service) => <article key={service.key}><span className={`status-chip status-chip--${service.policyStatus === "live_approved" ? "confirmed" : "pending"}`}>{service.policyStatus.replaceAll("_", " ")}</span><h2>{service.name}</h2><p>{service.key === "peer_tutoring" ? "The 60-minute maximum, seven-day booking horizon, weekly and exam-block limits, 24-hour cancellation rule, capacity ranges, and no-show review are mapped." : "Required milestones and provider routing are mapped."}</p><small>Live activation still requires office hours, Outlook free/busy, remaining service values, and administrator approval.</small></article>)}</div><button className="secondary-button" onClick={() => setView("policies")}>Review mapped policies</button></section>;
   return <section className="experience-panel">
