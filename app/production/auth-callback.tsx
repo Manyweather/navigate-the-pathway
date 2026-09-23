@@ -5,6 +5,8 @@ import { RosieGuide } from "../components/rosie-guide";
 import { clearStoredPreview, safeAppDestination } from "./auth-intent";
 import { parseRecoveryCallback } from "./auth-recovery";
 import { getSupabaseBrowserClient, loadProductionConfiguration } from "./supabase-client";
+import { PasswordRecovery } from "./production-pilot-app";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const CALLBACK_TIMEOUT_MS = 15_000;
 
@@ -18,6 +20,7 @@ async function withTimeout<T>(work: Promise<T>) {
 export function AuthCallback() {
   const [state, setState] = useState<"working" | "failed" | "timed_out">("working");
   const [detail, setDetail] = useState("Compass is establishing your secure session.");
+  const [recoveryClient, setRecoveryClient] = useState<SupabaseClient | null>(null);
 
   const complete = useCallback(async () => {
     setState("working");
@@ -41,9 +44,17 @@ export function AuthCallback() {
       }
       const session = await withTimeout(supabase.auth.getSession());
       if (session.error || !session.data.session) throw session.error || new Error("session_missing");
-      const destination = recovery.requested
-        ? "/app/creator-recovery?mode=set-password"
-        : safeAppDestination(original.searchParams.get("next"));
+      if (recovery.requested) {
+        // Keep the verified client in memory while the password update runs. A
+        // second page load can race Supabase's recovery-session persistence,
+        // especially when a mail client has already inspected the link.
+        window.history.replaceState({}, "", "/app/auth/callback");
+        setRecoveryClient(supabase);
+        setState("working");
+        setDetail("Your recovery session is verified. Choose a new password.");
+        return;
+      }
+      const destination = safeAppDestination(original.searchParams.get("next"));
       window.location.replace(destination);
     } catch (error) {
       const timedOut = error instanceof Error && error.message === "callback_timeout";
@@ -53,6 +64,8 @@ export function AuthCallback() {
         : "Compass could not establish a session from this link. It may have expired or already been used.");
     }
   }, []);
+
+  if (recoveryClient) return <PasswordRecovery supabase={recoveryClient} onComplete={() => window.location.replace("/app")} />;
 
   useEffect(() => { const timer = window.setTimeout(() => void complete(), 0); return () => window.clearTimeout(timer); }, [complete]);
 
