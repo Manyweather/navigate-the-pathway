@@ -267,7 +267,7 @@ export function PlatformAccess({ experience, children }: {
 
   const membership = experience ? memberships.find((item) => item.experienceKey === experience && item.status === "active" && item.featureEnabled) : null;
   if (experience && !membership) return <main className="production-auth"><section className="production-auth-card"><p className="kicker">Membership required</p><h1>This experience is not assigned to your account.</h1><p>Return to the Navigate hub or ask an administrator to review your membership.</p><InstallCompass compact /><a className="secondary-button" href="/app">Return to Navigate</a></section></main>;
-  const needsMfa = membership?.roles.some((role) => staffMfaRoles.has(role)) && !context.mfaSatisfied && context.aal !== "aal2" && !mfaVerified;
+  const needsMfa = membership?.roles.some((role) => staffMfaRoles.has(role)) && context.authMethod !== "sso/saml" && !context.mfaSatisfied && context.aal !== "aal2" && !mfaVerified;
   if (needsMfa) return <MfaGate supabase={supabase} onVerified={() => { setMfaVerified(true); void load(); }} />;
 
   const signOut = async () => { try { await api.request("/api/activity/signout", { method: "POST", body: {} }); } finally { await supabase.auth.signOut(); } };

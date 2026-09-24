@@ -388,6 +388,14 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.match(styles, /@media print/);
 });
 
+test("Roseman SSO staff sessions do not trigger a second-factor screen", async () => {
+  const platformAccess = await readFile(new URL("../app/production/platform-access.tsx", import.meta.url), "utf8");
+  const pathwayAccess = await readFile(new URL("../app/production/production-pilot-app.tsx", import.meta.url), "utf8");
+  assert.match(platformAccess, /context\.authMethod !== "sso\/saml" && !context\.mfaSatisfied/);
+  assert.match(pathwayAccess, /context\.authMethod === "sso\/saml" \|\| context\.aal === "aal2"/);
+  assert.match(pathwayAccess, /context\.authMethod !== "sso\/saml" && context\.aal !== "aal2"/);
+});
+
 test("the print-ready OACA worksheet ships as a valid one-page PDF artifact", async () => {
   const url = new URL("../public/resources/oaca-compass-visit-worksheet.pdf", import.meta.url);
   const [bytes, details] = await Promise.all([readFile(url), stat(url)]);
