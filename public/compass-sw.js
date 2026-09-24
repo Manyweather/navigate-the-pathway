@@ -13,6 +13,18 @@ self.addEventListener("push", (event) => {
   }));
 });
 
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
+// Keep authenticated Compass pages, recovery links, and API responses on the
+// network. The fetch handler exists for installability without persisting
+// protected content in a device cache.
+self.addEventListener("fetch", (event) => {
+  if (event.request.method === "GET" && new URL(event.request.url).origin === self.location.origin) {
+    event.respondWith(fetch(event.request));
+  }
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const destination = event.notification.data?.destination || "/app/compass";

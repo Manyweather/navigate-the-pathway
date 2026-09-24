@@ -304,7 +304,7 @@ test("Compass is the published application identity and Creator Preview remains 
   assert.doesNotMatch(layout, /template: "%s \| Navigate"/);
   assert.match(appPage, /absolute: "Compass"/);
   assert.match(signIn, /href="\/app\?preview=creator"/);
-  assert.match(signIn, /Explore the Creator Preview/);
+  assert.match(signIn, /Explore the Compass demo/);
 });
 
 test("phone-first pilot screens include the required privacy and approval guardrails", async () => {
@@ -328,7 +328,7 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.doesNotMatch(signIn, /GENESIS/);
   assert.doesNotMatch(signIn, /ExperienceGraphic/);
   assert.match(signIn, /Roseman Microsoft SSO/);
-  assert.match(signIn, /Staff pilot/);
+  assert.match(signIn, /Live sign-in available/);
   assert.match(signIn, /sign-in is taking too long/i);
   assert.match(signIn, /\/app\/auth\/callback/);
   assert.doesNotMatch(signIn, /signInWithPassword|resetPasswordForEmail/);

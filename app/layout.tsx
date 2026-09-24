@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { PwaRegistration } from "./pwa-registration";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://navigate-pathways.roseman-coll-6465.chatgpt.site"),
@@ -15,6 +16,11 @@ export const metadata: Metadata = {
     shortcut: "/assets/brand/compass-emblem-v2.png",
     apple: "/assets/brand/compass-emblem-v2.png",
   },
+  appleWebApp: {
+    capable: true,
+    title: "Compass",
+    statusBarStyle: "default",
+  },
   openGraph: {
     title: "Compass",
     description: "One secure starting point for student support and authorized workspaces.",
@@ -29,5 +35,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body>{children}<PwaRegistration /></body></html>;
 }

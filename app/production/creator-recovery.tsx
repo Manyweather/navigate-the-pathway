@@ -6,6 +6,7 @@ import { RosieGuide } from "../components/rosie-guide";
 import { clearStoredPreview } from "./auth-intent";
 import { PasswordRecovery } from "./production-pilot-app";
 import { getSupabaseBrowserClient, loadProductionConfiguration } from "./supabase-client";
+import { InstallCompass } from "./install-compass";
 
 function RecoverySignIn({ supabase }: { supabase: SupabaseClient }) {
   const [email, setEmail] = useState("");
@@ -41,7 +42,7 @@ function RecoverySignIn({ supabase }: { supabase: SupabaseClient }) {
       <button type="button" className="text-button" disabled={busy} onClick={() => void reset()}>Request a recovery link</button>
       <p className="form-message" aria-live="polite">{message}</p>
     </form>
-    <a className="secondary-button" href="/app?signin=1">Roseman staff sign-in</a>
+    <InstallCompass compact /><a className="secondary-button" href="/app?signin=1">Roseman staff sign-in</a>
   </section></main>;
 }
 
@@ -59,9 +60,8 @@ export function CreatorRecovery() {
     }).catch(() => setFailed(true));
   }, []);
 
-  if (failed) return <main className="production-auth"><section className="production-auth-card"><h1>Recovery is not connected.</h1><a className="secondary-button" href="/app?signin=1">Return to sign in</a></section></main>;
-  if (!supabase) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Creator recovery" title="Opening secure recovery…" /></section></main>;
+  if (failed) return <main className="production-auth"><section className="production-auth-card"><h1>Recovery is not connected.</h1><InstallCompass compact /><a className="secondary-button" href="/app?signin=1">Return to sign in</a></section></main>;
+  if (!supabase) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Creator recovery" title="Opening secure recovery…" /><InstallCompass compact /></section></main>;
   if (setPassword) return <PasswordRecovery supabase={supabase} onComplete={() => window.location.replace("/app")} />;
   return <RecoverySignIn supabase={supabase} />;
 }
-

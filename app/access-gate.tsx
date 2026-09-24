@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { assetUrl } from "./asset-url";
 import { RosieGuide } from "./components/rosie-guide";
+import { InstallCompass } from "./production/install-compass";
 
 export function AccessGate({
   requestUnlock,
@@ -78,6 +79,7 @@ export function AccessGate({
           {message ? <p id="access-message" className="access-error" role="alert">{message}</p> : null}
           <p id="access-note" className="access-note">This gate supports a hosted playtest. It is not a student account or institutional login.</p>
         </form>
+        <InstallCompass compact />
       </section>
     </main>
   );

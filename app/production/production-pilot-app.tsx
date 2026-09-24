@@ -31,6 +31,7 @@ import type {
 import { assignedModes, modeContext, modeLabels, principalMode, surveysForAudience, type DashboardMode } from "./dashboard-mode";
 import { RolePrivileges } from "./role-privileges";
 import { CreatorPreviewBanner, rememberWorkspace, useCreatorPreviewTimeTracking, WorkspaceSwitcher } from "./compass-platform-shell";
+import { InstallCompass } from "./install-compass";
 import type { ExperienceMembership } from "./platform-model";
 import { clearSyntheticPreview, getSyntheticPreviewPersona, isSyntheticPreviewActive, setSyntheticPreviewPersona, SYNTHETIC_PERSONAS, syntheticContextForPersona, syntheticMembershipsForPersona, syntheticPreviewApi, type SyntheticPersonaKey } from "./synthetic-preview";
 
@@ -53,7 +54,7 @@ export function AppHeader({ context, memberships = context.experienceMemberships
 }
 
 export function ConfigurationRequired() {
-  return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Compass" title="Secure setup is not connected yet." body="The application shell is ready. Supabase and the Compass service must be configured before invitations can be sent." priority /><div className="production-checklist"><p><strong>Public demonstration:</strong> remains separate and fictional.</p><p><strong>Compass records:</strong> will be stored only in Supabase.</p><p><strong>Survey wording:</strong> stays protected until permissions and PI approval are documented.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Compass demo</strong><small>Open every workspace with fictional records. Live Roseman sign-in is available from the Compass entry page.</small></span><span aria-hidden="true">→</span></a></section></main>;
+  return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Compass" title="Secure setup is not connected yet." body="The application shell is ready. Supabase and the Compass service must be configured before invitations can be sent." priority /><div className="production-checklist"><p><strong>Public demonstration:</strong> remains separate and fictional.</p><p><strong>Compass records:</strong> will be stored only in Supabase.</p><p><strong>Survey wording:</strong> stays protected until permissions and PI approval are documented.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Compass demo</strong><small>Open every workspace with fictional records. Live Roseman sign-in is available from the Compass entry page.</small></span><span aria-hidden="true">→</span></a><InstallCompass /></section></main>;
 }
 
 export function SignIn({ supabase }: { supabase: SupabaseClient }) {
@@ -74,7 +75,7 @@ export function SignIn({ supabase }: { supabase: SupabaseClient }) {
       setMessage("Roseman sign-in is taking too long. Check your connection and try again.");
     } finally { setBusy(false); }
   };
-  return <main className="production-auth"><section className="production-auth-card compass-signin"><div className="compass-signin__identity"><div className="compass-signin__emblem" aria-hidden="true"><img src={assetUrl("/assets/brand/compass-emblem-v2.png")} alt="" /></div><div className="compass-signin__hero-copy"><p className="compass-signin__eyebrow">Roseman University student support</p><h1>Compass</h1><p className="compass-signin__services">Advising <span>·</span> Tutoring <span>·</span> Events</p><p className="compass-signin__introduction">Sign in once to reach your assigned support and workspaces.</p></div></div><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Live sign-in available</span><small>Your Roseman identity and the approved Compass roster are separate access checks.</small></div><div className="production-form"><button type="button" className="primary-button" onClick={() => void signIn()} disabled={busy}>{busy ? "Opening Microsoft…" : "Sign in with Roseman Microsoft"}</button><p className="form-message" aria-live="polite">{message}</p></div><div className="pathway-invite-note"><strong>Joining from another university?</strong><p>External pre-med students enter through an approved Pathway invitation. An email domain never creates access automatically.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Compass demo</strong><small>Use fictional, role-scoped records while live Roseman sign-in remains available above.</small></span><span aria-hidden="true">→</span></a><p className="privacy-note">Signing in does not grant a workspace, calendar access, or a staff role. Those permissions are approved separately.</p><a className="text-button" href="/app/creator-recovery">Creator recovery</a></section></main>;
+  return <main className="production-auth"><section className="production-auth-card compass-signin"><div className="compass-signin__identity"><div className="compass-signin__emblem" aria-hidden="true"><img src={assetUrl("/assets/brand/compass-emblem-v2.png")} alt="" /></div><div className="compass-signin__hero-copy"><p className="compass-signin__eyebrow">Roseman University student support</p><h1>Compass</h1><p className="compass-signin__services">Advising <span>·</span> Tutoring <span>·</span> Events</p><p className="compass-signin__introduction">Sign in once to reach your assigned support and workspaces.</p></div></div><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Live sign-in available</span><small>Your Roseman identity and the approved Compass roster are separate access checks.</small></div><div className="production-form"><button type="button" className="primary-button" onClick={() => void signIn()} disabled={busy}>{busy ? "Opening Microsoft…" : "Sign in with Roseman Microsoft"}</button><p className="form-message" aria-live="polite">{message}</p></div><div className="pathway-invite-note"><strong>Joining from another university?</strong><p>External pre-med students enter through an approved Pathway invitation. An email domain never creates access automatically.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Compass demo</strong><small>Use fictional, role-scoped records while live Roseman sign-in remains available above.</small></span><span aria-hidden="true">→</span></a><p className="privacy-note">Signing in does not grant a workspace, calendar access, or a staff role. Those permissions are approved separately.</p><InstallCompass /><a className="text-button" href="/app/creator-recovery">Creator recovery</a></section></main>;
 }
 
 export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseClient; onComplete: () => void }) {
@@ -148,7 +149,7 @@ export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseC
       <button className="primary-button" disabled={busy}>{busy ? "Updating…" : "Set new password"}</button>
       {canRequestAnotherLink ? <><label><span>Account email</span><input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><button type="button" className="secondary-button" disabled={busy} onClick={() => void requestAnotherLink()}>{busy ? "Sending…" : "Send me a fresh reset link"}</button></> : null}
       <p className="form-message" aria-live="polite">{message}</p>
-    </form>
+    </form><InstallCompass compact />
   </section></main>;
 }
 
@@ -172,7 +173,7 @@ export function PasswordRecoveryProblem({ supabase, detail }: { supabase: Supaba
       <p className="form-message" aria-live="polite">{message}</p>
     </form>
     <a className="preview-entry" href="/app?preview=creator"><span><strong>Open the Creator Preview</strong><small>Continue exploring Compass with fictional records while account access is repaired.</small></span><span aria-hidden="true">→</span></a>
-    <a className="text-button" href="/app">Return to sign in</a>
+    <InstallCompass compact /><a className="text-button" href="/app">Return to sign in</a>
   </section></main>;
 }
 
@@ -186,7 +187,7 @@ export function MfaGate({ supabase, onVerified }: { supabase: SupabaseClient; on
     })();
     return () => { active = false; };
   }, [supabase]);
-  return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Roseman SSO" title="Returning you to Roseman sign-in." body="This staff session has not completed the approved Roseman SSO check. Compass is signing you out so you can continue through the Roseman sign-in button." priority /><p className="form-message" aria-live="polite">If the redirect does not start, <a className="text-button" href="/app?signin=1">return to Roseman SSO</a>.</p></section></main>;
+  return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Roseman SSO" title="Returning you to Roseman sign-in." body="This staff session has not completed the approved Roseman SSO check. Compass is signing you out so you can continue through the Roseman sign-in button." priority /><InstallCompass compact /><p className="form-message" aria-live="polite">If the redirect does not start, <a className="text-button" href="/app?signin=1">return to Roseman SSO</a>.</p></section></main>;
 }
 
 function SurveyCards({ assignments, onOpen }: { assignments: SurveyAssignmentSummary[]; onOpen: (assignment: SurveyAssignmentSummary) => void }) {

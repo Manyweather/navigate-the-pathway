@@ -215,6 +215,12 @@
 .preview-entry>span:last-child { font-size:1.6rem; }
 .preview-entry:focus-visible { outline:4px solid #f0b323; outline-offset:3px; }
 .production-auth h1, .production-main h1 { margin: .1rem 0; font-family: Georgia, serif; color: #26211f; }
+.compass-install { display: grid; gap: .65rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(103,72,54,.14); }
+.compass-install--compact { margin-top: .8rem; padding-top: .8rem; }
+.compass-install__actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.compass-install__help { display: grid; gap: .35rem; padding: .8rem 1rem; border: 1px solid rgba(121,16,52,.2); border-radius: .9rem; background: #fff8f1; color: #554540; font-size: .86rem; line-height: 1.45; }
+.compass-install__help strong { color: #791034; }
+.compass-install__help p { margin: 0; }
 .production-recovery { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 1.25rem; }
 .production-recovery p { flex-basis: 100%; margin: 0; color: #625b57; font-size: .9rem; }
 .production-form { display: grid; gap: .9rem; margin-top: 1.25rem; }

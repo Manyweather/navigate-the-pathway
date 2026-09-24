@@ -6,6 +6,7 @@ import { clearStoredPreview, safeAppDestination } from "./auth-intent";
 import { parseRecoveryCallback } from "./auth-recovery";
 import { getSupabaseBrowserClient, loadProductionConfiguration } from "./supabase-client";
 import { PasswordRecovery } from "./production-pilot-app";
+import { InstallCompass } from "./install-compass";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const CALLBACK_TIMEOUT_MS = 15_000;
@@ -65,9 +66,9 @@ export function AuthCallback() {
     }
   }, []);
 
-  if (recoveryClient) return <PasswordRecovery supabase={recoveryClient} onComplete={() => window.location.replace("/app")} />;
-
   useEffect(() => { const timer = window.setTimeout(() => void complete(), 0); return () => window.clearTimeout(timer); }, [complete]);
+
+  if (recoveryClient) return <PasswordRecovery supabase={recoveryClient} onComplete={() => window.location.replace("/app")} />;
 
   const returnToSignIn = async () => {
     clearStoredPreview(window.localStorage);
@@ -77,7 +78,7 @@ export function AuthCallback() {
   };
 
   return <main className="production-auth"><section className="production-auth-card">
-    <RosieGuide pose={state === "working" ? "tracks" : "idle"} eyebrow="Compass" title={state === "working" ? "Validating your secure link…" : state === "timed_out" ? "The connection took too long." : "This link could not be validated."} body={detail} priority />
+    <RosieGuide pose={state === "working" ? "tracks" : "idle"} eyebrow="Compass" title={state === "working" ? "Validating your secure link…" : state === "timed_out" ? "The connection took too long." : "This link could not be validated."} body={detail} priority /><InstallCompass compact />
     {state !== "working" ? <div className="production-form">
       <button className="primary-button" onClick={() => void complete()}>Retry this link</button>
       <button className="secondary-button" onClick={() => void returnToSignIn()}>Return to sign in</button>
@@ -85,4 +86,3 @@ export function AuthCallback() {
     </div> : null}
   </section></main>;
 }
-

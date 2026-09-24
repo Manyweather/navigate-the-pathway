@@ -9,6 +9,7 @@ import { parseRecoveryCallback } from "./auth-recovery";
 import { clearStoredPreview, hasAuthenticationCallback } from "./auth-intent";
 import { getSupabaseBrowserClient, loadProductionConfiguration } from "./supabase-client";
 import { staffMfaRoles, type ExperienceKey, type ExperienceMembership } from "./platform-model";
+import { InstallCompass } from "./install-compass";
 import type { AuthorizationContext } from "./types";
 import {
   getSyntheticPreviewPersona,
@@ -234,7 +235,7 @@ export function PlatformAccess({ experience, children }: {
     const previewContext = syntheticContextForPersona(scopedPersona);
     const membership = experience ? previewMemberships.find((item) => item.experienceKey === experience) : null;
     if (previewPersona === "impact_student" && experience === "oaca") return <PreviewWorkspaceRedirect href="/app/compass/impact" />;
-    if (experience && !membership) return <main className="production-auth"><section className="production-auth-card"><h1>Preview unavailable</h1><a className="secondary-button" href="/app">Return to Navigate</a></section></main>;
+    if (experience && !membership) return <main className="production-auth"><section className="production-auth-card"><h1>Preview unavailable</h1><InstallCompass compact /><a className="secondary-button" href="/app">Return to Navigate</a></section></main>;
     const exitPreview = async () => {
       clearStoredPreview(window.localStorage);
       window.location.assign("/app?signin=1");
@@ -243,10 +244,10 @@ export function PlatformAccess({ experience, children }: {
   }
 
   if (configured === "error") return <ConfigurationRequired />;
-  if (!supabase || configured === "loading") return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate" title="Connecting your secure account…" /></section></main>;
+  if (!supabase || configured === "loading") return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate" title="Connecting your secure account…" /><InstallCompass compact /></section></main>;
   if (recoveryError) return <PasswordRecoveryProblem supabase={supabase} detail={recoveryError} />;
-  if (authInitializationFailed) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Compass" title="Secure sign-in did not finish." body="The identity service did not respond within 15 seconds." priority /><button className="primary-button" onClick={() => window.location.reload()}>Retry</button><a className="secondary-button" href="/app?signin=1">Return to sign in</a></section></main>;
-  if (!authReady) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Compass" title="Validating your secure link…" /></section></main>;
+  if (authInitializationFailed) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Compass" title="Secure sign-in did not finish." body="The identity service did not respond within 15 seconds." priority /><InstallCompass compact /><button className="primary-button" onClick={() => window.location.reload()}>Retry</button><a className="secondary-button" href="/app?signin=1">Return to sign in</a></section></main>;
+  if (!authReady) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Compass" title="Validating your secure link…" /><InstallCompass compact /></section></main>;
   if (!session) return <SignIn supabase={supabase} />;
   if (recoveryMode) return <PasswordRecovery supabase={supabase} onComplete={() => {
     window.history.replaceState({}, "", window.location.pathname);
@@ -255,17 +256,17 @@ export function PlatformAccess({ experience, children }: {
     setContext(null);
     setMessage("Opening your Navigate account…");
   }} />;
-  if (accessPending) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Roseman access" title="Your sign-in is verified and access is pending." body="A Compass Creator must match this Roseman identity to one approved staff roster entry before any workspace data is available." priority /><p className="form-message" role="status">{message}</p><button className="secondary-button" onClick={() => void supabase.auth.signOut()}>Sign out</button></section></main>;
+  if (accessPending) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Roseman access" title="Your sign-in is verified and access is pending." body="A Compass Creator must match this Roseman identity to one approved staff roster entry before any workspace data is available." priority /><InstallCompass compact /><p className="form-message" role="status">{message}</p><button className="secondary-button" onClick={() => void supabase.auth.signOut()}>Sign out</button></section></main>;
   if (accountLoadFailed) return <main className="production-auth"><section className="production-auth-card">
     <RosieGuide pose="idle" compact eyebrow="Account connected" title="Your password was accepted." body="The expanded secure workspace is still being connected to this pilot. You can explore every new dashboard now with fictional records." priority />
-    <a className="preview-entry" href="/app?preview=creator"><span><strong>Open the Creator preview</strong><small>Compass, Navigate the Pathway, and Impact Studio with synthetic data only.</small></span><span aria-hidden="true">→</span></a>
+    <InstallCompass compact /><a className="preview-entry" href="/app?preview=creator"><span><strong>Open the Creator preview</strong><small>Compass, Navigate the Pathway, and Impact Studio with synthetic data only.</small></span><span aria-hidden="true">→</span></a>
     <button className="text-button" onClick={() => void supabase.auth.signOut()}>Return to sign in</button>
     <p className="form-message" aria-live="polite">{message}</p>
   </section></main>;
-  if (!context || !api) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate" title="Opening your account hub…" /><p className="form-message" aria-live="polite">{message}</p></section></main>;
+  if (!context || !api) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate" title="Opening your account hub…" /><InstallCompass compact /><p className="form-message" aria-live="polite">{message}</p></section></main>;
 
   const membership = experience ? memberships.find((item) => item.experienceKey === experience && item.status === "active" && item.featureEnabled) : null;
-  if (experience && !membership) return <main className="production-auth"><section className="production-auth-card"><p className="kicker">Membership required</p><h1>This experience is not assigned to your account.</h1><p>Return to the Navigate hub or ask an administrator to review your membership.</p><a className="secondary-button" href="/app">Return to Navigate</a></section></main>;
+  if (experience && !membership) return <main className="production-auth"><section className="production-auth-card"><p className="kicker">Membership required</p><h1>This experience is not assigned to your account.</h1><p>Return to the Navigate hub or ask an administrator to review your membership.</p><InstallCompass compact /><a className="secondary-button" href="/app">Return to Navigate</a></section></main>;
   const needsMfa = membership?.roles.some((role) => staffMfaRoles.has(role)) && !context.mfaSatisfied && context.aal !== "aal2" && !mfaVerified;
   if (needsMfa) return <MfaGate supabase={supabase} onVerified={() => { setMfaVerified(true); void load(); }} />;
 
