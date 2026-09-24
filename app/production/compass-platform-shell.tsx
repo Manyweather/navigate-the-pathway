@@ -88,7 +88,7 @@ export function CreatorPreviewBanner({ persona, onPersona, onExit, scope = "crea
     <div><span className="creator-preview-shell__mark" aria-hidden="true">◇</span><span><strong>{scope === "impact" ? "Impact Demo" : scope === "facilities" ? "Facilities Demo" : scope === "compass" ? "Compass Demo" : "Creator Preview"}</strong><small>Fictional records · strict role-scoped responses</small></span></div>
     <label data-demo-guide="role-switcher"><span>Viewing as</span><select value={persona} onChange={(event) => changePersona(event.target.value as SyntheticPersonaKey)}>{personaOptions.map((item) => <option key={item.key} value={item.key}>{item.label.replace("Compass ", "")}</option>)}</select></label>
     <DemoWorkspaceTutorial key={`${tutorialWorkspace}:${persona}`} workspace={tutorialWorkspace} persona={persona} roleOptions={scope === "impact" ? IMPACT_DEMO_PERSONAS : scope === "facilities" ? FACILITIES_DEMO_PERSONAS : undefined} onPersona={scope === "impact" || scope === "facilities" ? changePersona : undefined} />
-    <button className="text-button" onClick={onExit}>{scope === "creator" ? "Exit preview" : "Leave demo"}</button>
+    <span className="preview-live-signin"><small>Live Compass sign-in is available</small><a className="text-button" href="/app?signin=1">Roseman SSO</a></span><button className="text-button" onClick={onExit}>{scope === "creator" ? "Exit preview" : "Leave demo"}</button>
   </aside>;
 }
 

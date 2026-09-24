@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import type { AuthMFAEnrollResponse, Session, SupabaseClient } from "@supabase/supabase-js";
+import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { assetUrl } from "../asset-url";
 import { RosieGuide } from "../components/rosie-guide";
 import { WorkspaceTopTools, WorkspaceHub } from "./workspace-ui";
@@ -53,7 +53,7 @@ export function AppHeader({ context, memberships = context.experienceMemberships
 }
 
 export function ConfigurationRequired() {
-  return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Production pilot" title="Secure setup is not connected yet." body="The application shell is ready. Supabase and the pilot API must be configured before invitations can be sent." priority /><div className="production-checklist"><p><strong>Public demonstration:</strong> remains separate and fictional.</p><p><strong>Production records:</strong> will be stored only in Supabase.</p><p><strong>Survey wording:</strong> stays protected until permissions and PI approval are documented.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the synthetic pilot</strong><small>Open every workspace with fictional records. No sign-in required.</small></span><span aria-hidden="true">→</span></a></section></main>;
+  return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Compass" title="Secure setup is not connected yet." body="The application shell is ready. Supabase and the Compass service must be configured before invitations can be sent." priority /><div className="production-checklist"><p><strong>Public demonstration:</strong> remains separate and fictional.</p><p><strong>Compass records:</strong> will be stored only in Supabase.</p><p><strong>Survey wording:</strong> stays protected until permissions and PI approval are documented.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Compass demo</strong><small>Open every workspace with fictional records. Live Roseman sign-in is available from the Compass entry page.</small></span><span aria-hidden="true">→</span></a></section></main>;
 }
 
 export function SignIn({ supabase }: { supabase: SupabaseClient }) {
@@ -74,7 +74,7 @@ export function SignIn({ supabase }: { supabase: SupabaseClient }) {
       setMessage("Roseman sign-in is taking too long. Check your connection and try again.");
     } finally { setBusy(false); }
   };
-  return <main className="production-auth"><section className="production-auth-card compass-signin"><div className="compass-signin__identity"><div className="compass-signin__emblem" aria-hidden="true"><img src={assetUrl("/assets/brand/compass-emblem-v2.png")} alt="" /></div><div className="compass-signin__hero-copy"><p className="compass-signin__eyebrow">Roseman University student support</p><h1>Compass</h1><p className="compass-signin__services">Advising <span>·</span> Tutoring <span>·</span> Events</p><p className="compass-signin__introduction">Sign in once to reach your assigned support and workspaces.</p></div></div><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Staff pilot</span><small>Your Roseman identity and the approved Compass roster are separate access checks.</small></div><div className="production-form"><button type="button" className="primary-button" onClick={() => void signIn()} disabled={busy}>{busy ? "Opening Microsoft…" : "Sign in with Roseman Microsoft"}</button><p className="form-message" aria-live="polite">{message}</p></div><div className="pathway-invite-note"><strong>Joining from another university?</strong><p>External pre-med students enter through an approved Pathway invitation. An email domain never creates access automatically.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Creator Preview</strong><small>Use fictional, role-scoped records while live integrations remain inactive.</small></span><span aria-hidden="true">→</span></a><p className="privacy-note">Signing in does not grant a workspace, calendar access, or a staff role. Those permissions are approved separately.</p><a className="text-button" href="/app/creator-recovery">Creator recovery</a></section></main>;
+  return <main className="production-auth"><section className="production-auth-card compass-signin"><div className="compass-signin__identity"><div className="compass-signin__emblem" aria-hidden="true"><img src={assetUrl("/assets/brand/compass-emblem-v2.png")} alt="" /></div><div className="compass-signin__hero-copy"><p className="compass-signin__eyebrow">Roseman University student support</p><h1>Compass</h1><p className="compass-signin__services">Advising <span>·</span> Tutoring <span>·</span> Events</p><p className="compass-signin__introduction">Sign in once to reach your assigned support and workspaces.</p></div></div><div className="sso-coming-soon" role="note"><strong>Roseman Microsoft SSO</strong><span>Live sign-in available</span><small>Your Roseman identity and the approved Compass roster are separate access checks.</small></div><div className="production-form"><button type="button" className="primary-button" onClick={() => void signIn()} disabled={busy}>{busy ? "Opening Microsoft…" : "Sign in with Roseman Microsoft"}</button><p className="form-message" aria-live="polite">{message}</p></div><div className="pathway-invite-note"><strong>Joining from another university?</strong><p>External pre-med students enter through an approved Pathway invitation. An email domain never creates access automatically.</p></div><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore the Compass demo</strong><small>Use fictional, role-scoped records while live Roseman sign-in remains available above.</small></span><span aria-hidden="true">→</span></a><p className="privacy-note">Signing in does not grant a workspace, calendar access, or a staff role. Those permissions are approved separately.</p><a className="text-button" href="/app/creator-recovery">Creator recovery</a></section></main>;
 }
 
 export function PasswordRecovery({ supabase, onComplete }: { supabase: SupabaseClient; onComplete: () => void }) {
@@ -177,29 +177,16 @@ export function PasswordRecoveryProblem({ supabase, detail }: { supabase: Supaba
 }
 
 export function MfaGate({ supabase, onVerified }: { supabase: SupabaseClient; onVerified: () => void }) {
-  const [enrollment, setEnrollment] = useState<AuthMFAEnrollResponse["data"] | null>(null);
-  const [code, setCode] = useState("");
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const begin = async () => {
-    setBusy(true); setMessage("");
-    const factors = await supabase.auth.mfa.listFactors();
-    const verified = factors.data?.totp.find((factor) => factor.status === "verified");
-    if (verified) { setEnrollment({ id: verified.id, type: "totp", totp: { qr_code: "", secret: "", uri: "" }, friendly_name: verified.friendly_name }); setBusy(false); return; }
-    const result = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "Navigate" });
-    setBusy(false);
-    if (result.error) setMessage("A second factor could not be prepared. Contact the pilot administrator."); else setEnrollment(result.data);
-  };
-  const verify = async () => {
-    if (!enrollment || code.length < 6) return;
-    setBusy(true); setMessage("");
-    const challenge = await supabase.auth.mfa.challenge({ factorId: enrollment.id });
-    if (challenge.error) { setBusy(false); setMessage("The verification request could not be started."); return; }
-    const result = await supabase.auth.mfa.verify({ factorId: enrollment.id, challengeId: challenge.data.id, code });
-    setBusy(false);
-    if (result.error) setMessage("That code was not accepted. Try the current code from your authenticator."); else onVerified();
-  };
-  return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Staff security" title="Verify your second factor." body="Advisor and administrator dashboards require an authenticator code before student information is available." priority />{!enrollment ? <button className="primary-button" onClick={begin} disabled={busy}>{busy ? "Preparing..." : "Set up or verify MFA"}</button> : <div className="production-form">{"totp" in enrollment && enrollment.totp.qr_code ? <div className="mfa-qr" dangerouslySetInnerHTML={{ __html: enrollment.totp.qr_code }} /> : null}<label><span>Six-digit code</span><input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} /></label><button className="primary-button" onClick={verify} disabled={busy || code.length !== 6}>Verify</button></div>}<p className="form-message" aria-live="polite">{message}</p></section></main>;
+  void onVerified;
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      if (active) window.location.replace("/app?signin=1");
+    })();
+    return () => { active = false; };
+  }, [supabase]);
+  return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Roseman SSO" title="Returning you to Roseman sign-in." body="This staff session has not completed the approved Roseman SSO check. Compass is signing you out so you can continue through the Roseman sign-in button." priority /><p className="form-message" aria-live="polite">If the redirect does not start, <a className="text-button" href="/app?signin=1">return to Roseman SSO</a>.</p></section></main>;
 }
 
 function SurveyCards({ assignments, onOpen }: { assignments: SurveyAssignmentSummary[]; onOpen: (assignment: SurveyAssignmentSummary) => void }) {
@@ -477,3 +464,4 @@ export function ProductionPilotApp() {
   if (authState === "signed_out" || !session) return <SignIn supabase={supabase} />;
   return <WorkspaceNavigation key={session.user.id}><Dashboard session={session} supabase={supabase} /></WorkspaceNavigation>;
 }
+

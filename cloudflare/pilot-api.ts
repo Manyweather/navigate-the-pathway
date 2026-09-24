@@ -64,7 +64,7 @@ function corsHeaders(request: Request, env: Env): Record<string,string> {
   return origin ? {
     "access-control-allow-origin": origin,
     "access-control-allow-headers": "authorization, content-type, x-navigate-mode, x-navigate-experience",
-    "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "access-control-max-age": "86400",
     vary: "Origin",
   } : {};
@@ -389,6 +389,37 @@ async function upsertSsoRosterEntry(request: Request, env: Env, user: Authentica
     headers: { prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify({ organization_id: context.activeOrganizationId, program_id: context.activeProgramId, cohort_id: context.activeCohortId || null, email, display_name: displayName, roles, workspace_roles: workspaceRoles, status: "approved", source_id: body.sourceId || null, provenance: { source: "creator_roster", ...(typeof body.provenance === "object" && body.provenance ? body.provenance : {}) }, approved_by: user.id, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
   });
+  return rows;
+}
+
+async function updateSsoRosterEntry(request: Request, env: Env, user: AuthenticatedUser, context: AuthorizationContext, rosterEntryId: string, revoke = false) {
+  requireStaffMfa(user); requireCapability(context, "platform.creator"); requireCapability(context, "accounts.manage");
+  if (!context.activeOrganizationId || !/^[0-9a-f-]{36}$/i.test(rosterEntryId)) throw new HttpError(400, "Choose a valid roster entry.", "invalid_roster_entry");
+  const current = await serviceRest<Array<{ id: string; email: string; display_name: string; roles: string[]; workspace_roles: Record<string, string[]>; status: string }>>(
+    env,
+    `pilot_staff_roster_entries?id=eq.${encodeURIComponent(rosterEntryId)}&organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&select=id,email,display_name,roles,workspace_roles,status&limit=1`,
+  );
+  if (!current[0]) throw new HttpError(404, "That roster entry could not be found.", "roster_entry_not_found");
+  const body = revoke ? {} : await readBody(request);
+  const email = revoke ? current[0].email : String(body.email || current[0].email).trim().toLowerCase();
+  const displayName = revoke ? current[0].display_name : String(body.displayName || current[0].display_name).trim();
+  const roles = revoke ? current[0].roles : Array.isArray(body.roles) ? [...new Set(body.roles.map(String))] : current[0].roles;
+  const workspaceRoles = revoke ? current[0].workspace_roles : body.workspaceRoles && typeof body.workspaceRoles === "object" ? body.workspaceRoles : current[0].workspace_roles;
+  const allowedRoles = new Set(["advisor", "administrator", "faculty", "staff", "creator"]);
+  if (!email.endsWith("@roseman.edu") || !displayName || !roles.length || roles.some((role: string) => !allowedRoles.has(role))) throw new HttpError(400, "Enter one Roseman email, display name, and approved staff role.", "invalid_roster_entry");
+  for (const [workspace, assigned] of Object.entries(workspaceRoles)) {
+    if (!["pathway", "oaca", "genesis"].includes(workspace) || !Array.isArray(assigned) || assigned.some((role) => typeof role !== "string")) throw new HttpError(400, "Workspace roles are invalid.", "invalid_workspace_roles");
+  }
+  if ((revoke || !roles.includes("creator")) && current[0].roles.includes("creator")) {
+    const creators = await serviceRest<Array<{ id: string }>>(env, `pilot_staff_roster_entries?organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&status=eq.approved&roles=cs.%7Bcreator%7D&select=id`);
+    if (creators.length <= 1) throw new HttpError(409, "The last Creator cannot be revoked or downgraded.", "last_creator_protected");
+  }
+  const rows = await serviceRest(env, `pilot_staff_roster_entries?id=eq.${encodeURIComponent(rosterEntryId)}&organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}`, {
+    method: "PATCH",
+    headers: { prefer: "return=representation" },
+    body: JSON.stringify({ email, display_name: displayName, roles, workspace_roles: workspaceRoles, status: revoke ? "revoked" : "approved", updated_at: new Date().toISOString() }),
+  });
+  await serviceRest(env, "audit_events", { method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify({ organization_id: context.activeOrganizationId, actor_id: user.id, event_type: revoke ? "sso_roster_entry_revoked" : "sso_roster_entry_updated", subject_type: "sso_roster_entry", subject_id: rosterEntryId, metadata: { email, roles, workspaceRoles } }) });
   return rows;
 }
 
@@ -1929,6 +1960,11 @@ async function route(request: Request, env: Env) {
   if (url.pathname === "/api/admin/sso-access/roster" && request.method === "POST") {
     const context = await enrichPrincipalContext(env, user, await authorization(env, user));
     return json(await upsertSsoRosterEntry(request, env, user, context));
+  }
+  const rosterEdit = url.pathname.match(/^\/api\/admin\/sso-access\/roster\/([0-9a-f-]{36})$/i);
+  if (rosterEdit && (request.method === "PATCH" || request.method === "DELETE")) {
+    const context = await enrichPrincipalContext(env, user, await authorization(env, user));
+    return json(await updateSsoRosterEntry(request, env, user, context, rosterEdit[1], request.method === "DELETE"));
   }
   if (url.pathname === "/api/admin/sso-access/approve" && request.method === "POST") {
     const context = await enrichPrincipalContext(env, user, await authorization(env, user));
