@@ -68,6 +68,7 @@ export function PlatformAccess({ experience, children }: {
   const [authInitializationFailed, setAuthInitializationFailed] = useState(false);
   const [accessPending, setAccessPending] = useState(false);
   const [mfaVerified, setMfaVerified] = useState(false);
+  const [signInRequested, setSignInRequested] = useState(false);
   const api = useMemo(() => previewMode ? syntheticPreviewApi : supabase ? new PilotApiClient(supabase, undefined, experience) : null, [experience, previewMode, supabase]);
 
   useEffect(() => {
@@ -78,6 +79,12 @@ export function PlatformAccess({ experience, children }: {
         return;
       }
       const query = new URLSearchParams(window.location.search);
+      const requestedSignIn = query.get("signin") === "1";
+      if (requestedSignIn) {
+        clearStoredPreview(window.localStorage);
+        setSignInRequested(true);
+        window.history.replaceState({}, "", window.location.pathname);
+      }
       const requestedPreview = query.get("preview");
       const requestedDemoRole = query.get("demo");
       const storedPreview = window.localStorage.getItem(SYNTHETIC_PREVIEW_KEY) === "true";
@@ -176,6 +183,11 @@ export function PlatformAccess({ experience, children }: {
       }
     });
     void (async () => {
+      if (signInRequested) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+        if (active) { setSession(null); setAuthReady(true); }
+        return;
+      }
       if (recoveryError) {
         await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
         if (active) { setSession(null); setAuthReady(true); }
@@ -194,7 +206,7 @@ export function PlatformAccess({ experience, children }: {
       }
     })();
     return () => { active = false; window.clearTimeout(readinessTask); data.subscription.unsubscribe(); };
-  }, [previewMode, recoveryError, recoveryMode, supabase]);
+  }, [previewMode, recoveryError, recoveryMode, signInRequested, supabase]);
 
   const load = useCallback(async () => {
     if (!api || !session || recoveryMode) return;
@@ -251,6 +263,7 @@ export function PlatformAccess({ experience, children }: {
   if (configured === "error") return <ConfigurationRequired />;
   if (!supabase || configured === "loading") return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Navigate" title="Connecting your secure account…" /><InstallCompass compact /></section></main>;
   if (recoveryError) return <PasswordRecoveryProblem supabase={supabase} detail={recoveryError} />;
+  if (signInRequested && authReady) return <SignIn supabase={supabase} />;
   if (authInitializationFailed) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Compass" title="Secure sign-in did not finish." body="The identity service did not respond within 15 seconds." priority /><InstallCompass compact /><button className="primary-button" onClick={() => window.location.reload()}>Retry</button><a className="secondary-button" href="/app?signin=1">Return to sign in</a></section></main>;
   if (!authReady) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Compass" title="Validating your secure link…" /><InstallCompass compact /></section></main>;
   if (!session) return <SignIn supabase={supabase} />;
