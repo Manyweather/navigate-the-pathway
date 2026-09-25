@@ -49,3 +49,7 @@ yarn-error.log*
 *.tgz
 /tmp/
 /supabase/.temp/
+.sites-runtime/
+/artifacts/
+/deliverables/
+Compass_Roster09252026.docx
