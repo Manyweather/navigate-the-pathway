@@ -13,11 +13,12 @@ function isStandalone() {
   return window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
 }
 
-export function InstallCompass({ compact = false }: { compact?: boolean }) {
+export function InstallCompass({ compact = false, entry = false }: { compact?: boolean; entry?: boolean }) {
   const [state, setState] = useState<InstallState>("unavailable");
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [helpTopic, setHelpTopic] = useState<"phone" | "desktop" | null>(null);
 
   useEffect(() => {
     const initialize = window.setTimeout(() => {
@@ -50,7 +51,8 @@ export function InstallCompass({ compact = false }: { compact?: boolean }) {
     };
   }, []);
 
-  const install = async () => {
+  const install = async (topic: "phone" | "desktop") => {
+    setHelpTopic(topic);
     if (!promptEvent) {
       setHelpOpen((current) => !current);
       return;
@@ -68,19 +70,21 @@ export function InstallCompass({ compact = false }: { compact?: boolean }) {
     }
   };
 
-  return <div className={`compass-install${compact ? " compass-install--compact" : ""}`}>
+  return <div className={`compass-install${compact ? " compass-install--compact" : ""}${entry ? " compass-install--entry" : ""}`}>
     <div className="compass-install__actions">
-      <button type="button" className="secondary-button" onClick={() => void install()} aria-expanded={helpOpen}>
+      {entry ? <>
+        <button type="button" className="secondary-button" onClick={() => void install("phone")} aria-expanded={helpOpen && helpTopic === "phone"}>Add Compass to phone home screen</button>
+        <button type="button" className="secondary-button" onClick={() => void install("desktop")} aria-expanded={helpOpen && helpTopic === "desktop"}>Add Compass desktop shortcut</button>
+      </> : <button type="button" className="secondary-button" onClick={() => void install("phone")} aria-expanded={helpOpen}>
         {state === "installed" ? "Compass is on this device" : promptEvent ? "Add Compass to this device" : "Add Compass to home screen or desktop"}
-      </button>
+      </button>}
       <a className="text-button" href="/app?signin=1">Open Compass sign-in</a>
     </div>
     {message ? <p className="form-message" role="status">{message}</p> : null}
     {helpOpen || state === "unsupported" || state === "unavailable" ? <div className="compass-install__help" role="note">
       <strong>Add Compass without an install prompt</strong>
-      <p><b>iPhone or iPad:</b> open Compass in Safari, choose Share, then Add to Home Screen.</p>
-      <p><b>Android:</b> open the browser menu, then choose Install app or Add to Home screen.</p>
-      <p><b>Desktop:</b> choose the install icon or browser menu option to Install/Create shortcut. Safari users can bookmark the Compass sign-in page.</p>
+      {helpTopic === "desktop" || !entry ? <p><b>Desktop:</b> choose the install icon or browser menu option to Install/Create shortcut. Safari users can bookmark the Compass sign-in page.</p> : null}
+      {helpTopic === "phone" || !entry ? <><p><b>iPhone or iPad:</b> open Compass in Safari, choose Share, then Add to Home Screen.</p><p><b>Android:</b> open the browser menu, then choose Install app or Add to home screen.</p></> : null}
     </div> : null}
   </div>;
 }

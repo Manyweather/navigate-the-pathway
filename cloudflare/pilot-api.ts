@@ -399,6 +399,41 @@ async function upsertSsoRosterEntry(request: Request, env: Env, user: Authentica
   return rows;
 }
 
+const recoveryGateAttempts = new Map<string, { count: number; resetAt: number }>();
+const RECOVERY_GATE_WINDOW_MS = 10 * 60 * 1000;
+const RECOVERY_GATE_LIMIT = 5;
+
+async function secretMatches(candidate: string, expected: string) {
+  const encoder = new TextEncoder();
+  const [candidateHash, expectedHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(candidate)),
+    crypto.subtle.digest("SHA-256", encoder.encode(expected)),
+  ]);
+  const a = new Uint8Array(candidateHash); const b = new Uint8Array(expectedHash);
+  let difference = a.length ^ b.length;
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) difference |= (a[index] || 0) ^ (b[index] || 0);
+  return difference === 0;
+}
+
+async function creatorRecoveryGate(request: Request, env: Env) {
+  const values = env as unknown as Record<string, string | undefined>;
+  const key = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const now = Date.now();
+  const current = recoveryGateAttempts.get(key);
+  const attempt = current && current.resetAt > now ? current : { count: 0, resetAt: now + RECOVERY_GATE_WINDOW_MS };
+  if (attempt.count >= RECOVERY_GATE_LIMIT) {
+    await serviceRest(env, "audit_events", { method: "POST", body: JSON.stringify({ event_type: "creator_recovery_gate_failed", subject_type: "creator_recovery_gate", metadata: { rate_limited: true } }) }).catch(() => undefined);
+    return json({ ok: false, message: "The recovery gate could not be completed." }, 429, { "retry-after": String(Math.ceil((attempt.resetAt - now) / 1000)) });
+  }
+  attempt.count += 1; recoveryGateAttempts.set(key, attempt);
+  let passphrase = "";
+  try { const body = await request.json() as { passphrase?: unknown }; passphrase = typeof body.passphrase === "string" ? body.passphrase : ""; } catch { /* neutral failure below */ }
+  const expected = values.CREATOR_RECOVERY_GATE_SECRET || "";
+  const matched = Boolean(expected) && passphrase.length <= 256 && await secretMatches(passphrase, expected);
+  await serviceRest(env, "audit_events", { method: "POST", body: JSON.stringify({ event_type: matched ? "creator_recovery_gate_succeeded" : "creator_recovery_gate_failed", subject_type: "creator_recovery_gate", metadata: { rate_limited: false } }) }).catch(() => undefined);
+  return matched ? json({ ok: true }) : json({ ok: false, message: "The recovery gate could not be completed." }, 401);
+}
+
 type RosterImportRow = { email?: unknown; displayName?: unknown; roles?: unknown; workspaceRoles?: unknown; viewBundle?: unknown; roleTitle?: unknown; sourceId?: unknown };
 
 function normalizeRosterImport(rows: RosterImportRow[]) {
@@ -1896,6 +1931,7 @@ async function route(request: Request, env: Env) {
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request, env) });
   if (url.pathname === "/api/health") return json({ ok: true, environment: env.PILOT_ENVIRONMENT });
+  if (url.pathname === "/api/auth/creator-recovery-gate" && request.method === "POST") return creatorRecoveryGate(request, env);
   if (url.pathname === "/api/webhooks/oaca/sms" && request.method === "POST") return json(await receiveOacaSmsWebhook(request, env));
   if (url.pathname === "/api/webhooks/oaca/delivery" && request.method === "POST") return json(await receiveNotificationDeliveryWebhook(request, env));
 

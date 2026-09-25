@@ -147,7 +147,7 @@ test("password recovery takes priority over account loading and offers a safe pr
   assert.match(access, /recoveryError/);
   assert.match(access, /authReady/);
   assert.match(access, /signOut\(\{ scope: "local" \}\)/);
-  assert.match(access, /Open the Creator preview/);
+  assert.match(access, /Explore Compass demos/);
   assert.match(signIn, /supabase\.auth\.updateUser\(\{ password \}\)/);
   assert.match(signIn, /Set new password/);
   assert.match(signIn, /same_password/);
@@ -304,11 +304,11 @@ test("Compass is the published application identity and Creator Preview remains 
   assert.doesNotMatch(layout, /template: "%s \| Navigate"/);
   assert.match(appPage, /absolute: "Compass"/);
   assert.match(signIn, /href="\/app\?preview=creator"/);
-  assert.match(signIn, /Explore the Compass demo/);
+  assert.match(signIn, /Explore Compass demos/);
 });
 
 test("phone-first pilot screens include the required privacy and approval guardrails", async () => {
-  const [hub, oaca, engagement, genesis, worksheet, eventWorkspace, signInSource, styles, shell, assetUrl] = await Promise.all([
+  const [hub, oaca, engagement, genesis, worksheet, eventWorkspace, signInSource, install, styles, shell, assetUrl] = await Promise.all([
     readFile(new URL("../app/production/navigate-hub-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-compass-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-engagement-center.tsx", import.meta.url), "utf8"),
@@ -316,6 +316,7 @@ test("phone-first pilot screens include the required privacy and approval guardr
     readFile(new URL("../app/production/oaca-worksheet.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/oaca-event-workspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/production/production-pilot-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/production/install-compass.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/production/compass-platform-shell.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/asset-url.ts", import.meta.url), "utf8"),
@@ -327,8 +328,11 @@ test("phone-first pilot screens include the required privacy and approval guardr
   assert.doesNotMatch(signIn, /OACA Compass/);
   assert.doesNotMatch(signIn, /GENESIS/);
   assert.doesNotMatch(signIn, /ExperienceGraphic/);
-  assert.match(signIn, /Roseman Microsoft SSO/);
-  assert.match(signIn, /Live sign-in available/);
+  assert.match(signIn, /Roseman Single Sign On/);
+  assert.match(signIn, /Continue with Roseman Single Sign On/);
+  assert.match(signIn, /Prematriculating Student Access is Being Developed for Navigate the Pathway Students/);
+  assert.match(install, /Add Compass to phone home screen/);
+  assert.match(install, /Add Compass desktop shortcut/);
   assert.match(signIn, /sign-in is taking too long/i);
   assert.match(signIn, /\/app\/auth\/callback/);
   assert.doesNotMatch(signIn, /signInWithPassword|resetPasswordForEmail/);

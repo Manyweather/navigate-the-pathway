@@ -221,6 +221,11 @@
 .compass-install__help { display: grid; gap: .35rem; padding: .8rem 1rem; border: 1px solid rgba(121,16,52,.2); border-radius: .9rem; background: #fff8f1; color: #554540; font-size: .86rem; line-height: 1.45; }
 .compass-install__help strong { color: #791034; }
 .compass-install__help p { margin: 0; }
+.compass-install--entry { margin-top: 1.15rem; padding-top: 1rem; }
+.compass-install--entry .compass-install__actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.compass-install--entry .compass-install__actions .text-button { grid-column:1/-1; }
+.creator-recovery-link { display:inline-block; margin-top:1rem; color:#766b6d; font-size:.78rem; text-decoration:underline; text-underline-offset:.2em; }
+.creator-recovery-link:hover,.creator-recovery-link:focus-visible { color:#791034; }
 .production-recovery { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 1.25rem; }
 .production-recovery p { flex-basis: 100%; margin: 0; color: #625b57; font-size: .9rem; }
 .production-form { display: grid; gap: .9rem; margin-top: 1.25rem; }

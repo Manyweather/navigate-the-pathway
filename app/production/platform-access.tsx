@@ -264,7 +264,7 @@ export function PlatformAccess({ experience, children }: {
   if (accessPending) return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="idle" eyebrow="Roseman access" title="Your sign-in is verified and access is pending." body="A Compass Creator must match this Roseman identity to one approved staff roster entry before any workspace data is available." priority /><InstallCompass compact /><p className="form-message" role="status">{message}</p><button className="secondary-button" onClick={() => void supabase.auth.signOut()}>Sign out</button></section></main>;
   if (accountLoadFailed) return <main className="production-auth"><section className="production-auth-card">
     <RosieGuide pose="idle" compact eyebrow="Account connected" title="Your password was accepted." body="The expanded secure workspace is still being connected to this pilot. You can explore every new dashboard now with fictional records." priority />
-    <InstallCompass compact /><a className="preview-entry" href="/app?preview=creator"><span><strong>Open the Creator preview</strong><small>Compass, Navigate the Pathway, and Impact Studio with synthetic data only.</small></span><span aria-hidden="true">→</span></a>
+    <InstallCompass compact /><a className="preview-entry" href="/app?preview=creator"><span><strong>Explore Compass demos</strong><small>Compass, Navigate the Pathway, and Impact Studio with synthetic data only.</small></span><span aria-hidden="true">→</span></a>
     <button className="text-button" onClick={() => void supabase.auth.signOut()}>Return to sign in</button>
     <p className="form-message" aria-live="polite">{message}</p>
   </section></main>;
