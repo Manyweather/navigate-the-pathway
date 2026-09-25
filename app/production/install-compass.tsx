@@ -71,17 +71,18 @@ export function InstallCompass({ compact = false, entry = false }: { compact?: b
   };
 
   return <div className={`compass-install${compact ? " compass-install--compact" : ""}${entry ? " compass-install--entry" : ""}`}>
+    {entry ? <p className="compass-install__heading">Add Compass to your device</p> : null}
     <div className="compass-install__actions">
       {entry ? <>
-        <button type="button" className="secondary-button" onClick={() => void install("phone")} aria-expanded={helpOpen && helpTopic === "phone"}>Add Compass to phone home screen</button>
-        <button type="button" className="secondary-button" onClick={() => void install("desktop")} aria-expanded={helpOpen && helpTopic === "desktop"}>Add Compass desktop shortcut</button>
+        <button type="button" className="secondary-button" onClick={() => void install("phone")} aria-expanded={helpOpen && helpTopic === "phone"}>{state === "installed" ? "Compass is on this device" : "Add Compass to phone home screen"}</button>
+        <button type="button" className="secondary-button" onClick={() => void install("desktop")} aria-expanded={helpOpen && helpTopic === "desktop"}>{state === "installed" ? "Compass is on this device" : "Add Compass desktop shortcut"}</button>
       </> : <button type="button" className="secondary-button" onClick={() => void install("phone")} aria-expanded={helpOpen}>
         {state === "installed" ? "Compass is on this device" : promptEvent ? "Add Compass to this device" : "Add Compass to home screen or desktop"}
       </button>}
       <a className="text-button" href="/app?signin=1">Open Compass sign-in</a>
     </div>
     {message ? <p className="form-message" role="status">{message}</p> : null}
-    {helpOpen || state === "unsupported" || state === "unavailable" ? <div className="compass-install__help" role="note">
+    {helpOpen || (!entry && (state === "unsupported" || state === "unavailable")) ? <div className="compass-install__help" role="note">
       <strong>Add Compass without an install prompt</strong>
       {helpTopic === "desktop" || !entry ? <p><b>Desktop:</b> choose the install icon or browser menu option to Install/Create shortcut. Safari users can bookmark the Compass sign-in page.</p> : null}
       {helpTopic === "phone" || !entry ? <><p><b>iPhone or iPad:</b> open Compass in Safari, choose Share, then Add to Home Screen.</p><p><b>Android:</b> open the browser menu, then choose Install app or Add to home screen.</p></> : null}
