@@ -36,7 +36,7 @@ export type PlatformAccessValue = {
   context: AuthorizationContext;
   memberships: ExperienceMembership[];
   previewMode: boolean;
-  previewScope: "creator" | "compass" | "impact" | "facilities" | null;
+  previewScope: "creator" | "compass" | "impact" | "facilities" | "pathway" | "bundle" | null;
   previewPersona: SyntheticPersonaKey | null;
   setPreviewPersona: (persona: SyntheticPersonaKey) => void;
   signOut: () => Promise<void>;
@@ -53,7 +53,7 @@ export function PlatformAccess({ experience, children }: {
 }) {
   const [clientReady, setClientReady] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
-  const [previewScope, setPreviewScope] = useState<"creator" | "compass" | "impact" | "facilities" | null>(null);
+  const [previewScope, setPreviewScope] = useState<"creator" | "compass" | "impact" | "facilities" | "pathway" | "bundle" | null>(null);
   const [previewPersona, updatePreviewPersona] = useState<SyntheticPersonaKey>(() => getSyntheticPreviewPersona());
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -88,8 +88,10 @@ export function PlatformAccess({ experience, children }: {
           ? "facilities"
         : requestedPreview === "impact"
           ? "impact"
+        : requestedPreview === "pathway"
+          ? "pathway"
         : requestedPreview === "creator"
-          ? "creator"
+          ? (query.get("bundle") ? "creator" : "bundle")
           : storedPreview
             ? storedScope === "compass" ? "compass" : storedScope === "impact" ? "impact" : storedScope === "facilities" ? "facilities" : "creator"
             : null;
@@ -220,11 +222,14 @@ export function PlatformAccess({ experience, children }: {
     return () => window.clearTimeout(task);
   }, [load]);
 
+  if (previewMode && configured === "preview" && previewScope === "bundle") return <DemoBundlePicker />;
   if (previewMode && configured === "preview") {
     const compassPreviewRoles: SyntheticPersonaKey[] = ["compass_student", "peer_tutor", "tutoring_manager", "academic_advisor", "career_advisor", "compass_director"];
     const impactPreviewRoles = IMPACT_DEMO_PERSONAS.map((item) => item.key);
     const facilitiesPreviewRoles = FACILITIES_DEMO_PERSONAS.map((item) => item.key);
-    const scopedPersona = previewScope === "compass" && !compassPreviewRoles.includes(previewPersona)
+    const scopedPersona = previewScope === "pathway"
+      ? "pathway_student"
+      : previewScope === "compass" && !compassPreviewRoles.includes(previewPersona)
       ? "academic_advisor"
       : previewScope === "impact" && !impactPreviewRoles.includes(previewPersona)
         ? "impact_student"
@@ -272,4 +277,14 @@ export function PlatformAccess({ experience, children }: {
 
   const signOut = async () => { try { await api.request("/api/activity/signout", { method: "POST", body: {} }); } finally { await supabase.auth.signOut(); } };
   return <>{children({ session, supabase, api, context, memberships, previewMode: false, previewScope: null, previewPersona: null, setPreviewPersona: () => undefined, signOut })}</>;
+}
+
+function DemoBundlePicker() {
+  const bundles = [
+    { href: "/app/pathway?preview=pathway", title: "Navigate the Pathway", detail: "Pre-matriculation planning and pathway advising." },
+    { href: "/app/facilities?preview=facilities&demo=requester", title: "Facilities", detail: "Requests, spaces, work orders, and campus operations." },
+    { href: "/app/compass?preview=compass&demo=academic", title: "Compass Advising / Peer Tutoring", detail: "Student, academic advising, career advising, and tutoring views." },
+    { href: "/app/compass/impact?preview=impact&demo=student", title: "Impact Studio", detail: "Community initiative planning with synthetic records." },
+  ];
+  return <main className="production-auth"><section className="production-auth-card"><RosieGuide pose="tracks" eyebrow="Compass demos" title="Choose a workspace to explore." body="These previews use fictional records. Creator controls are available only after Roseman SSO and Creator authorization." />{bundles.map((bundle) => <a className="preview-entry" href={bundle.href} key={bundle.href}><span><strong>{bundle.title}</strong><small>{bundle.detail}</small></span><span aria-hidden="true">→</span></a>)}<InstallCompass compact /><a className="secondary-button" href="/app?signin=1">Return to staff sign in</a></section></main>;
 }

@@ -51,7 +51,7 @@ async function requireMembership(
     );
   if (
     membership.roles.some((role) => staffMfaRoles.has(role)) &&
-    services.user.aal !== "aal2"
+    !(services.user.mfaSatisfied ?? services.user.aal === "aal2")
   )
     throw new WorkspaceError(
       403,
@@ -270,7 +270,7 @@ async function platformAffiliations(services: ExperienceServices) {
 async function createFile(request: Request, services: ExperienceServices) {
   const body = await workspaceBody(request);
   const experienceKey = String(body.experienceKey || "") as ExperienceKey;
-  if (!["pathway", "oaca", "genesis"].includes(experienceKey))
+  if (!["pathway", "oaca", "genesis", "facilities"].includes(experienceKey))
     throw new WorkspaceError(400, "Choose a valid experience.");
   await requireMembership(request, services, experienceKey);
   const storagePath = String(body.storagePath || "");

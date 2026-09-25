@@ -65,7 +65,7 @@ type OacaView = "home" | "schedule" | "appointments" | "requirements" | "policie
 
 type CreatorActivity = { totalMs: number; locations: Record<string, number>; firstSeenAt: string; lastSeenAt: string };
 const creatorActivityKey = "navigate.creator.compass-time.v1";
-const oacaRoleLabels: Record<string, string> = { creator: "Creator", administrator: "Administrator", staff: "Staff", faculty: "Faculty", student: "Student", peer_tutor: "Peer Tutor", tutoring_manager: "Tutoring Manager" };
+const oacaRoleLabels: Record<string, string> = { creator: "Creator", administrator: "Administrator", staff: "Staff", faculty: "Faculty", student: "Student", peer_tutor: "Peer Tutor", tutoring_manager: "Tutoring Manager", academic_advisor: "Academic Advisor", career_advisor: "Career Advisor" };
 const oacaViewLabels: Record<OacaView, string> = { home: "Home", schedule: "Request appointment", appointments: "My visits", requirements: "Requirements", policies: "Policies", portfolio: "Portfolio", records: "Visit records", analytics: "Analytics", imports: "Data imports", settings: "Service configuration", schedule_student: "Schedule for student", tutor: "Tutor desk", events: "Events", notifications: "Notifications", checkin: "Check-in", outreach: "Events and outreach" };
 
 function readCreatorActivity(): CreatorActivity {
@@ -769,7 +769,7 @@ function OacaStaff({ api, supabase, context, data, mode, reload, view, setView }
   </section>;
 }
 
-function OacaWorkspace({ api, supabase, context, membership, memberships, previewMode, previewScope, previewPersona, setPreviewPersona, signOut }: { api: PilotApiClient; supabase: SupabaseClient; context: AuthorizationContext; membership: ExperienceMembership; memberships: ExperienceMembership[]; previewMode: boolean; previewScope: "creator" | "compass" | null; previewPersona: SyntheticPersonaKey | null; setPreviewPersona: (persona: SyntheticPersonaKey) => void; signOut: () => Promise<void> }) {
+function OacaWorkspace({ api, supabase, context, membership, memberships, previewMode, previewScope, previewPersona, setPreviewPersona, signOut }: { api: PilotApiClient; supabase: SupabaseClient; context: AuthorizationContext; membership: ExperienceMembership; memberships: ExperienceMembership[]; previewMode: boolean; previewScope: "creator" | "compass" | "impact" | "facilities" | "pathway" | "bundle" | null; previewPersona: SyntheticPersonaKey | null; setPreviewPersona: (persona: SyntheticPersonaKey) => void; signOut: () => Promise<void> }) {
   const [data, setData] = useState<Bootstrap>(emptyBootstrap);
   const [message, setMessage] = useState("Loading Compass…");
   const [view, setView] = useState<OacaView>("home");
@@ -781,6 +781,8 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
   useCreatorTimeTracking(membership.roles.includes("creator"), `Compass · ${oacaRoleLabels[mode] || mode} · ${oacaViewLabels[view]}`);
   const availableModes = [...new Set([
     ...membership.roles,
+    ...(membership.capabilities.includes("oaca.view.student") ? ["student"] : []),
+    ...(membership.capabilities.includes("oaca.view.peer_tutor") ? ["peer_tutor"] : []),
     ...(previewPersona === "peer_tutor" || data.currentProvider?.classification === "peer_tutor" ? ["peer_tutor"] : []),
     ...(previewPersona === "tutoring_manager" || membership.capabilities.includes("oaca.tutoring.manage") ? ["tutoring_manager"] : []),
   ])];
@@ -809,7 +811,7 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
     nudges: data.nudges.filter((nudge) => nudge.studentId === context.userId),
   };
   return <div className="navigate-platform navigate-platform--oaca">
-    <CreatorPreviewBanner persona={previewPersona} onPersona={setPreviewPersona} onExit={() => void signOut()} scope={previewScope || "creator"} tutorialWorkspace="compass" />
+    <CreatorPreviewBanner persona={previewPersona} onPersona={setPreviewPersona} onExit={() => void signOut()} scope={previewScope === "compass" ? "compass" : "creator"} tutorialWorkspace="compass" />
     <ExperienceHeader api={api} context={context} memberships={memberships} previewMode={previewMode} studentNavigation={mode === "student" ? { view, unreadCount: data.eventNotificationUnreadCount, onView: setView } : undefined} onSignOut={signOut} />
     <main className={`platform-main${staffTone ? ` staff-workspace-shell staff-workspace-shell--${staffTone}` : ""}`}>
       <nav className="experience-nav compass-role-nav" aria-label="Compass dashboard role">

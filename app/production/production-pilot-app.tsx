@@ -33,7 +33,7 @@ import { RolePrivileges } from "./role-privileges";
 import { CreatorPreviewBanner, rememberWorkspace, useCreatorPreviewTimeTracking, WorkspaceSwitcher } from "./compass-platform-shell";
 import { InstallCompass } from "./install-compass";
 import type { ExperienceMembership } from "./platform-model";
-import { clearSyntheticPreview, getSyntheticPreviewPersona, isSyntheticPreviewActive, setSyntheticPreviewPersona, SYNTHETIC_PERSONAS, syntheticContextForPersona, syntheticMembershipsForPersona, syntheticPreviewApi, type SyntheticPersonaKey } from "./synthetic-preview";
+import { activateSyntheticPreview, clearSyntheticPreview, getSyntheticPreviewPersona, isSyntheticPreviewActive, setSyntheticPreviewPersona, SYNTHETIC_PERSONAS, syntheticContextForPersona, syntheticMembershipsForPersona, syntheticPreviewApi, type SyntheticPersonaKey } from "./synthetic-preview";
 
 type AuthState = "loading" | "signed_out" | "signed_in";
 type AdvisorView = "home" | "students" | "survey";
@@ -439,7 +439,13 @@ function PathwaySyntheticPreview() {
 }
 
 export function ProductionPilotApp() {
-  const [previewMode] = useState(() => isSyntheticPreviewActive());
+  const [previewMode] = useState(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "pathway") {
+      activateSyntheticPreview("pathway_student", "pathway");
+      return true;
+    }
+    return isSyntheticPreviewActive();
+  });
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [configurationError, setConfigurationError] = useState(false);
   const [authState, setAuthState] = useState<AuthState>("loading");

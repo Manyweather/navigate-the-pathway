@@ -210,6 +210,13 @@ export function setSyntheticPreviewPersona(persona: SyntheticPersonaKey) {
   );
 }
 
+export function activateSyntheticPreview(persona: SyntheticPersonaKey, scope = "creator") {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SYNTHETIC_PREVIEW_KEY, "true");
+  window.localStorage.setItem(SYNTHETIC_PREVIEW_SCOPE_KEY, scope);
+  window.localStorage.setItem(SYNTHETIC_PERSONA_KEY, persona);
+}
+
 export function isSyntheticPreviewActive() {
   return (
     typeof window !== "undefined" &&

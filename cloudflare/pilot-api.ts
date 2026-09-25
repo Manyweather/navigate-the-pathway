@@ -369,7 +369,7 @@ async function ssoAccessOverview(env: Env, user: AuthenticatedUser, context: Aut
   if (!context.activeOrganizationId) throw new HttpError(409, "Choose an active organization.", "active_organization_required");
   const [pending, roster] = await Promise.all([
     serviceRest(env, "pilot_pending_sso_identities?select=auth_user_id,email,sso_provider_id,display_name,status,matched_roster_entry_id,first_seen_at,last_seen_at,reviewed_at&order=last_seen_at.desc"),
-    serviceRest(env, `pilot_staff_roster_entries?organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&select=id,email,display_name,roles,workspace_roles,status,source_id,provenance,approved_at,updated_at&order=display_name`),
+    serviceRest(env, `pilot_staff_roster_entries?organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&select=id,email,display_name,role_title,roles,workspace_roles,view_bundle,status,source_id,provenance,approved_at,updated_at&order=display_name`),
   ]);
   return { pending, roster };
 }
@@ -382,33 +382,89 @@ async function upsertSsoRosterEntry(request: Request, env: Env, user: Authentica
   const displayName = String(body.displayName || "").trim();
   const roles = Array.isArray(body.roles) ? [...new Set(body.roles.map(String))] : [];
   const workspaceRoles = body.workspaceRoles && typeof body.workspaceRoles === "object" ? body.workspaceRoles : { oaca: ["advisor"] };
-  const allowedRoles = new Set(["advisor", "administrator", "faculty", "staff", "creator"]);
-  if (!email.endsWith("@roseman.edu") || !displayName || !roles.length || roles.some((role) => !allowedRoles.has(role))) throw new HttpError(400, "Enter one Roseman email, display name, and approved staff role.", "invalid_roster_entry");
+  const viewBundle = body.viewBundle && typeof body.viewBundle === "object" ? body.viewBundle : {};
+  const roleTitle = String(body.roleTitle || "").trim() || null;
+  const allowedRoles = new Set(["advisor", "administrator", "faculty", "staff", "creator", "principal_investigator"]);
+  const hasWorkspace = Object.values(workspaceRoles).some((assigned) => Array.isArray(assigned) && assigned.length > 0);
+  if (!email.endsWith("@roseman.edu") || !displayName || (!roles.length && !hasWorkspace) || roles.some((role) => !allowedRoles.has(role))) throw new HttpError(400, "Enter one Roseman email, display name, and a valid workspace access bundle.", "invalid_roster_entry");
+  for (const [workspace, assigned] of Object.entries(workspaceRoles)) {
+    if (!["pathway", "oaca", "genesis", "facilities"].includes(workspace) || !Array.isArray(assigned) || assigned.some((role) => typeof role !== "string")) throw new HttpError(400, "Workspace roles are invalid.", "invalid_workspace_roles");
+  }
   const rows = await serviceRest(env, "pilot_staff_roster_entries?on_conflict=organization_id,email&select=id,email,display_name,roles,workspace_roles,status", {
     method: "POST",
     headers: { prefer: "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify({ organization_id: context.activeOrganizationId, program_id: context.activeProgramId, cohort_id: context.activeCohortId || null, email, display_name: displayName, roles, workspace_roles: workspaceRoles, status: "approved", source_id: body.sourceId || null, provenance: { source: "creator_roster", ...(typeof body.provenance === "object" && body.provenance ? body.provenance : {}) }, approved_by: user.id, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+    body: JSON.stringify({ organization_id: context.activeOrganizationId, program_id: context.activeProgramId, cohort_id: context.activeCohortId || null, email, display_name: displayName, role_title: roleTitle, roles, workspace_roles: workspaceRoles, view_bundle: viewBundle, status: "approved", source_id: body.sourceId || null, provenance: { source: "creator_roster", ...(typeof body.provenance === "object" && body.provenance ? body.provenance : {}) }, approved_by: user.id, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
   });
+  await serviceRest(env, "audit_events", { method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify({ organization_id: context.activeOrganizationId, actor_id: user.id, event_type: "sso_roster_entry_updated", subject_type: "sso_roster_entry", subject_id: rows[0]?.id || null, metadata: { email, roles, workspaceRoles, viewBundle, roleTitle } }) });
   return rows;
+}
+
+type RosterImportRow = { email?: unknown; displayName?: unknown; roles?: unknown; workspaceRoles?: unknown; viewBundle?: unknown; roleTitle?: unknown; sourceId?: unknown };
+
+function normalizeRosterImport(rows: RosterImportRow[]) {
+  const seen = new Set<string>();
+  const errors: string[] = [];
+  const normalized = rows.map((row, index) => {
+    const email = String(row.email || "").trim().toLowerCase();
+    const displayName = String(row.displayName || "").trim();
+    const roles = Array.isArray(row.roles) ? [...new Set(row.roles.map(String))] : [];
+    const workspaceRoles = row.workspaceRoles && typeof row.workspaceRoles === "object" ? row.workspaceRoles : {};
+    if (!email.endsWith("@roseman.edu")) errors.push(`Row ${index + 1}: use a Roseman email address.`);
+    if (!displayName) errors.push(`Row ${index + 1}: display name is required.`);
+    if (seen.has(email)) errors.push(`Row ${index + 1}: duplicate email ${email}.`);
+    seen.add(email);
+    return { email, displayName, roles, workspaceRoles, viewBundle: row.viewBundle && typeof row.viewBundle === "object" ? row.viewBundle : {}, roleTitle: String(row.roleTitle || "").trim() || null, sourceId: String(row.sourceId || `compass-roster-${index + 1}`) };
+  });
+  return { normalized, errors };
+}
+
+async function bulkUpsertSsoRoster(request: Request, env: Env, user: AuthenticatedUser, context: AuthorizationContext) {
+  requireStaffMfa(user); requireCapability(context, "platform.creator"); requireCapability(context, "accounts.manage");
+  if (!context.activeOrganizationId) throw new HttpError(409, "Choose an active organization.", "active_organization_required");
+  const body = await readBody(request);
+  if (!Array.isArray(body.rows) || body.rows.length < 1 || body.rows.length > 500) throw new HttpError(400, "Provide between one and 500 roster rows.", "invalid_roster_import");
+  const { normalized, errors } = normalizeRosterImport(body.rows as RosterImportRow[]);
+  if (errors.length) throw new HttpError(400, errors.join(" "), "invalid_roster_import");
+  const allowedRoles = new Set(["advisor", "administrator", "faculty", "staff", "creator", "principal_investigator"]);
+  for (const row of normalized) {
+    if (row.roles.some((role) => !allowedRoles.has(role))) throw new HttpError(400, `Unsupported role in ${row.email}.`, "invalid_roster_import");
+    for (const [workspace, assigned] of Object.entries(row.workspaceRoles)) if (!["pathway", "oaca", "genesis", "facilities"].includes(workspace) || !Array.isArray(assigned) || assigned.some((role) => typeof role !== "string")) throw new HttpError(400, `Invalid workspace roles in ${row.email}.`, "invalid_roster_import");
+  }
+  const existing = await serviceRest<Array<{ id: string; email: string; display_name: string; roles: string[]; workspace_roles: Record<string, string[]>; role_title?: string | null; view_bundle?: Record<string, unknown> }>>(env, `pilot_staff_roster_entries?organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&email=in.(${normalized.map((row) => encodeURIComponent(row.email)).join(",")})&select=id,email,display_name,roles,workspace_roles,role_title,view_bundle`);
+  const existingByEmail = new Map(existing.map((row) => [row.email, row]));
+  const diff = normalized.map((row) => ({ email: row.email, action: existingByEmail.has(row.email) ? "update" : "create", prior: existingByEmail.get(row.email) || null }));
+  if (body.commit !== true) return { committed: false, count: normalized.length, diff };
+  const results = [];
+  for (const row of normalized) {
+    const current = existingByEmail.get(row.email);
+    const path = current ? `pilot_staff_roster_entries?id=eq.${encodeURIComponent(current.id)}&organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}` : "pilot_staff_roster_entries";
+    const saved = await serviceRest(env, path, { method: current ? "PATCH" : "POST", headers: { prefer: current ? "return=representation" : "return=representation,resolution=merge-duplicates" }, body: JSON.stringify({ organization_id: context.activeOrganizationId, program_id: context.activeProgramId, cohort_id: context.activeCohortId || null, email: row.email, display_name: row.displayName, role_title: row.roleTitle, roles: row.roles, workspace_roles: row.workspaceRoles, view_bundle: row.viewBundle, status: "approved", source_id: row.sourceId, provenance: { source: "creator_bulk_roster", importedAt: new Date().toISOString() }, approved_by: user.id, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+    results.push(saved);
+  }
+  await serviceRest(env, "audit_events", { method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify({ organization_id: context.activeOrganizationId, actor_id: user.id, event_type: "sso_roster_bulk_imported", subject_type: "organization", subject_id: context.activeOrganizationId, metadata: { count: normalized.length, emails: normalized.map((row) => row.email) } }) });
+  return { committed: true, count: results.length, results };
 }
 
 async function updateSsoRosterEntry(request: Request, env: Env, user: AuthenticatedUser, context: AuthorizationContext, rosterEntryId: string, revoke = false) {
   requireStaffMfa(user); requireCapability(context, "platform.creator"); requireCapability(context, "accounts.manage");
   if (!context.activeOrganizationId || !/^[0-9a-f-]{36}$/i.test(rosterEntryId)) throw new HttpError(400, "Choose a valid roster entry.", "invalid_roster_entry");
-  const current = await serviceRest<Array<{ id: string; email: string; display_name: string; roles: string[]; workspace_roles: Record<string, string[]>; status: string }>>(
+  const current = await serviceRest<Array<{ id: string; email: string; display_name: string; roles: string[]; workspace_roles: Record<string, string[]>; role_title?: string | null; view_bundle?: Record<string, unknown>; status: string }>>(
     env,
-    `pilot_staff_roster_entries?id=eq.${encodeURIComponent(rosterEntryId)}&organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&select=id,email,display_name,roles,workspace_roles,status&limit=1`,
+    `pilot_staff_roster_entries?id=eq.${encodeURIComponent(rosterEntryId)}&organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&select=id,email,display_name,role_title,roles,workspace_roles,view_bundle,status&limit=1`,
   );
   if (!current[0]) throw new HttpError(404, "That roster entry could not be found.", "roster_entry_not_found");
   const body = revoke ? {} : await readBody(request);
   const email = revoke ? current[0].email : String(body.email || current[0].email).trim().toLowerCase();
   const displayName = revoke ? current[0].display_name : String(body.displayName || current[0].display_name).trim();
   const roles = revoke ? current[0].roles : Array.isArray(body.roles) ? [...new Set(body.roles.map(String))] : current[0].roles;
+  const roleTitle = revoke ? null : body.roleTitle === undefined ? (current[0].role_title || null) : String(body.roleTitle || "").trim() || null;
   const workspaceRoles = revoke ? current[0].workspace_roles : body.workspaceRoles && typeof body.workspaceRoles === "object" ? body.workspaceRoles : current[0].workspace_roles;
-  const allowedRoles = new Set(["advisor", "administrator", "faculty", "staff", "creator"]);
-  if (!email.endsWith("@roseman.edu") || !displayName || !roles.length || roles.some((role: string) => !allowedRoles.has(role))) throw new HttpError(400, "Enter one Roseman email, display name, and approved staff role.", "invalid_roster_entry");
+  const viewBundle = revoke ? {} : body.viewBundle && typeof body.viewBundle === "object" ? body.viewBundle : (current[0].view_bundle || {});
+  const allowedRoles = new Set(["advisor", "administrator", "faculty", "staff", "creator", "principal_investigator"]);
+  const hasWorkspace = Object.values(workspaceRoles).some((assigned) => Array.isArray(assigned) && assigned.length > 0);
+  if (!email.endsWith("@roseman.edu") || !displayName || (!roles.length && !hasWorkspace) || roles.some((role: string) => !allowedRoles.has(role))) throw new HttpError(400, "Enter one Roseman email, display name, and a valid workspace access bundle.", "invalid_roster_entry");
   for (const [workspace, assigned] of Object.entries(workspaceRoles)) {
-    if (!["pathway", "oaca", "genesis"].includes(workspace) || !Array.isArray(assigned) || assigned.some((role) => typeof role !== "string")) throw new HttpError(400, "Workspace roles are invalid.", "invalid_workspace_roles");
+    if (!["pathway", "oaca", "genesis", "facilities"].includes(workspace) || !Array.isArray(assigned) || assigned.some((role) => typeof role !== "string")) throw new HttpError(400, "Workspace roles are invalid.", "invalid_workspace_roles");
   }
   if ((revoke || !roles.includes("creator")) && current[0].roles.includes("creator")) {
     const creators = await serviceRest<Array<{ id: string }>>(env, `pilot_staff_roster_entries?organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}&status=eq.approved&roles=cs.%7Bcreator%7D&select=id`);
@@ -417,7 +473,7 @@ async function updateSsoRosterEntry(request: Request, env: Env, user: Authentica
   const rows = await serviceRest(env, `pilot_staff_roster_entries?id=eq.${encodeURIComponent(rosterEntryId)}&organization_id=eq.${encodeURIComponent(context.activeOrganizationId)}`, {
     method: "PATCH",
     headers: { prefer: "return=representation" },
-    body: JSON.stringify({ email, display_name: displayName, roles, workspace_roles: workspaceRoles, status: revoke ? "revoked" : "approved", updated_at: new Date().toISOString() }),
+    body: JSON.stringify({ email, display_name: displayName, role_title: roleTitle, roles, workspace_roles: workspaceRoles, view_bundle: viewBundle, status: revoke ? "revoked" : "approved", updated_at: new Date().toISOString() }),
   });
   await serviceRest(env, "audit_events", { method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify({ organization_id: context.activeOrganizationId, actor_id: user.id, event_type: revoke ? "sso_roster_entry_revoked" : "sso_roster_entry_updated", subject_type: "sso_roster_entry", subject_id: rosterEntryId, metadata: { email, roles, workspaceRoles } }) });
   return rows;
@@ -1960,6 +2016,10 @@ async function route(request: Request, env: Env) {
   if (url.pathname === "/api/admin/sso-access/roster" && request.method === "POST") {
     const context = await enrichPrincipalContext(env, user, await authorization(env, user));
     return json(await upsertSsoRosterEntry(request, env, user, context));
+  }
+  if (url.pathname === "/api/admin/sso-access/roster/bulk" && request.method === "POST") {
+    const context = await enrichPrincipalContext(env, user, await authorization(env, user));
+    return json(await bulkUpsertSsoRoster(request, env, user, context));
   }
   const rosterEdit = url.pathname.match(/^\/api\/admin\/sso-access\/roster\/([0-9a-f-]{36})$/i);
   if (rosterEdit && (request.method === "PATCH" || request.method === "DELETE")) {
