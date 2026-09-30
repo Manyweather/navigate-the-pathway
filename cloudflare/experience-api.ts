@@ -1,4 +1,5 @@
 import type { AuthorizationContext } from "../app/production/types";
+import { sharedEventRoute } from "./shared-event-api";
 import { normalizeSessionCsv, type SessionImportOptions } from "../app/production/oaca-session-import";
 import type {
   ExperienceKey,
@@ -87,6 +88,7 @@ function requireCapability(
 }
 
 function requireAdvisorWorkspace(
+  services: ExperienceServices,
   membership: ExperienceMembership,
   workspace: string,
 ) {
@@ -96,11 +98,10 @@ function requireAdvisorWorkspace(
       400,
       "Choose an Academic or Career Advisor workspace.",
     );
-  if (
-    membership.roles.includes("creator") ||
-    membership.roles.includes("administrator")
-  )
-    return;
+  const elevated = membership.roles.includes("creator") || membership.roles.includes("administrator");
+  if (services.user.mode === "advisor" && elevated && workspace === "career")
+    throw new WorkspaceError(403, "Career Advisor access is available from Creator or Administrator view.");
+  if (elevated) return;
   requireCapability(membership, `oaca.advisor.${workspace}`, false);
 }
 
@@ -1121,6 +1122,14 @@ export async function experienceRoute(
       }),
     );
 
+  if (url.pathname.startsWith("/api/shared-events/")) {
+    const experience = request.headers.get("x-navigate-experience");
+    if (experience !== "oaca" && experience !== "genesis" && experience !== "facilities")
+      throw new WorkspaceError(403,"Open events from an assigned workspace.");
+    const membership = await requireMembership(request,services,experience);
+    return sharedEventRoute(request,services,membership);
+  }
+
   if (url.pathname.startsWith("/api/oaca/")) {
     const membership = await requireMembership(request, services, "oaca");
     if (url.pathname === "/api/oaca/bootstrap" && request.method === "GET")
@@ -1215,7 +1224,7 @@ export async function experienceRoute(
       request.method === "GET"
     ) {
       const workspace = url.searchParams.get("workspace") || "academic";
-      requireAdvisorWorkspace(membership, workspace);
+      requireAdvisorWorkspace(services, membership, workspace);
       return workspaceJson(
         await services.rpc("oaca_advisor_workspace", {
           payload: { workspace },
@@ -1227,7 +1236,7 @@ export async function experienceRoute(
       request.method === "GET"
     ) {
       const workspace = url.searchParams.get("workspace") || "academic";
-      requireAdvisorWorkspace(membership, workspace);
+      requireAdvisorWorkspace(services, membership, workspace);
       return workspaceJson(
         await services.rpc("oaca_advisor_get_availability", {
           payload: { workspace },
@@ -1243,7 +1252,7 @@ export async function experienceRoute(
         body.workspace ||
           (url.pathname.includes("career-roadmap") ? "career" : "academic"),
       );
-      requireAdvisorWorkspace(membership, workspace);
+      requireAdvisorWorkspace(services, membership, workspace);
       const routes: Record<string, { rpc: string; status?: number }> = {
         "/api/oaca/advisor/appointments": {
           rpc: "oaca_advisor_schedule",

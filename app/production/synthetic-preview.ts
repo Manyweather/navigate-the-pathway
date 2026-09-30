@@ -1,5 +1,5 @@
-import { demoOperations } from "./pilot-operations-demo";
 "use client";
+import { demoOperations } from "./pilot-operations-demo";
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import type { PilotApiClient } from "./api-client";
@@ -14,6 +14,7 @@ import { zonedLocalIso } from "./oaca-event-model";
 import type { OacaAudience } from "./oaca-engagement-model";
 import { experiences, type ExperienceMembership } from "./platform-model";
 import { organizationsForSelect } from "./student-organizations";
+import type { SharedEventWorkspace, SharedEventPlan, SharedEvaluation, SharedHandoff } from "./shared-event-model";
 import type { AuthorizationContext } from "./types";
 
 type RequestOptions = Omit<RequestInit, "body"> & { body?: unknown };
@@ -392,6 +393,7 @@ export function syntheticMembershipsForPersona(
         ["administrator"],
         ["genesis.admin", "genesis.review"],
       ),
+      membership("facilities",["requester"],["facilities.requests.own","facilities.reservations.own","facilities.inventory.request"]),
     ];
   if (persona === "community_liaison")
     return [
@@ -400,6 +402,7 @@ export function syntheticMembershipsForPersona(
         ["community_liaison"],
         ["genesis.review", "genesis.events.decide"],
       ),
+      membership("facilities",["requester"],["facilities.requests.own","facilities.reservations.own","facilities.inventory.request"]),
     ];
   if (persona === "facilities_requester")
     return [membership("facilities", ["requester"], ["facilities.requests.own", "facilities.reservations.own", "facilities.supplies.own", "facilities.inventory.department", "facilities.inventory.request"] )];
@@ -1149,6 +1152,7 @@ type SyntheticEventState = {
 
 const syntheticEventStorageKey = "navigate.compass.synthetic-events.v3";
 const syntheticImpactStorageKey = "navigate.compass.synthetic-impact.v1";
+const syntheticSharedEventStorageKey = "navigate.compass.shared-events.v1";
 const syntheticEncounterStorageKey = "navigate.compass.synthetic-encounters.v1";
 
 function defaultSyntheticEventState(): SyntheticEventState {
@@ -2482,6 +2486,13 @@ function defaultSyntheticImpactEvents(): SyntheticImpactEvent[] {
   ];
 }
 
+function defaultSharedEventWorkspace(): SharedEventWorkspace {
+  const organizationId = medicineOrganization?.id || "medicine-organization";
+  const impact: SharedEventPlan = {id:"shared-impact-1",organizationId,ownerExperience:"genesis",createdBy:"synthetic-impact-student",title:"Community resource exchange",kind:"community",objective:"Connect community partners with student-led resource navigation.",audience:"Students and invited community partners",startsAt:isoAt(12,11),endsAt:isoAt(12,13),status:"published",details:{partner:"Community library",location:"Summerlin · pending verification",estimatedCost:250,roleDuties:"Coordinate partners, access, student volunteers, and the closing report."},recurrence:{label:"Monthly series"}};
+  const oaca: SharedEventPlan = {id:"shared-oaca-1",organizationId,ownerExperience:"oaca",createdBy:"synthetic-platform-creator",title:"Career pathways panel",kind:"career",objective:"Help students compare practice settings and professional pathways.",audience:"Roseman medical students",startsAt:isoAt(6,15),endsAt:isoAt(6,17),status:"published",details:{location:"Summerlin · pending verification",estimatedCost:180},recurrence:{}};
+  return {events:[impact,oaca],occurrences:[{id:"shared-occurrence-1",eventId:impact.id,startsAt:impact.startsAt!,endsAt:impact.endsAt,status:"planned"},{id:"shared-occurrence-2",eventId:oaca.id,startsAt:oaca.startsAt!,endsAt:oaca.endsAt,status:"planned"}],facilitiesRequests:[{id:"shared-facility-1",eventId:impact.id,occurrenceId:"shared-occurrence-1",requestKind:"room",itemKey:null,quantity:null,description:"Community meeting room",status:"pending",decisionNote:null}],evaluations:[],handoffs:[],oacaOverlay:[{id:oaca.id,title:oaca.title,startsAt:oaca.startsAt!,endsAt:oaca.endsAt,location:oaca.details.location||null,source:"oaca"},{id:impact.id,title:impact.title,startsAt:impact.startsAt!,endsAt:impact.endsAt,location:impact.details.location||null,source:"genesis"}],possibleDuplicates:[]};
+}
+
 function genesisBootstrap(
   persona: SyntheticPersonaKey,
   affiliations: SyntheticAffiliation[],
@@ -2832,6 +2843,8 @@ class SyntheticPilotApi {
     impact_student: false,
   };
   private impactEvents = defaultSyntheticImpactEvents();
+  private sharedEvents = defaultSharedEventWorkspace();
+  private sharedEventsLoaded = false;
   private impactNotifications: SyntheticImpactNotification[] = [
     {
       id: "impact-notice-1",
@@ -2853,6 +2866,85 @@ class SyntheticPilotApi {
   private eventsLoaded = false;
   private tutoringState: SyntheticTutoringState = defaultSyntheticTutoringState();
   private tutoringLoaded = false;
+
+  private ensureSharedEventsLoaded() {
+    if (this.sharedEventsLoaded) return;
+    this.sharedEventsLoaded = true;
+    if (typeof window === "undefined") return;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(syntheticSharedEventStorageKey) || "null") as SharedEventWorkspace | null;
+      if (saved && Array.isArray(saved.events)) {
+        const defaults = defaultSharedEventWorkspace();
+        this.sharedEvents = {...defaults,...saved,events:mergeMissingExamples(saved.events,defaults.events,(item)=>item.id),oacaOverlay:(saved.oacaOverlay||defaults.oacaOverlay).map((item)=>({...item,source:item.source||defaults.oacaOverlay.find((defaultItem)=>defaultItem.id===item.id)?.source}))};
+      }
+    } catch { this.sharedEvents = defaultSharedEventWorkspace(); }
+  }
+  private saveSharedEvents() {
+    if (typeof window !== "undefined") window.localStorage.setItem(syntheticSharedEventStorageKey,JSON.stringify(this.sharedEvents));
+  }
+
+  private sharedEventRequest<T>(route:string, method:string, body:Record<string,unknown>, persona:SyntheticPersonaKey, context:AuthorizationContext):T {
+    const experience=persona.startsWith("impact_")||persona==="community_liaison"?"genesis":persona.startsWith("facilities_")?"facilities":"oaca";
+    const staff=persona!=="impact_student" && persona!=="compass_student";
+    if (route==="/api/shared-events/workspace" && method==="GET") {
+      if (experience==="facilities") return clone({...this.sharedEvents,events:[],occurrences:[],evaluations:[],handoffs:[],oacaOverlay:[],facilitiesRequests:this.sharedEvents.facilitiesRequests.filter((item)=>item.status==="pending")}) as T;
+      const visible=this.sharedEvents.events.filter((item)=>item.ownerExperience===experience&&(staff||item.status==="published"||item.createdBy===context.userId));
+      const safeEvents=staff?visible:visible.map((item)=>item.createdBy===context.userId?item:{...item,createdBy:"",objective:"",audience:"",details:{},recurrence:{}});
+      return clone({...this.sharedEvents,events:safeEvents,occurrences:this.sharedEvents.occurrences.filter((item)=>visible.some((event)=>event.id===item.eventId)),facilitiesRequests:staff?this.sharedEvents.facilitiesRequests.filter((item)=>visible.some((event)=>event.id===item.eventId)):[],evaluations:staff?this.sharedEvents.evaluations.filter((item)=>visible.some((event)=>event.id===item.eventId)):[],handoffs:staff?this.sharedEvents.handoffs.filter((item)=>visible.some((event)=>event.id===item.eventId)):[],possibleDuplicates:staff?this.sharedEvents.possibleDuplicates:[]}) as T;
+    }
+    if (route==="/api/shared-events/plan" && method==="POST") {
+      if (!staff && persona!=="impact_student") throw new Error("Only an authorized event organizer can make a request.");
+      const current=this.sharedEvents.events.find((item)=>item.id===body.eventId);
+      if (current && current.ownerExperience!==experience) throw new Error("Open this event from its own workspace.");
+      if (current && !staff && current.createdBy!==context.userId) throw new Error("Only the organizer may change this request.");
+      if (current && !["draft","requested"].includes(current.status) && !(current.status==="published"&&experience==="oaca"&&staff)) throw new Error("Published events require the event change workflow.");
+      const id=current?.id||`shared-demo-${crypto.randomUUID()}`;
+      const details=(body.details||{}) as SharedEventPlan["details"];
+      if(current?.status==="published"&&(current.title!==body.title||current.startsAt!==body.startsAt||current.endsAt!==(body.endsAt||null)||current.details.location!==details.location||JSON.stringify(current.details.facilities||[])!==JSON.stringify(details.facilities||[])))throw new Error("Published title, date, location, and Facilities needs require an event change review.");
+      const next:SharedEventPlan={id,organizationId:String(body.organizationId||medicineOrganization?.id||"demo-organization"),ownerExperience:experience as "oaca"|"genesis",createdBy:current?.createdBy||context.userId,title:String(body.title||""),kind:String(body.kind||"community"),objective:String(body.objective||""),audience:String(body.audience||""),startsAt:String(body.startsAt||""),endsAt:body.endsAt?String(body.endsAt):null,status:current?.status||"draft",details,recurrence:(body.recurrence||{}) as SharedEventPlan["recurrence"]};
+      if(current)this.sharedEvents.events=this.sharedEvents.events.map((item)=>item.id===id?next:item);else this.sharedEvents.events.unshift(next);
+      const dates=(body.occurrences||[]) as Array<{startsAt:string;endsAt?:string}>;
+      for(const item of dates) if(!this.sharedEvents.occurrences.some((row)=>row.eventId===id&&row.startsAt===item.startsAt))this.sharedEvents.occurrences.push({id:`shared-occurrence-${crypto.randomUUID()}`,eventId:id,startsAt:item.startsAt,endsAt:item.endsAt||null,status:"planned"});
+      this.saveSharedEvents();return clone(next) as T;
+    }
+    const event=this.sharedEvents.events.find((item)=>item.id===body.eventId);
+    if (route==="/api/shared-events/facilities/decide") {
+      if (experience!=="facilities"||persona==="facilities_requester")throw new Error("Facilities staff access required.");
+      const request=this.sharedEvents.facilitiesRequests.find((item)=>item.id===body.requestId);if(!request||request.status!=="pending")throw new Error("Request not pending.");
+      request.status=body.decision==="confirmed"?"confirmed":"declined";request.decisionNote=String(body.note||"");this.saveSharedEvents();return clone(request) as T;
+    }
+    if (!event || event.ownerExperience!==experience) throw new Error("Event not found in this workspace.");
+    if (route==="/api/shared-events/submit") {
+      if(event.status!=="draft"||event.createdBy!==context.userId)throw new Error("Only the organizer can submit a draft.");
+      event.status="requested";
+      for(const occurrence of this.sharedEvents.occurrences.filter((item)=>item.eventId===event.id))for(const need of event.details.facilities||[])this.sharedEvents.facilitiesRequests.push({id:`shared-facility-${crypto.randomUUID()}`,eventId:event.id,occurrenceId:occurrence.id,requestKind:need.kind,itemKey:need.itemKey||null,quantity:need.quantity||null,description:need.description,status:"pending",decisionNote:null});
+    } else if (route==="/api/shared-events/review") {
+      if(!["impact_administrator","community_liaison","platform_creator"].includes(persona))throw new Error("Impact reviewer access required.");
+      if(body.reviewKind==="liaison"&&event.status!=="mentor_approved")throw new Error("Mentor review comes first.");
+      if(body.reviewKind==="liaison"&&this.sharedEvents.facilitiesRequests.some((item)=>item.eventId===event.id&&item.status==="pending"))throw new Error("Facilities needs must be decided first.");
+      event.status=body.decision==="changes_requested"?"draft":body.reviewKind==="mentor"?"mentor_approved":"published";
+    } else if (route==="/api/shared-events/publish") {
+      if(!staff||event.status!=="requested"||(event.createdBy!==context.userId&&!["compass_director","platform_creator"].includes(persona)))throw new Error("This event is not ready to publish.");
+      if(this.sharedEvents.facilitiesRequests.some((item)=>item.eventId===event.id&&item.status==="pending"))throw new Error("Facilities requests remain pending.");
+      event.status="published";
+    } else if (route==="/api/shared-events/evaluation") {
+      if(event.createdBy!==context.userId)throw new Error("Only the organizer may complete the evaluation.");
+      const occurrence=this.sharedEvents.occurrences.find((item)=>item.id===body.occurrenceId&&item.eventId===event.id);if(!occurrence)throw new Error("Event date not found.");
+      const report:SharedEvaluation={eventId:event.id,occurrenceId:occurrence.id,registrations:Number(body.registrations),attendance:Number(body.attendance),estimatedCost:Number(body.estimatedCost),actualCost:Number(body.actualCost),goalsMet:String(body.goalsMet||""),partnerFeedback:String(body.partnerFeedback||""),coordination:String(body.coordination||""),keepNextTime:String(body.keepNextTime||""),changeNextTime:String(body.changeNextTime||""),purchaseNeeds:String(body.purchaseNeeds||""),completedAt:new Date().toISOString()};
+      this.sharedEvents.evaluations=this.sharedEvents.evaluations.filter((item)=>item.occurrenceId!==occurrence.id);this.sharedEvents.evaluations.push(report);
+    } else if(route==="/api/shared-events/handoff") {
+      if(event.createdBy!==context.userId)throw new Error("Only the organizer may prepare the handoff.");
+      const document=body.document as SharedHandoff["document"];
+      if(!document||Object.values(document).some((value)=>!String(value).trim()))throw new Error("Complete the handoff first.");
+      const version=this.sharedEvents.handoffs.filter((item)=>item.eventId===event.id).length+1;
+      this.sharedEvents.handoffs.unshift({id:`shared-handoff-${crypto.randomUUID()}`,eventId:event.id,version,status:"complete",document,successorEmail:null,createdAt:new Date().toISOString()});
+    } else if(route==="/api/shared-events/handoff/offer") {
+      if(event.createdBy!==context.userId)throw new Error("Only the organizer may offer the handoff.");
+      const handoff=this.sharedEvents.handoffs.find((item)=>item.id===body.handoffId&&item.eventId===event.id);if(!handoff||handoff.status!=="complete")throw new Error("Complete the handoff before entering an email.");handoff.status="offered";handoff.successorEmail=String(body.successorEmail||"");
+    } else throw new Error("Unknown shared event action.");
+    if(event.status==="published"&&event.startsAt){const summary={id:event.id,title:event.title,startsAt:event.startsAt,endsAt:event.endsAt,location:event.details.location||null,source:event.ownerExperience};this.sharedEvents.oacaOverlay=this.sharedEvents.oacaOverlay.filter((item)=>item.id!==event.id).concat(summary);}
+    this.saveSharedEvents();return clone(event) as T;
+  }
 
   private ensureEncountersLoaded() {
     if (this.encountersLoaded) return;
@@ -3073,6 +3165,7 @@ class SyntheticPilotApi {
   }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    this.ensureSharedEventsLoaded();
     this.ensureEventsLoaded();
     this.ensureImpactLoaded();
     this.ensureAdvisorLoaded();
@@ -3081,6 +3174,7 @@ class SyntheticPilotApi {
     const method = (options.method || "GET").toUpperCase();
     const persona = getSyntheticPreviewPersona();
     const context = syntheticContextForPersona(persona);
+    if (route.startsWith("/api/shared-events/")) return this.sharedEventRequest<T>(route,method,(options.body||{}) as Record<string,unknown>,persona,context);
     if(route==="/api/pilot/reports"){
       if(!context.experienceMemberships?.some(m=>m.roles.some(r=>["advisor","administrator","creator","staff","faculty"].includes(r)))&&context.principalType!=="creator"&&!context.roles.some(r=>r!=="student"))throw new Error("Staff reporting required.");
       const rows=this.appointments.map(a=>({id:a.id,kind:"visit",studentId:a.studentId,studentName:a.studentName,providerId:a.providerName||null,providerName:a.providerName||"",service:a.serviceName,topic:a.subject||"",campus:"Summerlin",location:a.modality==="in_person"?"Summerlin · pending verification":a.modality,startsAt:a.startsAt,status:a.status,attendance:null,scheduledMinutes:a.startsAt&&a.endsAt?(Date.parse(a.endsAt)-Date.parse(a.startsAt))/60000:0,reportedMinutes:null,source:"fictional demo",occurrenceId:null}));

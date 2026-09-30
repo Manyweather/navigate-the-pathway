@@ -15,6 +15,8 @@ export type WorkspaceUser = {
   token: string;
   aal: string;
   sessionId: string;
+  mode?: string;
+  mfaSatisfied?: boolean;
 };
 export type WorkspaceServices = CalendarServices & {
   user: WorkspaceUser;

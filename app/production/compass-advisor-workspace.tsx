@@ -196,6 +196,7 @@ type AdvisorView =
   | "templates";
 type LegacyView =
   | "events"
+  | "coordination"
   | "outreach"
   | "analytics"
   | "imports"
@@ -734,6 +735,7 @@ export function CompassAdvisorWorkspace({
     const next = {
       defaultDurationMinutes: Number(availabilityDuration),
       blocks: [...availabilitySettings.blocks, block],
+      exceptions: availabilitySettings.exceptions,
     };
     await saveAvailability(next, "Availability block added.");
   };
@@ -952,6 +954,12 @@ export function CompassAdvisorWorkspace({
       title: "Events",
       description: "Create and manage programs you coordinate",
       action: () => onOpenLegacy("events"),
+    },
+    {
+      key: "coordination",
+      title: "Event coordination",
+      description: "Shared requests, Facilities, calendar, and handoffs",
+      action: () => onOpenLegacy("coordination"),
     },
     {
       key: "outreach",

@@ -115,12 +115,10 @@ export function allowedAdvisorWorkspaces(input: {
   );
   const academic =
     elevated ||
-    input.capabilities.includes("oaca.advisor.academic") ||
-    input.providerServiceKeys?.includes("academic_advising");
+      input.capabilities.includes("oaca.advisor.academic");
   const career =
     elevated ||
-    input.capabilities.includes("oaca.advisor.career") ||
-    input.providerServiceKeys?.includes("career_advising");
+      input.capabilities.includes("oaca.advisor.career");
   return [academic ? "academic" : null, career ? "career" : null].filter(
     Boolean,
   ) as AdvisorWorkspaceKey[];

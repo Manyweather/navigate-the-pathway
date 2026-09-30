@@ -31,6 +31,7 @@ test("next-up fallback excludes historical and cancelled visits and returns the 
 });
 
 test("advisor workspace capabilities stay service-specific", () => {
+  assert.deepEqual(allowedAdvisorWorkspaces({roles:["advisor"],capabilities:["oaca.advisor.academic"],providerServiceKeys:["academic_advising","career_advising"]}), ["academic"]);
   assert.deepEqual(
     allowedAdvisorWorkspaces({
       roles: ["staff"],

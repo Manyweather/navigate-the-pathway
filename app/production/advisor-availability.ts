@@ -122,7 +122,7 @@ export function normalizeAdvisorAvailability(
               ? item.id
               : `availability-exception-${index + 1}`,
           date,
-          kind: item.kind === "remove" ? "remove" : "add",
+          kind: item.kind === "remove" ? "remove" as const : "add" as const,
           startsAt,
           endsAt,
           bufferMinutes: Math.min(

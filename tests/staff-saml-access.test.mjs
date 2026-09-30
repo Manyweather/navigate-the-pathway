@@ -43,10 +43,10 @@ test('exact SAML provider satisfies the database MFA gate while another provider
 });
 
 test('canonical Creator merge transfers ownership and leaves one active Creator permission',async()=>{
+  await db.query("select set_config('request.jwt.claim.sub',$1,false),set_config('request.jwt.claims',$2,false)",[gmail,JSON.stringify({sub:gmail,aal:'aal2'})]);
   const result=(await db.query("select public.pilot_merge_canonical_accounts($1,$2,$3,'backup-verified') result",[roseman,gmail,gmail])).rows[0].result;
   assert.equal(result.merged,true); assert.equal(result.oneCreatorVerified,true);
   assert.equal((await db.query("select count(*)::int count from public.permission_assignments where organization_id=$1 and permission_key='platform.creator' and revoked_at is null",[org])).rows[0].count,1);
   assert.equal((await db.query("select user_id from public.principal_assignments where organization_id=$1 and principal_type='creator' and revoked_at is null",[org])).rows[0].user_id,roseman);
   assert.equal((await db.query("select canonical_user_id from public.account_auth_identities where auth_user_id=$1",[gmail])).rows[0].canonical_user_id,roseman);
 });
-

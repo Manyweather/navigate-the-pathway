@@ -87,7 +87,9 @@ function PeerTutorHome({ data, onOpen, onSave, message }: { data: TutorBootstrap
   const [duration, setDuration] = useState<30 | 45 | 60>(60);
   const [modality, setModality] = useState("in_person");
   const [location, setLocation] = useState("Learning Commons");
-  const upcoming = [...data.sessions].filter((item) => new Date(item.endsAt).getTime() >= Date.now()).sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime()).slice(0, 3);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
+  const upcoming = [...data.sessions].filter((item) => new Date(item.endsAt).getTime() >= now).sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime()).slice(0, 3);
   const saveHomeAvailability = async (event: React.FormEvent) => {
     event.preventDefault();
     if (startsAt >= endsAt) return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PlatformAccess } from "./platform-access";
 import { CreatorPreviewBanner, useCreatorPreviewTimeTracking, useRememberWorkspace, WorkspaceSwitcher } from "./compass-platform-shell";
@@ -15,7 +15,7 @@ import {
   type ExperienceMembership,
   type OacaAppointmentState,
 } from "./platform-model";
-import type { PilotApiClient } from "./api-client";
+import { PilotApiClient } from "./api-client";
 import type { AuthorizationContext } from "./types";
 import { type OacaAggregateAnalytics, type OacaImportBatch } from "./oaca-import-center";
 import { OacaSessionCenter, OacaSessionInsights } from "./oaca-session-center";
@@ -30,6 +30,7 @@ import {
   type OacaNudgeSummary,
 } from "./oaca-engagement-center";
 import { CompassAdvisorWorkspace } from "./compass-advisor-workspace";
+import { SharedEventCoordination } from "./shared-event-coordination";
 import { PeerTutoringWorkspace } from "./peer-tutoring-workspace";
 import {
   availabilityTimeBand,
@@ -61,12 +62,12 @@ type Bootstrap = {
   eventNotificationUnreadCount: number;
   availabilitySlots?: OacaAvailabilitySlot[];
 };
-type OacaView = "home" | "schedule" | "appointments" | "requirements" | "policies" | "portfolio" | "records" | "analytics" | "imports" | "settings" | "schedule_student" | "tutor" | "events" | "notifications" | "checkin" | "outreach";
+type OacaView = "home" | "schedule" | "appointments" | "requirements" | "policies" | "portfolio" | "records" | "analytics" | "imports" | "settings" | "schedule_student" | "tutor" | "events" | "notifications" | "checkin" | "outreach" | "coordination";
 
 type CreatorActivity = { totalMs: number; locations: Record<string, number>; firstSeenAt: string; lastSeenAt: string };
 const creatorActivityKey = "navigate.creator.compass-time.v1";
 const oacaRoleLabels: Record<string, string> = { creator: "Creator", administrator: "Administrator", staff: "Staff", faculty: "Faculty", student: "Student", peer_tutor: "Peer Tutor", tutoring_manager: "Tutoring Manager", academic_advisor: "Academic Advisor", career_advisor: "Career Advisor" };
-const oacaViewLabels: Record<OacaView, string> = { home: "Home", schedule: "Request appointment", appointments: "My visits", requirements: "Requirements", policies: "Policies", portfolio: "Portfolio", records: "Visit records", analytics: "Analytics", imports: "Data imports", settings: "Service configuration", schedule_student: "Schedule for student", tutor: "Tutor desk", events: "Events", notifications: "Notifications", checkin: "Check-in", outreach: "Events and outreach" };
+const oacaViewLabels: Record<OacaView, string> = { home: "Home", schedule: "Request appointment", appointments: "My visits", requirements: "Requirements", policies: "Policies", portfolio: "Portfolio", records: "Visit records", analytics: "Analytics", imports: "Data imports", settings: "Service configuration", schedule_student: "Schedule for student", tutor: "Tutor desk", events: "Events", notifications: "Notifications", checkin: "Check-in", outreach: "Events and outreach", coordination:"Event coordination" };
 
 function readCreatorActivity(): CreatorActivity {
   const empty = { totalMs: 0, locations: {}, firstSeenAt: new Date().toISOString(), lastSeenAt: new Date().toISOString() };
@@ -753,13 +754,15 @@ function OacaStaff({ api, supabase, context, data, mode, reload, view, setView }
   </section>;
   if (view === "analytics") return <OacaSessionInsights api={api} onBack={() => setView("home")} />;
   if (view === "imports") return <OacaSessionCenter api={api} supabase={supabase} context={context} batches={data.importBatches} reload={reload} onBack={() => setView("home")} />;
-  if (view === "events" || view === "outreach") return <OacaEventsAndOutreach key={view} initialSection={view === "events" ? "event" : "nudge"} api={api} supabase={supabase} context={context} canManageOutreach={data.canManageOutreach} canManageImports={data.canManageImports} events={data.events} campaigns={data.campaigns} nudges={data.nudges} students={data.assignedStudents} providers={data.providers} services={data.services} audienceOptions={data.audienceOptions} reload={reload} onBack={() => setView("home")} />;
+  if (view === "coordination") return <SharedEventCoordination api={api} experience="oaca" userId={context.userId} canCreate canReview={["administrator","creator"].includes(mode)} previewMode={context.userId.startsWith("synthetic-")} onBack={() => setView("home")} />;
+  if (view === "events" || view === "outreach") return <OacaEventsAndOutreach key={view} initialSection={view === "events" ? "event" : "nudge"} api={api} supabase={supabase} context={context} canManageOutreach={data.canManageOutreach} canManageImports={data.canManageImports} events={data.events} campaigns={data.campaigns} nudges={data.nudges} students={data.assignedStudents} providers={data.providers} services={data.services} audienceOptions={data.audienceOptions} reload={reload} onCoordinate={() => setView("coordination")} onBack={() => setView("home")} />;
   if (view === "settings") return <section className="experience-panel"><button className="workspace-back text-button" onClick={() => setView("home")}>← Staff home</button><p className="kicker">Service configuration</p><h1>Policies received; operations still gated.</h1><div className="record-list">{(data.services.length ? data.services : fallbackServices).map((service) => <article key={service.key}><span className={`status-chip status-chip--${service.policyStatus === "live_approved" ? "confirmed" : "pending"}`}>{service.policyStatus.replaceAll("_", " ")}</span><h2>{service.name}</h2><p>{service.key === "peer_tutoring" ? "The 60-minute maximum, seven-day booking horizon, weekly and exam-block limits, 24-hour cancellation rule, capacity ranges, and no-show review are mapped." : "Required milestones and provider routing are mapped."}</p><small>Live activation still requires office hours, Outlook free/busy, remaining service values, and administrator approval.</small></article>)}</div><button className="secondary-button" onClick={() => setView("policies")}>Review mapped policies</button></section>;
   return <section className="experience-panel">
     <div className="experience-hero experience-hero--oaca"><div><p className="kicker">Compass staff workspace</p><h1>Today’s advising work.</h1><p>See only assigned students, service workload, and the records your capability bundle permits.</p></div><div className="hero-status"><strong>{data.appointments.length}</strong><p>appointments in your authorized scope</p></div></div>
     {mode === "creator" ? <CreatorTimePanel /> : null}
     <div className="home-action-grid home-action-grid--experience">
       <button onClick={() => setView("outreach")}><span>◉</span><strong>{data.canManageOutreach ? "Events and outreach" : "Appointment nudges"}</strong><small>{data.canManageOutreach ? "Events, rich email, forms, and insights" : "Remind assigned students to schedule"}</small></button>
+      <button onClick={() => setView("coordination")}><span>▣</span><strong>Event coordination</strong><small>Shared calendar, requests, Facilities, evaluations, and handoffs</small></button>
       {mode !== "administrator" ? <><button onClick={() => setView("schedule_student")}><span>＋</span><strong>Schedule for a student</strong><small>Assigned or explicitly authorized students</small></button><button onClick={() => setView("records")}><span>✎</span><strong>Visit records</strong><small>Completed sessions, notes, and student recaps</small></button></> : null}
       {data.canViewAnalytics ? <button onClick={() => setView("analytics")}><span>▥</span><strong>Service analytics</strong><small>Aggregate workload and cohort trends</small></button> : null}
       {data.canManageImports ? <button onClick={() => setView("imports")}><span>⇧</span><strong>Secure data imports</strong><small>Penji history and student metadata</small></button> : null}
@@ -774,7 +777,8 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
   const [message, setMessage] = useState("Loading Compass…");
   const [view, setView] = useState<OacaView>("home");
   const [mode, setMode] = useState<string>(previewPersona === "peer_tutor" ? "peer_tutor" : previewPersona === "tutoring_manager" ? "tutoring_manager" : membership.roles.includes("creator") ? "creator" : membership.roles.includes("student") ? "student" : membership.roles[0] || "staff");
-  const load = useCallback(async () => { try { setData(await api.request<Bootstrap>("/api/oaca/bootstrap")); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "Compass could not be loaded."); } }, [api]);
+  const roleApi = useMemo(() => !previewMode && mode === "advisor" ? new PilotApiClient(supabase, "advisor", "oaca") : api, [api, mode, previewMode, supabase]);
+  const load = useCallback(async () => { try { setData(await roleApi.request<Bootstrap>("/api/oaca/bootstrap")); setMessage(""); } catch (error) { setMessage(error instanceof Error ? error.message : "Compass could not be loaded."); } }, [roleApi]);
   useEffect(() => { const task = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(task); }, [load]);
   useRememberWorkspace(api, "compass", previewMode);
   useCreatorPreviewTimeTracking(previewMode, previewPersona, "compass", `${mode}:${view}`);
@@ -786,6 +790,9 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
     ...(previewPersona === "peer_tutor" || data.currentProvider?.classification === "peer_tutor" ? ["peer_tutor"] : []),
     ...(previewPersona === "tutoring_manager" || membership.capabilities.includes("oaca.tutoring.manage") ? ["tutoring_manager"] : []),
   ])];
+  const restrictAdvisorView = mode === "advisor" && membership.roles.some((role) => ["creator", "administrator"].includes(role));
+  const advisorRoles = restrictAdvisorView ? membership.roles.filter((role) => !["creator", "administrator"].includes(role)) : membership.roles;
+  const advisorCapabilities = restrictAdvisorView ? [...new Set([...membership.capabilities.filter((capability) => capability !== "oaca.advisor.career"), "oaca.advisor.academic"])] : membership.capabilities;
   const staff = mode !== "student" && mode !== "peer_tutor";
   const staffTone =
     mode === "student"
@@ -818,11 +825,11 @@ function OacaWorkspace({ api, supabase, context, membership, memberships, previe
         {availableModes.length > 1 ? <label><span>Viewing dashboard as</span><select value={mode} onChange={(event) => { setMode(event.target.value); setView("home"); }}>{availableModes.map((role) => <option key={role} value={role}>{oacaRoleLabels[role] || role.replaceAll("_", " ")}</option>)}</select></label> : <span className="status-chip">{oacaRoleLabels[mode] || mode.replaceAll("_", " ")} dashboard</span>}
       </nav>
       {message ? <p className="form-message" aria-live="polite">{message}</p> : null}
-      {mode === "peer_tutor" || mode === "tutoring_manager" ? <PeerTutoringWorkspace api={api} mode={mode} />
+      {mode === "peer_tutor" || mode === "tutoring_manager" ? <PeerTutoringWorkspace api={roleApi} mode={mode} />
         : staff ? view === "home"
-        ? <CompassAdvisorWorkspace api={api} data={data} roles={membership.roles} capabilities={membership.capabilities} reload={load} onOpenLegacy={setView} />
-        : <OacaStaff api={api} supabase={supabase} context={context} data={data} mode={mode} reload={load} view={view} setView={setView} />
-        : <OacaStudent api={api} supabase={supabase} context={context} data={studentData} view={view} setView={setView} reload={load} />}
+        ? <CompassAdvisorWorkspace api={roleApi} data={data} roles={advisorRoles} capabilities={advisorCapabilities} reload={load} onOpenLegacy={setView} />
+        : <OacaStaff api={roleApi} supabase={supabase} context={context} data={data} mode={mode} reload={load} view={view} setView={setView} />
+        : <OacaStudent api={roleApi} supabase={supabase} context={context} data={studentData} view={view} setView={setView} reload={load} />}
     </main>
   </div>;
 }

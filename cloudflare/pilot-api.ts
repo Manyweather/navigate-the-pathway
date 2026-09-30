@@ -353,6 +353,12 @@ async function prepareAuthenticatedUser(env: Env, user: AuthenticatedUser) {
   }
 
   await canonicalizeAuthenticatedUser(env, user);
+  if (user.authMethod === "sso/saml") {
+    const matches = await serviceRest<Array<{ matched_roster_entry_id: string }>>(env, `pilot_pending_sso_identities?auth_user_id=eq.${encodeURIComponent(user.authUserId)}&status=eq.approved&email=eq.${encodeURIComponent(user.email)}&sso_provider_id=eq.${encodeURIComponent(trustedProvider)}&select=matched_roster_entry_id&limit=1`);
+    const rosterId = matches[0]?.matched_roster_entry_id;
+    const approved = rosterId ? await serviceRest<Array<{ id: string }>>(env, `pilot_staff_roster_entries?id=eq.${encodeURIComponent(rosterId)}&status=eq.approved&email=eq.${encodeURIComponent(user.email)}&select=id&limit=1`) : [];
+    if (!approved.length) throw new HttpError(403, "Your Roseman sign-in is verified and awaiting Creator approval against the staff roster.", "access_pending");
+  }
   const profiles = await optionalServiceRest<Array<{ user_id: string }>>(env, `profiles?user_id=eq.${encodeURIComponent(user.id)}&status=in.(active,invited)&select=user_id&limit=1`, []);
   if (!profiles.length) {
     if (user.authMethod === "sso/saml") throw new HttpError(403, "Your Roseman sign-in is verified and awaiting Creator approval against the staff roster.", "access_pending");
@@ -390,7 +396,7 @@ async function upsertSsoRosterEntry(request: Request, env: Env, user: Authentica
   for (const [workspace, assigned] of Object.entries(workspaceRoles)) {
     if (!["pathway", "oaca", "genesis", "facilities"].includes(workspace) || !Array.isArray(assigned) || assigned.some((role) => typeof role !== "string")) throw new HttpError(400, "Workspace roles are invalid.", "invalid_workspace_roles");
   }
-  const rows = await serviceRest(env, "pilot_staff_roster_entries?on_conflict=organization_id,email&select=id,email,display_name,roles,workspace_roles,status", {
+  const rows = await serviceRest<Array<{ id: string }>>(env, "pilot_staff_roster_entries?on_conflict=organization_id,email&select=id,email,display_name,roles,workspace_roles,status", {
     method: "POST",
     headers: { prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify({ organization_id: context.activeOrganizationId, program_id: context.activeProgramId, cohort_id: context.activeCohortId || null, email, display_name: displayName, role_title: roleTitle, roles, workspace_roles: workspaceRoles, view_bundle: viewBundle, status: "approved", source_id: body.sourceId || null, provenance: { source: "creator_roster", ...(typeof body.provenance === "object" && body.provenance ? body.provenance : {}) }, approved_by: user.id, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }),

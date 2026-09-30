@@ -2329,3 +2329,23 @@ details.event-admin-card>summary { min-height:44px; display:flex; align-items:ce
 .facilities-supply-queue article>div:last-of-type { display:grid; justify-items:end; gap:6px; }
 .facilities-supply-queue details { grid-column:1/-1; border-top:1px solid #d7e0e4; padding-top:8px; }
 @media(max-width:820px) { .facilities-notification-panel { position:fixed; top:86px; left:14px; right:14px; width:auto; } .facilities-spec-grid { grid-template-columns:1fr; } .facilities-spec-list article { grid-template-columns:1fr; } .facilities-supply-queue>article { grid-template-columns:1fr; } .facilities-supply-queue article>div:last-of-type { justify-items:start; } }
+.workspace-help-actions { display: inline-flex; align-items: center; gap: .5rem; }
+.workspace-help-icon { display: inline-flex; align-items: center; gap: .35rem; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: .45rem .55rem; border-radius: .5rem; }
+.workspace-help-icon svg { width: 1.1rem; height: 1.1rem; flex: 0 0 auto; }
+.workspace-help-icon:hover, .workspace-help-icon:focus-visible { background: rgba(116, 12, 55, .08); outline: 2px solid #740c37; outline-offset: 2px; }
+.creator-dashboard-link { white-space: nowrap; }
+.creator-dashboard-nav { display: flex; gap: .5rem; }
+.creator-dashboard-nav button { border: 1px solid #d8c4cb; border-radius: .55rem; background: transparent; color: inherit; font: inherit; padding: .55rem .8rem; cursor: pointer; }
+.creator-dashboard-nav button.active { background: #740c37; border-color: #740c37; color: white; }
+.creator-notifications-list { display: grid; gap: .75rem; margin-top: 1rem; }
+.creator-notifications-list article { border: 1px solid #ddd5d8; border-radius: .75rem; padding: 1rem; background: white; }
+.creator-notifications-list article > div { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.creator-notifications-list article h3 { margin: .8rem 0 .35rem; }
+.creator-notifications-list article p { margin: 0 0 .6rem; white-space: pre-wrap; }
+.creator-notifications-list article time { color: #62575b; font-size: .9rem; }
+@media (max-width: 760px) {
+  .workspace-help-actions { gap: .15rem; }
+  .workspace-help-icon { flex-direction: column; font-size: .75rem; padding: .35rem; }
+  .creator-dashboard-nav { width: 100%; order: 4; }
+  .creator-dashboard-nav button { flex: 1; }
+}
